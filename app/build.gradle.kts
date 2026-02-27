@@ -4,9 +4,8 @@ plugins {
 
 android {
     namespace = "com.example.campus_event_org_hub"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
+
 
     defaultConfig {
         applicationId = "com.example.campus_event_org_hub"
