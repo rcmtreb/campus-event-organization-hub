@@ -8,14 +8,16 @@ public class Event implements Serializable {
     private String date;
     private String tags;
     private String organizer;
+    private String category; // Added for filtering
     private int imageResId;
 
-    public Event(String title, String description, String date, String tags, String organizer, int imageResId) {
+    public Event(String title, String description, String date, String tags, String organizer, String category, int imageResId) {
         this.title = title;
         this.description = description;
         this.date = date;
         this.tags = tags;
         this.organizer = organizer;
+        this.category = category;
         this.imageResId = imageResId;
     }
 
@@ -37,6 +39,10 @@ public class Event implements Serializable {
 
     public String getOrganizer() {
         return organizer;
+    }
+
+    public String getCategory() {
+        return category;
     }
 
     public int getImageResId() {

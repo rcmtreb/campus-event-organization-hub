@@ -3,106 +3,208 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#F5F5F5">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp"
-        tools:context=".EventDetailActivity">
+        android:orientation="vertical"
+        android:padding="8dp">
 
-        <TextView
-            android:id="@+id/detail_event_title"
-            android:layout_width="0dp"
+        <!-- Header Card: Image and Actions -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textAppearance="?attr/textAppearanceHeadline5"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/btn_bookmark"
-            tools:text="Event Title" />
+            android:layout_margin="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
 
-        <ImageButton
-            android:id="@+id/btn_bookmark"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_bookmark"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Bookmark"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/btn_share" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-        <ImageButton
-            android:id="@+id/btn_share"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_share"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Share"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+                <ImageView
+                    android:id="@+id/detail_event_image"
+                    android:layout_width="match_parent"
+                    android:layout_height="200dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_image_placeholder" />
 
-        <TextView
-            android:id="@+id/detail_event_date"
-            android:layout_width="wrap_content"
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/detail_event_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_toStartOf="@id/action_buttons"
+                        android:textAppearance="?attr/textAppearanceHeadline5"
+                        android:textColor="@android:color/black"
+                        android:textStyle="bold"
+                        tools:text="Event Title" />
+
+                    <LinearLayout
+                        android:id="@+id/action_buttons"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:orientation="horizontal">
+
+                        <ImageButton
+                            android:id="@+id/btn_bookmark"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Bookmark"
+                            android:src="@drawable/ic_bookmark"
+                            app:tint="@android:color/black" />
+
+                        <ImageButton
+                            android:id="@+id/btn_share"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Share"
+                            android:src="@drawable/ic_share"
+                            app:tint="@android:color/black" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/detail_event_date"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@id/detail_event_title"
+                        android:layout_marginTop="8dp"
+                        android:drawablePadding="8dp"
+                        android:textAppearance="?attr/textAppearanceCaption"
+                        android:textColor="@android:color/black"
+                        tools:text="March 15, 2026 • 10:00 AM" />
+
+                </RelativeLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Description Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?attr/textAppearanceCaption"
-            app:layout_constraintTop_toBottomOf="@id/detail_event_title"
-            app:layout_constraintStart_toStartOf="parent"
-            tools:text="Event Date" />
+            android:layout_margin="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
 
-        <TextView
-            android:id="@+id/detail_event_description"
-            android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="About this Event"
+                    android:textAppearance="?attr/textAppearanceSubtitle1"
+                    android:textColor="@android:color/black"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/detail_event_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="4dp"
+                    android:textAppearance="?attr/textAppearanceBody1"
+                    android:textColor="@android:color/black"
+                    tools:text="Detailed event description goes here. This explains what the event is about and why students should join." />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Tags Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:textAppearance="?attr/textAppearanceBody1"
-            app:layout_constraintTop_toBottomOf="@id/detail_event_date"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            tools:text="Detailed event description goes here. It can be a long text spanning multiple lines." />
+            android:layout_margin="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
 
-        <TextView
-            android:id="@+id/tags_label"
-            android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tags"
+                    android:textAppearance="?attr/textAppearanceSubtitle1"
+                    android:textColor="@android:color/black"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/detail_tags_chip_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Organizer Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Tags:"
-            android:textAppearance="?attr/textAppearanceHeadline6"
-            app:layout_constraintTop_toBottomOf="@id/detail_event_description"
-            app:layout_constraintStart_toStartOf="parent"/>
+            android:layout_margin="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
 
-        <TextView
-            android:id="@+id/detail_event_tags"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            app:layout_constraintTop_toTopOf="@id/tags_label"
-            app:layout_constraintBottom_toBottomOf="@id/tags_label"
-            app:layout_constraintStart_toEndOf="@id/tags_label"
-            app:layout_constraintEnd_toEndOf="parent"
-            tools:text="#tech #conference #students"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
 
-        <TextView
-            android:id="@+id/organizer_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Organizer:"
-            android:textAppearance="?attr/textAppearanceHeadline6"
-            app:layout_constraintTop_toBottomOf="@id/tags_label"
-            app:layout_constraintStart_toStartOf="parent"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Organizer Information"
+                    android:textAppearance="?attr/textAppearanceSubtitle1"
+                    android:textColor="@android:color/black"
+                    android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/detail_event_organizer"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            app:layout_constraintTop_toTopOf="@id/organizer_label"
-            app:layout_constraintBottom_toBottomOf="@id/organizer_label"
-            app:layout_constraintStart_toEndOf="@id/organizer_label"
-            app:layout_constraintEnd_toEndOf="parent"
-            tools:text="Computer Science Society"/>
+                <TextView
+                    android:id="@+id/detail_event_organizer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textAppearance="?attr/textAppearanceBody2"
+                    android:textColor="@android:color/black"
+                    android:textStyle="bold"
+                    tools:text="Computer Science Society" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+                <TextView
+                    android:id="@+id/detail_organizer_contact"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Contact: css@university.edu"
+                    android:textAppearance="?attr/textAppearanceCaption"
+                    android:textColor="@android:color/black" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Register Button -->
+        <Button
+            android:id="@+id/btn_register"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_margin="16dp"
+            android:text="Register for Event"
+            android:textAllCaps="false"
+            android:textSize="18sp"
+            app:cornerRadius="12dp" />
+
+    </LinearLayout>
 </ScrollView>
