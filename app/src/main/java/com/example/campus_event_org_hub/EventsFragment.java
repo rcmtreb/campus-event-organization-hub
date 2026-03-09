@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,15 +37,22 @@ public class EventsFragment extends Fragment {
 
         // Create sample data with categories
         eventList = new ArrayList<>();
-        eventList.add(new Event("Tech Summit 2026", "An annual conference about the future of technology.", "2026-03-15", "#tech #summit #students", "College of Engineering", "Academic", R.drawable.ic_image_placeholder));
-        eventList.add(new Event("Campus Art Fair", "Featuring artwork from students across all departments.", "2026-03-20", "#art #fair #creative", "Fine Arts Department", "Social", R.drawable.ic_image_placeholder));
-        eventList.add(new Event("Career Week", "Connect with top employers and find your dream job.", "2026-04-10", "#career #jobs #networking", "Career Services", "Academic", R.drawable.ic_image_placeholder));
-        eventList.add(new Event("Music Festival", "A weekend of live music from local and student bands.", "2026-04-25", "#music #festival #live", "Student Government", "Social", R.drawable.ic_image_placeholder));
-        eventList.add(new Event("Android Workshop", "Learn to build apps with modern tools.", "2026-05-05", "#android #coding #workshop", "Google Developer Group", "Workshop", R.drawable.ic_image_placeholder));
-        eventList.add(new Event("Basketball Finals", "Come and cheer for your favorite college team.", "2026-05-12", "#sports #basketball #finals", "Sports Council", "Sports", R.drawable.ic_image_placeholder));
+        eventList.add(new Event("Tech Summit 2026", "An annual conference about the future of technology.", "2026-03-15", "#tech #summit #students", "College of Engineering", "Academic", R.drawable.banner_tech_summit));
+        eventList.add(new Event("Campus Art Fair", "Featuring artwork from students across all departments.", "2026-03-20", "#art #fair #creative", "Fine Arts Department", "Social", R.drawable.banner_art_fair));
+        eventList.add(new Event("Career Week", "Connect with top employers and find your dream job.", "2026-04-10", "#career #jobs #networking", "Career Services", "Academic", R.drawable.banner_career_week));
+        eventList.add(new Event("Music Festival", "A weekend of live music from local and student bands.", "2026-04-25", "#music #festival #live", "Student Government", "Social", R.drawable.banner_music_festival));
+        eventList.add(new Event("Android Workshop", "Learn to build apps with modern tools.", "2026-05-05", "#android #coding #workshop", "Google Developer Group", "Workshop", R.drawable.banner_android_workshop));
+        eventList.add(new Event("Basketball Finals", "Come and cheer for your favorite college team.", "2026-05-12", "#sports #basketball #finals", "Sports Council", "Sports", R.drawable.banner_basketball_finals));
 
         adapter = new EventAdapter(eventList);
         recyclerView.setAdapter(adapter);
+
+        FloatingActionButton fab = view.findViewById(R.id.fab_create_event);
+        fab.setOnClickListener(v -> requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, new CreateEventFragment())
+                .addToBackStack(null)
+                .commit());
 
         // Setup Search
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {

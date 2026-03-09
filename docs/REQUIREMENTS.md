@@ -18,6 +18,7 @@
 ## 3. Constraints & Limitations
 * [cite_start]**Platform**: Exclusively an Android application[cite: 5].
 * [cite_start]**Access**: Restricted to UCC students and authorized personnel[cite: 23].
+* [cite_start]**UI Consistency**: Use stretchable 9-patch graphics (`.9.png`) for all card backgrounds, buttons, and containers to ensure visual integrity across different screen sizes.
 * [cite_start]**Connectivity**: High-dependency on internet access for real-time updates[cite: 24].
 * [cite_start]**Financials**: No processing of payments or fees[cite: 24].
 * [cite_start]**Academic Integration**: No connection to enrollment or grading systems[cite: 25].

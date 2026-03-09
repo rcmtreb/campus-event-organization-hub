@@ -201,9 +201,11 @@
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:layout_margin="16dp"
+            android:background="@drawable/bg_button_stretchable"
             android:text="Register for Event"
             android:textAllCaps="false"
             android:textSize="18sp"
+            app:backgroundTint="@null"
             app:cornerRadius="12dp" />
 
     </LinearLayout>

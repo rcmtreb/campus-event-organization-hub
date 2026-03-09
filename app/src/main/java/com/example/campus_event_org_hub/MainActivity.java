@@ -36,8 +36,8 @@ public class MainActivity extends AppCompatActivity {
                         selectedFragment = new EventsFragment();
                     } else if (itemId == R.id.nav_notifications) {
                         selectedFragment = new NotificationsFragment();
-                    } else if (itemId == R.id.nav_settings) {
-                        selectedFragment = new SettingsFragment();
+                    } else if (itemId == R.id.nav_menu) {
+                        selectedFragment = new MenuFragment();
                     }
 
                     if (selectedFragment != null) {
