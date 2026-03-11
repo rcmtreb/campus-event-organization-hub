@@ -1,6 +1,7 @@
-package com.example.campus_event_org_hub;
+package com.example.campus_event_org_hub.ui.events;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,6 +11,10 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.campus_event_org_hub.R;
+import com.example.campus_event_org_hub.model.Event;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +41,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         holder.title.setText(event.getTitle());
         holder.date.setText(event.getDate());
         holder.description.setText(event.getDescription());
-        holder.image.setImageResource(event.getImageResId());
+
+        if (event.getImagePath() != null && !event.getImagePath().isEmpty()) {
+            try {
+                holder.image.setImageURI(Uri.parse(event.getImagePath()));
+            } catch (Exception e) {
+                holder.image.setImageResource(R.drawable.ic_image_placeholder);
+            }
+        } else {
+            holder.image.setImageResource(R.drawable.ic_image_placeholder);
+        }
 
         holder.itemView.setOnClickListener(v -> {
             Intent intent = new Intent(v.getContext(), EventDetailActivity.class);
@@ -59,12 +73,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         @Override
         protected FilterResults performFiltering(CharSequence constraint) {
             List<Event> filteredList = new ArrayList<>();
-
             if (constraint == null || constraint.length() == 0) {
                 filteredList.addAll(eventListFull);
             } else {
                 String filterPattern = constraint.toString().toLowerCase().trim();
-
                 for (Event item : eventListFull) {
                     if (item.getTitle().toLowerCase().contains(filterPattern) || 
                         item.getDescription().toLowerCase().contains(filterPattern) ||
@@ -73,7 +85,6 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     }
                 }
             }
-
             FilterResults results = new FilterResults();
             results.values = filteredList;
             return results;
@@ -104,11 +115,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     }
 
     public static class EventViewHolder extends RecyclerView.ViewHolder {
-        TextView title;
-        TextView date;
-        TextView description;
+        TextView title, date, description;
         ImageView image;
-
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
             title = itemView.findViewById(R.id.event_title);

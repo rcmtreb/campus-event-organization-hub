@@ -93,7 +93,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
-                        android:text="Event Details"
+                        android:text="Event Information"
                         android:textColor="@android:color/black"
                         android:textSize="16sp"
                         android:textStyle="bold" />
@@ -104,12 +104,15 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
                         android:hint="Event Title *"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        app:hintTextColor="@color/black"
+                        app:placeholderTextColor="@color/black"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_title"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textColor="@color/black"
+                            android:textColorHint="#757575"
                             android:inputType="textCapWords" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -119,13 +122,15 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
                         android:hint="Description *"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        app:hintTextColor="@color/black"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_description"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="top"
                             android:textColor="@color/black"
+                            android:textColorHint="#757575"
                             android:inputType="textMultiLine"
                             android:lines="3"
                             android:maxLines="6" />
@@ -137,12 +142,14 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
                         android:hint="Date (YYYY-MM-DD) *"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        app:hintTextColor="@color/black"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_date"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textColor="@color/black"
+                            android:textColorHint="#757575"
                             android:inputType="date" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -152,12 +159,14 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
                         android:hint="Organizer / Department *"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        app:hintTextColor="@color/black"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_organizer"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textColor="@color/black"
+                            android:textColorHint="#757575"
                             android:inputType="textCapWords" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -167,12 +176,14 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="4dp"
                         android:hint="Tags (e.g. #tech #workshop)"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        app:hintTextColor="@color/black"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_tags"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textColor="@color/black"
+                            android:textColorHint="#757575"
                             android:inputType="text" />
                     </com.google.android.material.textfield.TextInputLayout>
 

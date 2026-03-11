@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">CEOH</string>
+    <string-array name="roles_array">
+        <item>Student</item>
+        <item>Officer</item>
+        <item>Admin</item>
+    </string-array>
+    <string-array name="departments_array">
+        <item>College of Computer Studies (CCS)</item>
+        <item>College of Engineering (COE)</item>
+        <item>College of Arts and Sciences (CAS)</item>
+        <item>College of Business and Accountancy (CBA)</item>
+        <item>College of Education (COED)</item>
+        <item>College of Criminology (COC)</item>
+        <item>College of Hospitality and Tourism Management (CHTM)</item>
+    </string-array>
 </resources>

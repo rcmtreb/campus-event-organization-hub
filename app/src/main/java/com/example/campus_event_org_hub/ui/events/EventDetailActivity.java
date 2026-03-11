@@ -1,5 +1,6 @@
-package com.example.campus_event_org_hub;
+package com.example.campus_event_org_hub.ui.events;
 
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.ContextThemeWrapper;
 import android.widget.Button;
@@ -9,6 +10,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.example.campus_event_org_hub.R;
+import com.example.campus_event_org_hub.model.Event;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
@@ -37,21 +41,23 @@ public class EventDetailActivity extends AppCompatActivity {
             ImageButton shareButton = findViewById(R.id.btn_share);
             Button registerButton = findViewById(R.id.btn_register);
 
-            eventImage.setImageResource(event.getImageResId());
+            if (event.getImagePath() != null && !event.getImagePath().isEmpty()) {
+                eventImage.setImageURI(Uri.parse(event.getImagePath()));
+            } else {
+                eventImage.setImageResource(R.drawable.ic_image_placeholder);
+            }
+
             title.setText(event.getTitle());
             date.setText(event.getDate());
             description.setText(event.getDescription());
             organizer.setText(event.getOrganizer());
-            
             organizerContact.setText("Contact: " + event.getOrganizer().toLowerCase().replace(" ", ".") + "@university.edu");
 
-            // Populate Chips with custom style
             String tagsString = event.getTags();
             if (tagsString != null && !tagsString.isEmpty()) {
                 String[] tagsArray = tagsString.split(" ");
                 for (String tag : tagsArray) {
                     if (!tag.trim().isEmpty()) {
-                        // Use ContextThemeWrapper to apply the style
                         Chip chip = new Chip(new ContextThemeWrapper(this, R.style.Widget_App_Chip_Detail), null, 0);
                         chip.setText(tag);
                         tagsChipGroup.addView(chip);
@@ -60,17 +66,10 @@ public class EventDetailActivity extends AppCompatActivity {
             }
 
             setTitle("Event Details");
-
-            bookmarkButton.setOnClickListener(v -> {
-                Toast.makeText(this, "Event saved to bookmarks!", Toast.LENGTH_SHORT).show();
-            });
-
-            shareButton.setOnClickListener(v -> {
-                Toast.makeText(this, "Sharing event: " + event.getTitle(), Toast.LENGTH_SHORT).show();
-            });
-
+            bookmarkButton.setOnClickListener(v -> Toast.makeText(this, "Event saved to bookmarks!", Toast.LENGTH_SHORT).show());
+            shareButton.setOnClickListener(v -> Toast.makeText(this, "Sharing event: " + event.getTitle(), Toast.LENGTH_SHORT).show());
             registerButton.setOnClickListener(v -> {
-                Toast.makeText(this, "Successfully registered for " + event.getTitle() + "!", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Successfully registered!", Toast.LENGTH_LONG).show();
                 registerButton.setEnabled(false);
                 registerButton.setText("Registered");
             });

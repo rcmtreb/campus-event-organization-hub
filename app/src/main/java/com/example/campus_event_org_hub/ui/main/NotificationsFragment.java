@@ -1,4 +1,4 @@
-package com.example.campus_event_org_hub;
+package com.example.campus_event_org_hub.ui.main;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -9,6 +9,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.campus_event_org_hub.R;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,22 +33,12 @@ public class NotificationsFragment extends Fragment {
         items.add(new NotifItem("New Event Added",
                 "Android Workshop has been added to the events list.",
                 "Yesterday", false));
-        items.add(new NotifItem("Seats Filling Up",
-                "Only 10 seats left for Career Week. Register now!",
-                "2 days ago", false));
-        items.add(new NotifItem("Event Updated",
-                "Music Festival venue has been changed to the Main Auditorium.",
-                "3 days ago", false));
-        items.add(new NotifItem("Bookmark Reminder",
-                "Basketball Finals you bookmarked is in 3 days.",
-                "4 days ago", false));
 
         RecyclerView rv = view.findViewById(R.id.notifications_recycler);
         rv.setAdapter(new NotifAdapter(items));
         return view;
     }
 
-    // --- simple data class ---
     static class NotifItem {
         final String title, message, time;
         final boolean unread;
@@ -55,7 +48,6 @@ public class NotificationsFragment extends Fragment {
         }
     }
 
-    // --- inline adapter ---
     static class NotifAdapter extends RecyclerView.Adapter<NotifAdapter.VH> {
         private final List<NotifItem> items;
         NotifAdapter(List<NotifItem> items) { this.items = items; }
@@ -92,4 +84,3 @@ public class NotificationsFragment extends Fragment {
         }
     }
 }
-
