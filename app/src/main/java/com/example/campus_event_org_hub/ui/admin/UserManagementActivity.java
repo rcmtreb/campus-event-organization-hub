@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,6 +28,7 @@ public class UserManagementActivity extends AppCompatActivity {
     private DatabaseHelper db;
     private RecyclerView rv;
     private UserAdapter adapter;
+    private final List<User> userList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +46,7 @@ public class UserManagementActivity extends AppCompatActivity {
     }
 
     private void loadUsers() {
-        List<User> userList = new ArrayList<>();
+        userList.clear();
         Cursor cursor = db.getAllUsers();
         if (cursor != null && cursor.moveToFirst()) {
             do {
@@ -60,8 +62,12 @@ public class UserManagementActivity extends AppCompatActivity {
             } while (cursor.moveToNext());
             cursor.close();
         }
-        adapter = new UserAdapter(userList);
-        rv.setAdapter(adapter);
+        if (adapter == null) {
+            adapter = new UserAdapter(userList);
+            rv.setAdapter(adapter);
+        } else {
+            adapter.notifyDataSetChanged();
+        }
     }
 
     static class User {
@@ -75,10 +81,10 @@ public class UserManagementActivity extends AppCompatActivity {
         private final List<User> list;
         UserAdapter(List<User> list) { this.list = list; }
 
-        @NonNull
-        @Override
+        @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.user_list_item, parent, false);
+            View v = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.user_list_item, parent, false);
             return new VH(v);
         }
 
@@ -89,26 +95,49 @@ public class UserManagementActivity extends AppCompatActivity {
             h.details.setText(u.id + " | " + u.dept);
             h.role.setText(u.role);
 
-            // Load avatar
             if (h.avatar != null) {
                 ImageUtils.load(h.itemView.getContext(), h.avatar,
                         u.profileImg, R.drawable.ic_image_placeholder);
             }
 
+            // Tap row → change role
             h.itemView.setOnClickListener(v -> {
                 String newRole = u.role.equalsIgnoreCase("Student") ? "Officer" : "Student";
                 new AlertDialog.Builder(UserManagementActivity.this)
                         .setTitle("Change User Role")
-                        .setMessage("Do you want to change " + u.name + " to " + newRole + "?")
+                        .setMessage("Change " + u.name + " to " + newRole + "?")
                         .setPositiveButton("Yes", (dialog, which) -> {
                             db.updateUserRole(u.id, newRole);
                             u.role = newRole;
                             notifyItemChanged(pos);
-                            Toast.makeText(UserManagementActivity.this, "Role updated!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(UserManagementActivity.this,
+                                    "Role updated!", Toast.LENGTH_SHORT).show();
                         })
                         .setNegativeButton("Cancel", null)
                         .show();
             });
+
+            // Delete button
+            if (h.btnDelete != null) {
+                h.btnDelete.setOnClickListener(v -> {
+                    new AlertDialog.Builder(UserManagementActivity.this)
+                            .setTitle("Delete Account")
+                            .setMessage("Permanently delete " + u.name + " (" + u.id + ")?\n\n"
+                                    + "This will also remove their registrations and notifications.")
+                            .setPositiveButton("Delete", (dialog, which) -> {
+                                db.deleteUserAccount(u.id);
+                                int idx = list.indexOf(u);
+                                if (idx >= 0) {
+                                    list.remove(idx);
+                                    notifyItemRemoved(idx);
+                                }
+                                Toast.makeText(UserManagementActivity.this,
+                                        u.name + " deleted.", Toast.LENGTH_SHORT).show();
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                });
+            }
         }
 
         @Override
@@ -117,12 +146,14 @@ public class UserManagementActivity extends AppCompatActivity {
         class VH extends RecyclerView.ViewHolder {
             TextView name, details, role;
             ShapeableImageView avatar;
+            ImageButton btnDelete;
             VH(View v) {
                 super(v);
-                name    = v.findViewById(R.id.user_item_name);
-                details = v.findViewById(R.id.user_item_details);
-                role    = v.findViewById(R.id.user_item_role);
-                avatar  = v.findViewById(R.id.user_item_avatar);
+                name      = v.findViewById(R.id.user_item_name);
+                details   = v.findViewById(R.id.user_item_details);
+                role      = v.findViewById(R.id.user_item_role);
+                avatar    = v.findViewById(R.id.user_item_avatar);
+                btnDelete = v.findViewById(R.id.btn_delete_user);
             }
         }
     }

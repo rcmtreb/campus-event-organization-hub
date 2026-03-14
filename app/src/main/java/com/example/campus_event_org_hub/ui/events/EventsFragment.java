@@ -118,14 +118,10 @@ public class EventsFragment extends Fragment {
 
     // ── Data loading ─────────────────────────────────────────────────────────
 
-    /** First-time load — seeds default events if the table is empty. */
+    /** Load events from DB. */
     private void loadEvents() {
         try {
             eventList = dbHelper.getAllEvents();
-            if (eventList == null || eventList.isEmpty()) {
-                addDefaultEvents();
-                eventList = dbHelper.getAllEvents();
-            }
             if (eventList == null) eventList = new ArrayList<>();
 
             String sid = getArguments() != null
@@ -163,27 +159,5 @@ public class EventsFragment extends Fragment {
         super.onResume();
         // Keep list fresh when user navigates back (e.g. after admin approved/cancelled events)
         if (adapter != null) reloadEvents();
-    }
-
-    private void addDefaultEvents() {
-        try {
-            dbHelper.addEvent(new Event("Tech Summit 2026",
-                    "An annual conference about the future of technology, innovation, and engineering. " +
-                    "Join industry leaders, faculty, and students for talks, workshops, and networking.",
-                    "2026-03-15", "#tech #summit #engineering",
-                    "College of Engineering", "Academic", "", "APPROVED"));
-            dbHelper.addEvent(new Event("Campus Art Fair",
-                    "Featuring artwork from students across all departments. Explore paintings, sculptures, " +
-                    "digital art, and live performances throughout the campus grounds.",
-                    "2026-03-20", "#art #fair #culture",
-                    "Fine Arts Department", "Social", "", "APPROVED"));
-            dbHelper.addEvent(new Event("Career Week",
-                    "Connect with top employers and find your dream job. Attend mock interviews, resume " +
-                    "workshops, and company booths from leading local and international firms.",
-                    "2026-04-10", "#career #jobs #networking",
-                    "Career Services", "Academic", "", "APPROVED"));
-        } catch (Exception e) {
-            Log.e(TAG, "Error adding default events", e);
-        }
     }
 }

@@ -25,7 +25,10 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.google.android.material.button.MaterialButton;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -96,6 +99,40 @@ public class AdminEventControlActivity extends AppCompatActivity {
                     h.tvStatus.setBackgroundResource(R.color.primary_blue);
             }
 
+            // Timeline badge: UPCOMING / ENDED / POSTPONED (based on date + status)
+            String status = e.getStatus();
+            if ("POSTPONED".equals(status)) {
+                h.tvTimelineBadge.setText("POSTPONED");
+                h.tvTimelineBadge.setBackgroundResource(android.R.color.holo_purple);
+                h.tvTimelineBadge.setVisibility(View.VISIBLE);
+            } else if ("APPROVED".equals(status)) {
+                boolean isEnded = false;
+                try {
+                    Date eventDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                            .parse(e.getDate());
+                    // Strip time from today so we compare date only
+                    Calendar todayCal = Calendar.getInstance();
+                    todayCal.set(Calendar.HOUR_OF_DAY, 0);
+                    todayCal.set(Calendar.MINUTE, 0);
+                    todayCal.set(Calendar.SECOND, 0);
+                    todayCal.set(Calendar.MILLISECOND, 0);
+                    if (eventDate != null && eventDate.before(todayCal.getTime())) {
+                        isEnded = true;
+                    }
+                } catch (ParseException ignored) { }
+                if (isEnded) {
+                    h.tvTimelineBadge.setText("ENDED");
+                    h.tvTimelineBadge.setBackgroundResource(android.R.color.darker_gray);
+                } else {
+                    h.tvTimelineBadge.setText("UPCOMING");
+                    h.tvTimelineBadge.setBackgroundResource(android.R.color.holo_green_dark);
+                }
+                h.tvTimelineBadge.setVisibility(View.VISIBLE);
+            } else {
+                // PENDING, CANCELLED, or unknown — hide the timeline badge
+                h.tvTimelineBadge.setVisibility(View.GONE);
+            }
+
             h.btnEdit.setOnClickListener(v -> {
                 Intent intent = new Intent(AdminEventControlActivity.this,
                         AdminEditEventActivity.class);
@@ -117,17 +154,18 @@ public class AdminEventControlActivity extends AppCompatActivity {
         @Override public int getItemCount() { return events.size(); }
 
         class VH extends RecyclerView.ViewHolder {
-            TextView tvTitle, tvDate, tvStatus;
+            TextView tvTitle, tvDate, tvStatus, tvTimelineBadge;
             MaterialButton btnEdit, btnDelete, btnCancel, btnPostpone;
             VH(@NonNull View v) {
                 super(v);
-                tvTitle     = v.findViewById(R.id.tv_control_title);
-                tvDate      = v.findViewById(R.id.tv_control_date);
-                tvStatus    = v.findViewById(R.id.tv_control_status);
-                btnEdit     = v.findViewById(R.id.btn_edit_event);
-                btnDelete   = v.findViewById(R.id.btn_delete_event);
-                btnCancel   = v.findViewById(R.id.btn_cancel_event);
-                btnPostpone = v.findViewById(R.id.btn_postpone_event);
+                tvTitle         = v.findViewById(R.id.tv_control_title);
+                tvDate          = v.findViewById(R.id.tv_control_date);
+                tvStatus        = v.findViewById(R.id.tv_control_status);
+                tvTimelineBadge = v.findViewById(R.id.tv_timeline_badge);
+                btnEdit         = v.findViewById(R.id.btn_edit_event);
+                btnDelete       = v.findViewById(R.id.btn_delete_event);
+                btnCancel       = v.findViewById(R.id.btn_cancel_event);
+                btnPostpone     = v.findViewById(R.id.btn_postpone_event);
             }
         }
     }

@@ -162,11 +162,74 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureUsersTableColumns(db);
         ensureEventTableColumns(db);
         ensureNotificationsTable(db);
+        // Remove legacy seed events that were added automatically on first launch
+        removeSeedEvents(db);
+        // Backfill creator_sid for events created before v11 or synced without it
+        backfillCreatorSid(db);
         // Pass db directly — avoids recursive getWritableDatabase() call inside onOpen
         deleteEndedEventsOlderThan(db, 30);
     }
 
     // ── Defensive repair ─────────────────────────────────────────────────────
+
+    /** One-time cleanup: delete the three hard-coded seed events if they still exist. */
+    private void removeSeedEvents(SQLiteDatabase db) {
+        try {
+            String[] seedTitles = {"Tech Summit 2026", "Campus Art Fair", "Career Week"};
+            for (String title : seedTitles) {
+                db.delete(TABLE_EVENTS, COLUMN_TITLE + "=?", new String[]{title});
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "removeSeedEvents failed", e);
+        }
+    }
+
+    /**
+     * Backfill creator_sid for events that have an empty creator_sid.
+     * Parses the organizer column (format: "Name – Dept") and looks up the matching
+     * officer in the users table by name LIKE match. Updates the event row if found.
+     * This repairs events created before DB v11 or synced from Firestore without creator_sid.
+     */
+    private void backfillCreatorSid(SQLiteDatabase db) {
+        try {
+            // Find all events with empty creator_sid
+            Cursor events = db.rawQuery(
+                    "SELECT " + COLUMN_ID + ", " + COLUMN_ORGANIZER +
+                    " FROM " + TABLE_EVENTS +
+                    " WHERE " + COLUMN_CREATOR_SID + " IS NULL OR " + COLUMN_CREATOR_SID + " = ''",
+                    null);
+            if (events == null) return;
+            while (events.moveToNext()) {
+                int eventId   = events.getInt(0);
+                String org    = events.getString(1);
+                if (org == null || org.isEmpty()) continue;
+                // Extract name part before " – " or " - "
+                String namePart = org.split("[\u2013\\-]")[0].trim();
+                if (namePart.isEmpty()) continue;
+                // Find officer by name LIKE match (case-insensitive via SQLite default)
+                Cursor user = db.rawQuery(
+                        "SELECT " + COLUMN_USER_STUDENT_ID +
+                        " FROM " + TABLE_USERS +
+                        " WHERE " + COLUMN_USER_NAME + " LIKE ? LIMIT 1",
+                        new String[]{"%" + namePart + "%"});
+                if (user != null && user.moveToFirst()) {
+                    String sid = user.getString(0);
+                    if (sid != null && !sid.isEmpty()) {
+                        ContentValues cv = new ContentValues();
+                        cv.put(COLUMN_CREATOR_SID, sid);
+                        db.update(TABLE_EVENTS, cv,
+                                COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+                        Log.d("DatabaseHelper", "backfillCreatorSid: event " + eventId +
+                                " -> sid=" + sid + " (organizer=" + org + ")");
+                    }
+                    user.close();
+                }
+            }
+            events.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "backfillCreatorSid failed", e);
+        }
+    }
 
     private void ensureCoreTables(SQLiteDatabase db) {
         try {
@@ -634,6 +697,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
+     * Officer proposes/confirms a new date for a postponed event.
+     * Sets the event's date to the proposed date and restores status to APPROVED.
+     */
+    public boolean proposeNewDate(int eventId, String newDate) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_DATE,   newDate);
+            v.put(COLUMN_STATUS, "APPROVED");
+            int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
+                    new String[]{String.valueOf(eventId)});
+            db.close();
+            if (rows > 0) {
+                // Only update date + status in Firestore
+                new FirestoreHelper().updateEventDateAndStatus(eventId, newDate, "APPROVED");
+            }
+            return rows > 0;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "proposeNewDate failed", e);
+            return false;
+        }
+    }
+
+    /**
      * Updates editable event fields (title, description, date, time, tags, organizer, category).
      * Does NOT change status or creator_sid.
      */
@@ -734,6 +821,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             }
         } catch (Exception e) {
             Log.e("DatabaseHelper", "getEventsByOfficer failed", e);
+        }
+        return events;
+    }
+
+    public List<Event> getEventsByCreatorSid(String creatorSid) {
+        List<Event> events = new ArrayList<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT * FROM " + TABLE_EVENTS +
+                    " WHERE " + COLUMN_CREATOR_SID + " = ?" +
+                    " ORDER BY " + COLUMN_DATE + " ASC",
+                    new String[]{creatorSid});
+            if (c != null && c.moveToFirst()) {
+                do { events.add(eventFromCursor(c)); } while (c.moveToNext());
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getEventsByCreatorSid failed", e);
         }
         return events;
     }
@@ -1071,5 +1177,200 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 c.getInt(c.getColumnIndexOrThrow(COLUMN_NOTIF_IS_READ)) == 1,
                 c.getString(c.getColumnIndexOrThrow(COLUMN_NOTIF_CREATED_AT))
         );
+    }
+
+    // ── Export / Import ───────────────────────────────────────────────────────
+
+    /**
+     * Export entire database to a CSV zip-style text file.
+     * Each table is written as a CSV block separated by blank lines.
+     * Returns the CSV string, or null on failure.
+     */
+    public String exportDatabaseCsv() {
+        StringBuilder sb = new StringBuilder();
+        SQLiteDatabase db = this.getReadableDatabase();
+        try {
+            exportTableCsv(db, TABLE_EVENTS, sb);
+            sb.append("\n\n");
+            exportTableCsv(db, TABLE_USERS, sb);
+            sb.append("\n\n");
+            exportTableCsv(db, TABLE_REGISTRATIONS, sb);
+            sb.append("\n\n");
+            exportTableCsv(db, TABLE_NOTIFICATIONS, sb);
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "exportDatabaseCsv failed", e);
+            return null;
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Export registered students per event as CSV.
+     * Columns: Event Title, Event Date, Student Name, Student ID, Department, Email, Registration Timestamp
+     */
+    public String exportRegisteredStudentsCsv() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Event Title,Event Date,Student Name,Student ID,Department,Email,Registration Timestamp\n");
+        SQLiteDatabase db = this.getReadableDatabase();
+        try {
+            String sql =
+                "SELECT e." + COLUMN_TITLE + ", e." + COLUMN_DATE +
+                ", u." + COLUMN_USER_NAME + ", u." + COLUMN_USER_STUDENT_ID +
+                ", u." + COLUMN_USER_DEPARTMENT + ", u." + COLUMN_USER_EMAIL +
+                ", r." + COLUMN_REG_TIMESTAMP +
+                " FROM " + TABLE_REGISTRATIONS + " r" +
+                " JOIN " + TABLE_EVENTS + " e ON e." + COLUMN_ID + " = r." + COLUMN_REG_EVENT_ID +
+                " JOIN " + TABLE_USERS + " u ON u." + COLUMN_USER_STUDENT_ID + " = r." + COLUMN_REG_STUDENT_ID +
+                " ORDER BY e." + COLUMN_TITLE + ", u." + COLUMN_USER_NAME;
+            Cursor c = db.rawQuery(sql, null);
+            if (c != null) {
+                while (c.moveToNext()) {
+                    sb.append(csvEscape(c.getString(0))).append(",");
+                    sb.append(csvEscape(c.getString(1))).append(",");
+                    sb.append(csvEscape(c.getString(2))).append(",");
+                    sb.append(csvEscape(c.getString(3))).append(",");
+                    sb.append(csvEscape(c.getString(4))).append(",");
+                    sb.append(csvEscape(c.getString(5))).append(",");
+                    sb.append(csvEscape(c.getString(6))).append("\n");
+                }
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "exportRegisteredStudentsCsv failed", e);
+            return null;
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Import database from a full CSV string (produced by exportDatabaseCsv).
+     * Parses each table block and upserts rows. Only events and users are imported
+     * (registrations and notifications are skipped to avoid conflicts).
+     * Returns number of rows imported, or -1 on failure.
+     */
+    public int importDatabaseCsv(String csv) {
+        if (csv == null || csv.trim().isEmpty()) return -1;
+        int count = 0;
+        try {
+            // Split by double newline into table blocks
+            String[] blocks = csv.split("\n\n+");
+            for (String block : blocks) {
+                String[] lines = block.split("\n");
+                if (lines.length < 2) continue;
+                String header = lines[0].trim();
+                // Detect table by header columns
+                if (header.startsWith("id,title,")) {
+                    // Events table
+                    for (int i = 1; i < lines.length; i++) {
+                        String[] cols = splitCsvLine(lines[i]);
+                        if (cols.length < 11) continue;
+                        try {
+                            int localId = Integer.parseInt(cols[0].trim());
+                            syncUpsertEvent(localId, cols[1], cols[2], cols[3], cols[4],
+                                    cols[5], cols[6], cols[7], cols[8], cols[9], cols[10]);
+                            count++;
+                        } catch (Exception ignored) {}
+                    }
+                } else if (header.startsWith("user_pk,")) {
+                    // Users table
+                    for (int i = 1; i < lines.length; i++) {
+                        String[] cols = splitCsvLine(lines[i]);
+                        if (cols.length < 9) continue;
+                        try {
+                            // cols: user_pk, name, student_id, email, password(skip), role, dept, gender, mobile, profile_image, notif_pref
+                            syncUpsertUser(cols[2], cols[1], cols[3], cols[5], cols[6],
+                                    cols[7], cols[8],
+                                    cols.length > 9 ? cols[9] : "",
+                                    cols.length > 10 ? cols[10] : "All Events");
+                            count++;
+                        } catch (Exception ignored) {}
+                    }
+                }
+                // registrations and notifications are re-synced via SyncManager, skip here
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "importDatabaseCsv failed", e);
+            return -1;
+        }
+        return count;
+    }
+
+    // ── Delete User ───────────────────────────────────────────────────────────
+
+    /**
+     * Delete a user account by student_id.
+     * Also deletes their registrations and notifications from local DB and Firestore.
+     */
+    public void deleteUserAccount(String studentId) {
+        if (studentId == null || studentId.isEmpty()) return;
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            // Delete registrations
+            db.delete(TABLE_REGISTRATIONS, COLUMN_REG_STUDENT_ID + "=?", new String[]{studentId});
+            // Delete notifications sent to this user
+            db.delete(TABLE_NOTIFICATIONS, COLUMN_NOTIF_RECIPIENT_SID + "=?", new String[]{studentId});
+            // Delete the user row
+            db.delete(TABLE_USERS, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+            // Mirror to Firestore
+            FirestoreHelper fs = new FirestoreHelper();
+            fs.deleteUser(studentId);
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "deleteUserAccount failed", e);
+        }
+    }
+
+    // ── CSV helpers ───────────────────────────────────────────────────────────
+
+    private void exportTableCsv(SQLiteDatabase db, String table, StringBuilder sb) {
+        Cursor c = db.rawQuery("SELECT * FROM " + table, null);
+        if (c == null) return;
+        // Header row
+        String[] cols = c.getColumnNames();
+        for (int i = 0; i < cols.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append(cols[i]);
+        }
+        sb.append("\n");
+        // Data rows — skip password column for users
+        while (c.moveToNext()) {
+            for (int i = 0; i < cols.length; i++) {
+                if (i > 0) sb.append(",");
+                // Redact password from export
+                if (table.equals(TABLE_USERS) && cols[i].equals(COLUMN_USER_PASSWORD)) {
+                    sb.append("");
+                } else {
+                    sb.append(csvEscape(c.getString(i)));
+                }
+            }
+            sb.append("\n");
+        }
+        c.close();
+    }
+
+    private String csvEscape(String val) {
+        if (val == null) return "";
+        if (val.contains(",") || val.contains("\"") || val.contains("\n")) {
+            return "\"" + val.replace("\"", "\"\"") + "\"";
+        }
+        return val;
+    }
+
+    private String[] splitCsvLine(String line) {
+        // Simple CSV split (handles quoted fields)
+        List<String> result = new ArrayList<>();
+        boolean inQuote = false;
+        StringBuilder field = new StringBuilder();
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line.charAt(i);
+            if (ch == '"') {
+                if (inQuote && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    field.append('"'); i++;
+                } else { inQuote = !inQuote; }
+            } else if (ch == ',' && !inQuote) {
+                result.add(field.toString()); field.setLength(0);
+            } else { field.append(ch); }
+        }
+        result.add(field.toString());
+        return result.toArray(new String[0]);
     }
 }

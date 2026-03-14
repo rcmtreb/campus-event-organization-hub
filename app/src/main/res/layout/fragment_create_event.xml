@@ -188,12 +188,12 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Organizer Name -->
+                    <!-- Organizer Name — auto-filled from logged-in officer, read-only -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
-                        android:hint="Organizer Name *"
+                        android:hint="Organizer Name"
                         app:hintTextColor="@color/primary_blue"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
@@ -202,7 +202,10 @@
                             android:layout_height="wrap_content"
                             android:textColor="@color/black"
                             android:textColorHint="#757575"
-                            android:inputType="textCapWords" />
+                            android:inputType="none"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
                     <!-- Department — dropdown from departments_array -->

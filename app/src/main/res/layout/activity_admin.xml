@@ -307,6 +307,30 @@
                             android:textColor="@color/black"/>
                     </LinearLayout>
 
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginHorizontal="16dp"/>
+
+                    <!-- Export / Import -->
+                    <LinearLayout
+                        android:id="@+id/card_export_import"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:padding="16dp">
+                         <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_share"
+                            app:tint="@color/primary_blue"/>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:text="Export / Import Data"
+                            android:textSize="15sp"
+                            android:textColor="@color/black"/>
+                    </LinearLayout>
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

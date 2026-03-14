@@ -1,11 +1,14 @@
 package com.example.campus_event_org_hub.ui.main;
 
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,8 +21,10 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.google.android.material.tabs.TabLayout;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -29,11 +34,14 @@ public class OfficerMyEventsFragment extends Fragment {
     private static final int TAB_UPCOMING  = 0;
     private static final int TAB_HAPPENING = 1;
     private static final int TAB_ENDED     = 2;
+    private static final int TAB_POSTPONED = 3;
 
     private RecyclerView rv;
     private TextView tvEmpty;
     private String officerName;
+    private String officerSid;
     private List<Event> allOfficerEvents = new ArrayList<>();
+    private int currentTab = TAB_UPCOMING;
 
     @Nullable
     @Override
@@ -43,7 +51,8 @@ public class OfficerMyEventsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_officer_my_events, container, false);
 
         Bundle args = getArguments();
-        officerName = args != null ? args.getString("USER_NAME", "") : "";
+        officerName = args != null ? args.getString("USER_NAME",       "") : "";
+        officerSid  = args != null ? args.getString("USER_STUDENT_ID", "") : "";
 
         rv      = view.findViewById(R.id.rv_my_events);
         tvEmpty = view.findViewById(R.id.tv_my_events_empty);
@@ -56,16 +65,18 @@ public class OfficerMyEventsFragment extends Fragment {
             });
         }
 
-        // Set up tabs
+        // Set up tabs — 4 tabs now
         TabLayout tabs = view.findViewById(R.id.tabs_my_events);
         tabs.addTab(tabs.newTab().setText("Upcoming"));
         tabs.addTab(tabs.newTab().setText("Happening"));
         tabs.addTab(tabs.newTab().setText("Ended"));
+        tabs.addTab(tabs.newTab().setText("Postponed"));
 
         tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
-                showTab(tab.getPosition());
+                currentTab = tab.getPosition();
+                showTab(currentTab);
             }
             @Override public void onTabUnselected(TabLayout.Tab tab) {}
             @Override public void onTabReselected(TabLayout.Tab tab) {}
@@ -82,12 +93,12 @@ public class OfficerMyEventsFragment extends Fragment {
     public void onResume() {
         super.onResume();
         loadEvents();
-        showTab(TAB_UPCOMING);
+        showTab(currentTab);
     }
 
     private void loadEvents() {
         DatabaseHelper db = new DatabaseHelper(requireContext());
-        allOfficerEvents = db.getEventsByOfficer(officerName);
+        allOfficerEvents = db.getEventsByCreatorSid(officerSid);
     }
 
     private void showTab(int tab) {
@@ -95,11 +106,26 @@ public class OfficerMyEventsFragment extends Fragment {
         List<Event> filtered = new ArrayList<>();
 
         for (Event e : allOfficerEvents) {
-            String date = e.getDate();
+            String status = e.getStatus();
+            String date   = e.getDate();
+
+            // POSTPONED events go only to the Postponed tab
+            if ("POSTPONED".equals(status)) {
+                if (tab == TAB_POSTPONED) filtered.add(e);
+                continue;
+            }
+
+            // CANCELLED events are shown in Ended tab
+            if ("CANCELLED".equals(status)) {
+                if (tab == TAB_ENDED) filtered.add(e);
+                continue;
+            }
+
+            // For APPROVED / PENDING — categorise by date
             int cmp = date.compareTo(today);
-            if (tab == TAB_UPCOMING  && cmp > 0) filtered.add(e);
-            if (tab == TAB_HAPPENING && cmp == 0) filtered.add(e);
-            if (tab == TAB_ENDED     && cmp < 0) filtered.add(e);
+            if (tab == TAB_UPCOMING  && cmp > 0)  filtered.add(e);
+            if (tab == TAB_HAPPENING && cmp == 0)  filtered.add(e);
+            if (tab == TAB_ENDED     && cmp < 0)   filtered.add(e);
         }
 
         if (filtered.isEmpty()) {
@@ -108,17 +134,81 @@ public class OfficerMyEventsFragment extends Fragment {
         } else {
             rv.setVisibility(View.VISIBLE);
             tvEmpty.setVisibility(View.GONE);
-            rv.setAdapter(new EventsAdapter(filtered));
+            rv.setAdapter(new EventsAdapter(filtered, tab == TAB_POSTPONED, this));
         }
     }
 
-    // ── Minimal adapter reusing event_list_item.xml ──────────────────────────
+    // ── Dialog: officer confirms admin date or proposes their own ────────────
+
+    void showPostponedActionDialog(Event e) {
+        DatabaseHelper db = new DatabaseHelper(requireContext());
+        String adminDate = e.getDate(); // current date stored (admin's suggested date)
+
+        String[] options = {
+                "Confirm admin's date: " + adminDate,
+                "Propose a different date"
+        };
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Reschedule: " + e.getTitle())
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        // Confirm admin's suggested date as-is
+                        boolean ok = db.proposeNewDate(e.getId(), adminDate);
+                        if (ok) {
+                            e.setStatus("APPROVED");
+                            Toast.makeText(requireContext(),
+                                    "Date confirmed. Event is now APPROVED.", Toast.LENGTH_SHORT).show();
+                            loadEvents();
+                            showTab(TAB_POSTPONED);
+                        } else {
+                            Toast.makeText(requireContext(), "Failed to update.", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        // Let officer pick a new date
+                        pickNewDate(e, db);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void pickNewDate(Event e, DatabaseHelper db) {
+        Calendar cal = Calendar.getInstance();
+        new DatePickerDialog(requireContext(),
+                (view, year, month, day) -> {
+                    String newDate = String.format(Locale.getDefault(),
+                            "%04d-%02d-%02d", year, month + 1, day);
+                    boolean ok = db.proposeNewDate(e.getId(), newDate);
+                    if (ok) {
+                        e.setStatus("APPROVED");
+                        Toast.makeText(requireContext(),
+                                "New date set to " + newDate + ". Event is now APPROVED.",
+                                Toast.LENGTH_SHORT).show();
+                        loadEvents();
+                        showTab(TAB_POSTPONED);
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to update.", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
+                .show();
+    }
+
+    // ── Adapter ──────────────────────────────────────────────────────────────
 
     static class EventsAdapter extends RecyclerView.Adapter<EventsAdapter.VH> {
 
         private final List<Event> list;
+        private final boolean isPostponedTab;
+        private final OfficerMyEventsFragment fragment;
 
-        EventsAdapter(List<Event> list) { this.list = list; }
+        EventsAdapter(List<Event> list, boolean isPostponedTab,
+                      OfficerMyEventsFragment fragment) {
+            this.list            = list;
+            this.isPostponedTab  = isPostponedTab;
+            this.fragment        = fragment;
+        }
 
         @NonNull
         @Override
@@ -138,22 +228,57 @@ public class OfficerMyEventsFragment extends Fragment {
                     : e.getDate() + "  " + e.getTime());
             h.category.setText(e.getCategory());
 
-            // Status badge in category chip for clarity
-            String statusLabel = e.getCategory() + " \u2022 " + e.getStatus();
-            h.category.setText(statusLabel);
+            // ── Timeline badge ───────────────────────────────────────────────
+            String status = e.getStatus();
+            if ("CANCELLED".equals(status)) {
+                h.timelineBadge.setText("CANCELLED");
+                h.timelineBadge.setBackgroundColor(0xFFD32F2F);
+                h.timelineBadge.setVisibility(View.VISIBLE);
+            } else if ("POSTPONED".equals(status)) {
+                h.timelineBadge.setText("POSTPONED");
+                h.timelineBadge.setBackgroundColor(0xFF7B1FA2);
+                h.timelineBadge.setVisibility(View.VISIBLE);
+            } else {
+                // APPROVED / PENDING — compute from date
+                String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        .format(new Date());
+                int cmp = e.getDate().compareTo(today);
+                if (cmp > 0) {
+                    h.timelineBadge.setText("UPCOMING");
+                    h.timelineBadge.setBackgroundColor(0xFF388E3C);
+                    h.timelineBadge.setVisibility(View.VISIBLE);
+                } else if (cmp == 0) {
+                    h.timelineBadge.setText("HAPPENING");
+                    h.timelineBadge.setBackgroundColor(0xFF0288D1);
+                    h.timelineBadge.setVisibility(View.VISIBLE);
+                } else {
+                    h.timelineBadge.setText("ENDED");
+                    h.timelineBadge.setBackgroundColor(0xFF757575);
+                    h.timelineBadge.setVisibility(View.VISIBLE);
+                }
+            }
+
+            // ── Tap: postponed tab → reschedule dialog; otherwise no-op ─────
+            if (isPostponedTab) {
+                h.itemView.setOnClickListener(v ->
+                        fragment.showPostponedActionDialog(e));
+            } else {
+                h.itemView.setOnClickListener(null);
+            }
         }
 
         @Override
         public int getItemCount() { return list.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
-            TextView title, desc, date, category;
+            TextView title, desc, date, category, timelineBadge;
             VH(View v) {
                 super(v);
-                title    = v.findViewById(R.id.event_title);
-                desc     = v.findViewById(R.id.event_description);
-                date     = v.findViewById(R.id.event_date);
-                category = v.findViewById(R.id.event_category);
+                title         = v.findViewById(R.id.event_title);
+                desc          = v.findViewById(R.id.event_description);
+                date          = v.findViewById(R.id.event_date);
+                category      = v.findViewById(R.id.event_category);
+                timelineBadge = v.findViewById(R.id.tv_timeline_badge);
             }
         }
     }

@@ -77,6 +77,7 @@ public class CreateEventFragment extends Fragment {
 
         // --- Get logged-in user info passed from MainActivity ---
         Bundle args = getArguments();
+        String userName      = args != null ? args.getString("USER_NAME",       "") : "";
         String userDept      = args != null ? args.getString("USER_DEPT",       "") : "";
         String userStudentId = args != null ? args.getString("USER_STUDENT_ID", "") : "";
 
@@ -149,6 +150,11 @@ public class CreateEventFragment extends Fragment {
             deptAcv.setText(userDept, false);
         }
 
+        // Auto-fill organizer with the logged-in officer's name (read-only)
+        if (userName != null && !userName.isEmpty()) {
+            organizerEt.setText(userName);
+        }
+
         // --- Target Audience chips — pre-check user's department ---
         preselectAudienceChip(audienceChipGroup, userDept);
 
@@ -180,7 +186,7 @@ public class CreateEventFragment extends Fragment {
             String organizer= organizerEt.getText() != null ? organizerEt.getText().toString().trim() : "";
             String dept     = deptAcv.getText().toString().trim();
 
-            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || time.isEmpty() || organizer.isEmpty() || dept.isEmpty()) {
+            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || time.isEmpty() || dept.isEmpty()) {
                 Toast.makeText(getContext(), "Please fill in all required fields", Toast.LENGTH_SHORT).show();
                 return;
             }

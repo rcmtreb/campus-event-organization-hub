@@ -31,6 +31,7 @@ public class AdminActivity extends AppCompatActivity {
         LinearLayout cardUsers = findViewById(R.id.card_manage_users);
         LinearLayout cardEventControl = findViewById(R.id.card_event_control);
         LinearLayout cardReports = findViewById(R.id.card_reports);
+        LinearLayout cardExportImport = findViewById(R.id.card_export_import);
 
         btnLogout.setOnClickListener(v -> {
             Toast.makeText(this, "Admin Logged Out", Toast.LENGTH_SHORT).show();
@@ -50,6 +51,9 @@ public class AdminActivity extends AppCompatActivity {
 
         cardReports.setOnClickListener(v ->
             startActivity(new Intent(this, AdminSystemStatsActivity.class)));
+
+        cardExportImport.setOnClickListener(v ->
+            startActivity(new Intent(this, ExportImportActivity.class)));
     }
 
     @Override

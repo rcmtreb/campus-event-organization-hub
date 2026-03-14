@@ -48,17 +48,35 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/user_item_role"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Student"
-            android:textStyle="bold"
-            android:textColor="@color/primary_blue"
-            android:background="@drawable/bg_button_stretchable"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="4dp"
-            android:textSize="12sp"/>
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/user_item_role"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Student"
+                android:textStyle="bold"
+                android:textColor="@color/primary_blue"
+                android:background="@drawable/bg_button_stretchable"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"
+                android:textSize="12sp"/>
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/btn_delete_user"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginTop="6dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_delete"
+                android:contentDescription="Delete user"
+                app:tint="@color/error_red" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

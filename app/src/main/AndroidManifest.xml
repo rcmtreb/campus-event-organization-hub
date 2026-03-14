@@ -62,6 +62,10 @@
             android:name=".ui.admin.AdminEditEventActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.admin.ExportImportActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>

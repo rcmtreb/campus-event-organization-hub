@@ -64,6 +64,12 @@ public class FirestoreHelper {
                 .addOnFailureListener(e -> Log.e(TAG, "updateUserField failed", e));
     }
 
+    public void deleteUser(String studentId) {
+        db.collection(COL_USERS).document(studentId)
+                .delete()
+                .addOnFailureListener(e -> Log.e(TAG, "deleteUser failed: " + studentId, e));
+    }
+
     // ── Events ────────────────────────────────────────────────────────────────
 
     /**
@@ -94,6 +100,15 @@ public class FirestoreHelper {
         db.collection(COL_EVENTS).document(String.valueOf(localId))
                 .update("status", status)
                 .addOnFailureListener(e -> Log.e(TAG, "updateEventStatus failed", e));
+    }
+
+    public void updateEventDateAndStatus(int localId, String date, String status) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("date",   date);
+        data.put("status", status);
+        db.collection(COL_EVENTS).document(String.valueOf(localId))
+                .update(data)
+                .addOnFailureListener(e -> Log.e(TAG, "updateEventDateAndStatus failed", e));
     }
 
     public void updateEventFields(int localId, String title, String description,

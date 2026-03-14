@@ -15,8 +15,13 @@ import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> implements Filterable {
 
@@ -56,7 +61,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         ImageUtils.load(holder.itemView.getContext(), holder.image,
                 event.getImagePath(), R.drawable.ic_image_placeholder);
 
-        // Status badge for CANCELLED / POSTPONED
+        // Status badge for CANCELLED / POSTPONED (below description)
         if (holder.statusBadge != null) {
             String status = event.getStatus();
             if ("CANCELLED".equals(status)) {
@@ -69,6 +74,50 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 holder.statusBadge.setBackgroundColor(0xFF7B1FA2); // purple
             } else {
                 holder.statusBadge.setVisibility(View.GONE);
+            }
+        }
+
+        // Timeline badge (top row, beside date): UPCOMING / HAPPENING / ENDED / POSTPONED / CANCELLED
+        if (holder.timelineBadge != null) {
+            String status = event.getStatus();
+            if ("CANCELLED".equals(status)) {
+                holder.timelineBadge.setText("CANCELLED");
+                holder.timelineBadge.setBackgroundColor(0xFFD32F2F);
+                holder.timelineBadge.setVisibility(View.VISIBLE);
+            } else if ("POSTPONED".equals(status)) {
+                holder.timelineBadge.setText("POSTPONED");
+                holder.timelineBadge.setBackgroundColor(0xFF7B1FA2);
+                holder.timelineBadge.setVisibility(View.VISIBLE);
+            } else if ("APPROVED".equals(status)) {
+                // Compute UPCOMING / HAPPENING / ENDED from date
+                Calendar todayCal = Calendar.getInstance();
+                todayCal.set(Calendar.HOUR_OF_DAY, 0);
+                todayCal.set(Calendar.MINUTE, 0);
+                todayCal.set(Calendar.SECOND, 0);
+                todayCal.set(Calendar.MILLISECOND, 0);
+                try {
+                    Date eventDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                            .parse(event.getDate());
+                    if (eventDate == null) {
+                        holder.timelineBadge.setVisibility(View.GONE);
+                    } else if (eventDate.before(todayCal.getTime())) {
+                        holder.timelineBadge.setText("ENDED");
+                        holder.timelineBadge.setBackgroundColor(0xFF757575); // gray
+                        holder.timelineBadge.setVisibility(View.VISIBLE);
+                    } else if (eventDate.equals(todayCal.getTime())) {
+                        holder.timelineBadge.setText("HAPPENING");
+                        holder.timelineBadge.setBackgroundColor(0xFF0288D1); // light blue
+                        holder.timelineBadge.setVisibility(View.VISIBLE);
+                    } else {
+                        holder.timelineBadge.setText("UPCOMING");
+                        holder.timelineBadge.setBackgroundColor(0xFF388E3C); // green
+                        holder.timelineBadge.setVisibility(View.VISIBLE);
+                    }
+                } catch (ParseException ex) {
+                    holder.timelineBadge.setVisibility(View.GONE);
+                }
+            } else {
+                holder.timelineBadge.setVisibility(View.GONE);
             }
         }
 
@@ -136,16 +185,17 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     }
 
     public static class EventViewHolder extends RecyclerView.ViewHolder {
-        TextView title, date, description, category, statusBadge;
+        TextView title, date, description, category, statusBadge, timelineBadge;
         ImageView image;
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
-            title       = itemView.findViewById(R.id.event_title);
-            date        = itemView.findViewById(R.id.event_date);
-            description = itemView.findViewById(R.id.event_description);
-            category    = itemView.findViewById(R.id.event_category);
-            image       = itemView.findViewById(R.id.event_image);
-            statusBadge = itemView.findViewById(R.id.tv_event_status_badge);
+            title         = itemView.findViewById(R.id.event_title);
+            date          = itemView.findViewById(R.id.event_date);
+            description   = itemView.findViewById(R.id.event_description);
+            category      = itemView.findViewById(R.id.event_category);
+            image         = itemView.findViewById(R.id.event_image);
+            statusBadge   = itemView.findViewById(R.id.tv_event_status_badge);
+            timelineBadge = itemView.findViewById(R.id.tv_timeline_badge);
         }
     }
 }
