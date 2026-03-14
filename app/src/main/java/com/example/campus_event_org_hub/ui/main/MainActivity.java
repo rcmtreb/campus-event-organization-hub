@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.campus_event_org_hub.R;
+import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.ui.events.EventsFragment;
 
 public class MainActivity extends AppCompatActivity
@@ -76,6 +77,14 @@ public class MainActivity extends AppCompatActivity
             Log.e(TAG, "CRITICAL CRASH in MainActivity onCreate", e);
             Toast.makeText(this, "App Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Background sync so data stays fresh on every return to the app.
+        // No loading indicator here — data updates silently.
+        SyncManager.sync(this, null);
     }
 
     private void selectTab(int index) {

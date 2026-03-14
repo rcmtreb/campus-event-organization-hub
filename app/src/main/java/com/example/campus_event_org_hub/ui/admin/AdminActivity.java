@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.ui.auth.LoginActivity;
 
 public class AdminActivity extends AppCompatActivity {
@@ -54,7 +55,8 @@ public class AdminActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        updateStats();
+        // Sync Firestore → local SQLite so admin sees latest data from all devices
+        SyncManager.sync(this, this::updateStats);
     }
 
     private void updateStats() {

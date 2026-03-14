@@ -280,6 +280,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_USER_DEPARTMENT, department);
         long id = db.insert(TABLE_USERS, null, v);
         db.close();
+        if (id != -1) {
+            // Mirror to Firestore (password NOT synced)
+            new FirestoreHelper().upsertUser(studentId, name, email, role, department,
+                    "", "", "", "All Events");
+        }
         return id;
     }
 
@@ -330,6 +335,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_USER_ROLE, newRole);
         db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
         db.close();
+        new FirestoreHelper().updateUserField(studentId, "role", newRole);
     }
 
     public boolean updateUserProfile(String studentId, String gender, String mobile, String profileImagePath) {
@@ -341,6 +347,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             if (profileImagePath != null) v.put(COLUMN_USER_PROFILE_IMG, profileImagePath);
             int rows = db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
             db.close();
+            if (rows > 0) {
+                FirestoreHelper fsh = new FirestoreHelper();
+                if (gender != null)           fsh.updateUserField(studentId, "gender",        gender);
+                if (mobile != null)           fsh.updateUserField(studentId, "mobile",        mobile);
+                if (profileImagePath != null) fsh.updateUserField(studentId, "profile_image", profileImagePath);
+            }
             return rows > 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "updateUserProfile failed", e);
@@ -375,6 +387,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_USER_NOTIF_PREF, pref);
             db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
             db.close();
+            new FirestoreHelper().updateUserField(studentId, "notif_pref", pref);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "updateNotifPref failed", e);
         }
@@ -385,14 +398,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public boolean registerForEvent(String studentId, int eventId) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    .format(new Date());
             ContentValues v = new ContentValues();
             v.put(COLUMN_REG_STUDENT_ID, studentId);
             v.put(COLUMN_REG_EVENT_ID, eventId);
-            v.put(COLUMN_REG_TIMESTAMP,
-                    new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                            .format(new Date()));
+            v.put(COLUMN_REG_TIMESTAMP, timestamp);
             long id = db.insertOrThrow(TABLE_REGISTRATIONS, null, v);
             db.close();
+            if (id != -1) {
+                new FirestoreHelper().upsertRegistration(studentId, eventId, timestamp);
+            }
             return id != -1;
         } catch (android.database.sqlite.SQLiteConstraintException e) {
             return false;
@@ -439,6 +455,115 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return events;
     }
 
+    // ── Sync helpers (called by SyncManager to import Firestore data) ─────────
+
+    /**
+     * Upsert a user row from Firestore. Uses INSERT OR REPLACE so existing rows
+     * are overwritten with the latest cloud data.
+     * NOTE: password is NOT synced from Firestore — it stays local only.
+     */
+    public void syncUpsertUser(String studentId, String name, String email,
+                                String role, String department,
+                                String gender, String mobile,
+                                String profileImage, String notifPref) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            // Use INSERT OR REPLACE — preserve the local password by reading it first
+            String localPassword = "";
+            Cursor c = db.rawQuery("SELECT " + COLUMN_USER_PASSWORD + " FROM " + TABLE_USERS +
+                    " WHERE " + COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+            if (c != null && c.moveToFirst()) { localPassword = c.getString(0); c.close(); }
+
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_USER_STUDENT_ID,  studentId);
+            v.put(COLUMN_USER_NAME,        name);
+            v.put(COLUMN_USER_EMAIL,       email);
+            v.put(COLUMN_USER_PASSWORD,    localPassword); // keep local password
+            v.put(COLUMN_USER_ROLE,        role);
+            v.put(COLUMN_USER_DEPARTMENT,  department);
+            v.put(COLUMN_USER_GENDER,      gender        != null ? gender        : "");
+            v.put(COLUMN_USER_MOBILE,      mobile        != null ? mobile        : "");
+            v.put(COLUMN_USER_PROFILE_IMG, profileImage  != null ? profileImage  : "");
+            v.put(COLUMN_USER_NOTIF_PREF,  notifPref     != null ? notifPref     : "All Events");
+            db.insertWithOnConflict(TABLE_USERS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "syncUpsertUser failed", e);
+        }
+    }
+
+    /**
+     * Upsert an event row from Firestore. localId is the Firestore doc id (= original SQLite id).
+     */
+    public void syncUpsertEvent(int localId, String title, String description,
+                                 String date, String time, String tags,
+                                 String organizer, String category,
+                                 String imagePath, String status, String creatorSid) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_ID,          localId);
+            v.put(COLUMN_TITLE,       title);
+            v.put(COLUMN_DESC,        description);
+            v.put(COLUMN_DATE,        date);
+            v.put(COLUMN_EVENT_TIME,  time       != null ? time       : "");
+            v.put(COLUMN_TAGS,        tags       != null ? tags       : "");
+            v.put(COLUMN_ORGANIZER,   organizer);
+            v.put(COLUMN_CATEGORY,    category);
+            v.put(COLUMN_IMAGE_PATH,  imagePath  != null ? imagePath  : "");
+            v.put(COLUMN_STATUS,      status);
+            v.put(COLUMN_CREATOR_SID, creatorSid != null ? creatorSid : "");
+            db.insertWithOnConflict(TABLE_EVENTS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "syncUpsertEvent failed", e);
+        }
+    }
+
+    /**
+     * Upsert a registration row from Firestore.
+     */
+    public void syncUpsertRegistration(String studentId, int eventId, String timestamp) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_REG_STUDENT_ID, studentId);
+            v.put(COLUMN_REG_EVENT_ID,   eventId);
+            v.put(COLUMN_REG_TIMESTAMP,  timestamp != null ? timestamp : "");
+            db.insertWithOnConflict(TABLE_REGISTRATIONS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "syncUpsertRegistration failed", e);
+        }
+    }
+
+    /**
+     * Upsert a notification row from Firestore.
+     */
+    public void syncUpsertNotification(int localNotifId, String recipientSid, int eventId,
+                                        String type, String message, String reason,
+                                        String suggestedDate, String instructions,
+                                        int isRead, String createdAt) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_NOTIF_ID,             localNotifId);
+            v.put(COLUMN_NOTIF_RECIPIENT_SID,  recipientSid);
+            v.put(COLUMN_NOTIF_EVENT_ID,       eventId);
+            v.put(COLUMN_NOTIF_TYPE,           type);
+            v.put(COLUMN_NOTIF_MESSAGE,        message);
+            v.put(COLUMN_NOTIF_REASON,         reason        != null ? reason        : "");
+            v.put(COLUMN_NOTIF_SUGGESTED_DATE, suggestedDate != null ? suggestedDate : "");
+            v.put(COLUMN_NOTIF_INSTRUCTIONS,   instructions  != null ? instructions  : "");
+            v.put(COLUMN_NOTIF_IS_READ,        isRead);
+            v.put(COLUMN_NOTIF_CREATED_AT,     createdAt     != null ? createdAt     : "");
+            db.insertWithOnConflict(TABLE_NOTIFICATIONS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "syncUpsertNotification failed", e);
+        }
+    }
+
     // ── Event Operations ──────────────────────────────────────────────────────
 
     public long addEvent(Event event) {
@@ -456,6 +581,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_CREATOR_SID, event.getCreatorSid() != null ? event.getCreatorSid() : "");
         long id = db.insert(TABLE_EVENTS, null, v);
         db.close();
+        if (id != -1) {
+            new FirestoreHelper().upsertEvent((int) id,
+                    event.getTitle(), event.getDescription(), event.getDate(),
+                    event.getTime(), event.getTags(), event.getOrganizer(),
+                    event.getCategory(), event.getImagePath(), event.getStatus(),
+                    event.getCreatorSid());
+        }
         return id;
     }
 
@@ -465,12 +597,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_STATUS, "APPROVED");
         db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
         db.close();
+        new FirestoreHelper().updateEventStatus(eventId, "APPROVED");
     }
 
     public void deleteEvent(int eventId) {
         SQLiteDatabase db = this.getWritableDatabase();
         db.delete(TABLE_EVENTS, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
         db.close();
+        new FirestoreHelper().deleteEvent(eventId);
     }
 
     public void cancelEvent(int eventId) {
@@ -480,6 +614,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_STATUS, "CANCELLED");
             db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
             db.close();
+            new FirestoreHelper().updateEventStatus(eventId, "CANCELLED");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "cancelEvent failed", e);
         }
@@ -492,6 +627,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_STATUS, "POSTPONED");
             db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
             db.close();
+            new FirestoreHelper().updateEventStatus(eventId, "POSTPONED");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "postponeEvent failed", e);
         }
@@ -517,6 +653,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                     new String[]{String.valueOf(eventId)});
             db.close();
+            if (rows > 0) {
+                new FirestoreHelper().updateEventFields(eventId, title, description,
+                        date, time, tags, organizer, category);
+            }
             return rows > 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "updateEvent failed", e);
@@ -649,7 +789,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         try {
             String cutoff = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                     .format(new Date(System.currentTimeMillis() - (long) days * 24 * 60 * 60 * 1000));
+            // Collect IDs before deleting so we can mirror to Firestore
+            List<Integer> ids = new ArrayList<>();
+            Cursor c = db.query(TABLE_EVENTS, new String[]{COLUMN_ID},
+                    COLUMN_DATE + " < ?", new String[]{cutoff}, null, null, null);
+            if (c != null) {
+                while (c.moveToNext()) ids.add(c.getInt(0));
+                c.close();
+            }
             db.delete(TABLE_EVENTS, COLUMN_DATE + " < ?", new String[]{cutoff});
+            // Mirror deletions to Firestore (fire-and-forget)
+            FirestoreHelper fs = new FirestoreHelper();
+            for (int id : ids) fs.deleteEvent(id);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "deleteEndedEventsOlderThan(db) failed", e);
         }
@@ -663,7 +814,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             String cutoff = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                     .format(new Date(System.currentTimeMillis() - (long) days * 24 * 60 * 60 * 1000));
             SQLiteDatabase db = this.getWritableDatabase();
+            // Collect IDs before deleting so we can mirror to Firestore
+            List<Integer> ids = new ArrayList<>();
+            Cursor c = db.query(TABLE_EVENTS, new String[]{COLUMN_ID},
+                    COLUMN_DATE + " < ?", new String[]{cutoff}, null, null, null);
+            if (c != null) {
+                while (c.moveToNext()) ids.add(c.getInt(0));
+                c.close();
+            }
             db.delete(TABLE_EVENTS, COLUMN_DATE + " < ?", new String[]{cutoff});
+            // Mirror deletions to Firestore (fire-and-forget)
+            FirestoreHelper fs = new FirestoreHelper();
+            for (int id : ids) fs.deleteEvent(id);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "deleteEndedEventsOlderThan failed", e);
         }
@@ -698,6 +860,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                    String message, String reason,
                                    String suggestedDate, String instructions) {
         try {
+            String createdAt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    .format(new Date());
             SQLiteDatabase db = this.getWritableDatabase();
             ContentValues v = new ContentValues();
             v.put(COLUMN_NOTIF_RECIPIENT_SID, recipientSid);
@@ -708,10 +872,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_NOTIF_SUGGESTED_DATE, suggestedDate != null ? suggestedDate : "");
             v.put(COLUMN_NOTIF_INSTRUCTIONS, instructions != null ? instructions : "");
             v.put(COLUMN_NOTIF_IS_READ, 0);
-            v.put(COLUMN_NOTIF_CREATED_AT,
-                    new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+            v.put(COLUMN_NOTIF_CREATED_AT, createdAt);
             long id = db.insert(TABLE_NOTIFICATIONS, null, v);
             db.close();
+            if (id != -1) {
+                new FirestoreHelper().upsertNotification((int) id, recipientSid, eventId,
+                        type, message, reason, suggestedDate, instructions, false, createdAt);
+            }
             return id;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "insertNotification failed", e);
@@ -746,6 +913,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.update(TABLE_NOTIFICATIONS, v, COLUMN_NOTIF_ID + "=?",
                     new String[]{String.valueOf(notifId)});
             db.close();
+            new FirestoreHelper().markNotificationRead(notifId);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "markNotificationRead failed", e);
         }
