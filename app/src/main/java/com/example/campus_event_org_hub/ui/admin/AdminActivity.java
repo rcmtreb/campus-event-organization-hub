@@ -3,6 +3,7 @@ package com.example.campus_event_org_hub.ui.admin;
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
@@ -10,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.ui.auth.LoginActivity;
-import com.google.android.material.card.MaterialCardView;
 
 public class AdminActivity extends AppCompatActivity {
 
@@ -26,8 +26,10 @@ public class AdminActivity extends AppCompatActivity {
         updateStats();
 
         ImageButton btnLogout = findViewById(R.id.btn_admin_logout);
-        MaterialCardView cardApprove = findViewById(R.id.card_approve_events);
-        MaterialCardView cardUsers = findViewById(R.id.card_manage_users);
+        LinearLayout cardApprove = findViewById(R.id.card_approve_events);
+        LinearLayout cardUsers = findViewById(R.id.card_manage_users);
+        LinearLayout cardEventControl = findViewById(R.id.card_event_control);
+        LinearLayout cardReports = findViewById(R.id.card_reports);
 
         btnLogout.setOnClickListener(v -> {
             Toast.makeText(this, "Admin Logged Out", Toast.LENGTH_SHORT).show();
@@ -36,33 +38,41 @@ public class AdminActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        cardApprove.setOnClickListener(v -> {
-            // Intent to real approval activity
-            startActivity(new Intent(this, ApproveEventsActivity.class));
-        });
+        cardApprove.setOnClickListener(v -> 
+            startActivity(new Intent(this, ApproveEventsActivity.class)));
 
         cardUsers.setOnClickListener(v -> 
-            Toast.makeText(this, "Opening User Management...", Toast.LENGTH_SHORT).show());
+            startActivity(new Intent(this, UserManagementActivity.class)));
+
+        cardEventControl.setOnClickListener(v ->
+            startActivity(new Intent(this, AdminEventControlActivity.class)));
+
+        cardReports.setOnClickListener(v ->
+            startActivity(new Intent(this, AdminSystemStatsActivity.class)));
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        updateStats(); // Refresh stats when returning to dashboard
+        updateStats();
     }
 
     private void updateStats() {
-        TextView tvTotalStudents = findViewById(R.id.tv_stat_students);
-        TextView tvActiveEvents = findViewById(R.id.tv_stat_events);
+        TextView tvStudents = findViewById(R.id.tv_stat_students);
+        TextView tvOfficers = findViewById(R.id.tv_stat_officers);
+        TextView tvEvents = findViewById(R.id.tv_stat_events);
+        TextView tvPending = findViewById(R.id.tv_stat_pending);
         TextView tvPendingBadge = findViewById(R.id.tv_pending_badge);
 
         int studentCount = db.getCount(DatabaseHelper.TABLE_USERS, DatabaseHelper.COLUMN_USER_ROLE + "=?", new String[]{"Student"});
+        int officerCount = db.getCount(DatabaseHelper.TABLE_USERS, DatabaseHelper.COLUMN_USER_ROLE + "=?", new String[]{"Officer"});
         int eventCount = db.getCount(DatabaseHelper.TABLE_EVENTS, DatabaseHelper.COLUMN_STATUS + "=?", new String[]{"APPROVED"});
         int pendingCount = db.getCount(DatabaseHelper.TABLE_EVENTS, DatabaseHelper.COLUMN_STATUS + "=?", new String[]{"PENDING"});
 
-        // I need to add these IDs to activity_admin.xml first
-        if (tvTotalStudents != null) tvTotalStudents.setText(String.valueOf(studentCount));
-        if (tvActiveEvents != null) tvActiveEvents.setText(String.valueOf(eventCount));
+        if (tvStudents != null) tvStudents.setText(String.valueOf(studentCount));
+        if (tvOfficers != null) tvOfficers.setText(String.valueOf(officerCount));
+        if (tvEvents != null) tvEvents.setText(String.valueOf(eventCount));
+        if (tvPending != null) tvPending.setText(String.valueOf(pendingCount));
         if (tvPendingBadge != null) tvPendingBadge.setText(String.valueOf(pendingCount));
     }
 }

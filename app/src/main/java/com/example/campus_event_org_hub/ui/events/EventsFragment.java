@@ -1,16 +1,21 @@
 package com.example.campus_event_org_hub.ui.events;
 
-import android.content.ContentResolver;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import androidx.appcompat.widget.SearchView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SearchView;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
@@ -24,7 +29,10 @@ import java.util.List;
 
 public class EventsFragment extends Fragment {
 
+    private static final String TAG = "CEOH_EVENTS";
+
     private RecyclerView recyclerView;
+    private SwipeRefreshLayout swipeRefresh;
     private EventAdapter adapter;
     private List<Event> eventList;
     private SearchView searchView;
@@ -33,72 +41,149 @@ public class EventsFragment extends Fragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_events, container, false);
-
-        dbHelper = new DatabaseHelper(getContext());
-        recyclerView = view.findViewById(R.id.events_recycler_view);
-        searchView = view.findViewById(R.id.search_view);
-        chipGroup = view.findViewById(R.id.chip_group_filter);
-
-        loadEvents();
-
-        FloatingActionButton fab = view.findViewById(R.id.fab_create_event);
-        
-        String role = getArguments() != null ? getArguments().getString("USER_ROLE", "Student") : "Student";
-        if ("Student".equalsIgnoreCase(role)) {
-            fab.setVisibility(View.GONE);
-        } else {
-            fab.setVisibility(View.VISIBLE);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View view;
+        try {
+            view = inflater.inflate(R.layout.fragment_events, container, false);
+        } catch (Exception e) {
+            Log.e(TAG, "CRITICAL: failed to inflate fragment_events layout", e);
+            return new android.widget.FrameLayout(requireContext());
         }
 
-        fab.setOnClickListener(v -> requireActivity().getSupportFragmentManager()
-                .beginTransaction()
-                .replace(R.id.fragment_container, new CreateEventFragment())
-                .addToBackStack(null)
-                .commit());
+        try {
+            dbHelper = new DatabaseHelper(requireContext());
 
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) { return false; }
+            recyclerView = view.findViewById(R.id.events_recycler_view);
+            swipeRefresh = view.findViewById(R.id.swipe_refresh_events);
+            searchView   = view.findViewById(R.id.search_view);
+            chipGroup    = view.findViewById(R.id.chip_group_filter);
 
-            @Override
-            public boolean onQueryTextChange(String newText) {
-                adapter.getFilter().filter(newText);
-                return false;
+            // Set layout manager programmatically to prevent XML inflation crashes
+            recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+            // Brand the refresh spinner with the app's primary colour
+            swipeRefresh.setColorSchemeResources(R.color.primary_blue, R.color.primary_dark);
+
+            loadEvents();
+
+            // ── Pull-to-refresh ──────────────────────────────────────────────
+            swipeRefresh.setOnRefreshListener(() ->
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    reloadEvents();
+                    swipeRefresh.setRefreshing(false);
+                }, 600)
+            );
+
+            // ── FAB (Officers only) ──────────────────────────────────────────
+            FloatingActionButton fab = view.findViewById(R.id.fab_create_event);
+            String role = getArguments() != null
+                    ? getArguments().getString("USER_ROLE", "Student") : "Student";
+            fab.setVisibility("Student".equalsIgnoreCase(role) ? View.GONE : View.VISIBLE);
+            fab.setOnClickListener(v -> requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new CreateEventFragment())
+                    .addToBackStack(null)
+                    .commit());
+
+            // ── Search ───────────────────────────────────────────────────────
+            if (searchView != null) {
+                searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                    @Override public boolean onQueryTextSubmit(String q) { return false; }
+                    @Override public boolean onQueryTextChange(String newText) {
+                        if (adapter != null) adapter.getFilter().filter(newText);
+                        return false;
+                    }
+                });
             }
-        });
 
-        chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            if (!checkedIds.isEmpty()) {
-                Chip chip = group.findViewById(checkedIds.get(0));
-                if (chip != null) {
-                    adapter.filterByCategory(chip.getText().toString());
-                }
+            // ── Category chips ───────────────────────────────────────────────
+            if (chipGroup != null) {
+                chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
+                    if (!checkedIds.isEmpty() && adapter != null) {
+                        Chip chip = group.findViewById(checkedIds.get(0));
+                        if (chip != null) adapter.filterByCategory(chip.getText().toString());
+                    }
+                });
             }
-        });
+
+        } catch (Exception e) {
+            Log.e(TAG, "CRITICAL CRASH in EventsFragment", e);
+            Toast.makeText(getContext(), "Error loading events: " + e.getMessage(),
+                    Toast.LENGTH_LONG).show();
+        }
 
         return view;
     }
 
-    private void loadEvents() {
-        eventList = dbHelper.getAllEvents(); // Gets "APPROVED" events
-        
-        if (eventList.isEmpty()) {
-            addDefaultEvents();
-            eventList = dbHelper.getAllEvents();
-        }
+    // ── Data loading ─────────────────────────────────────────────────────────
 
-        adapter = new EventAdapter(eventList);
-        recyclerView.setAdapter(adapter);
+    /** First-time load — seeds default events if the table is empty. */
+    private void loadEvents() {
+        try {
+            eventList = dbHelper.getAllEvents();
+            if (eventList == null || eventList.isEmpty()) {
+                addDefaultEvents();
+                eventList = dbHelper.getAllEvents();
+            }
+            if (eventList == null) eventList = new ArrayList<>();
+
+            String sid = getArguments() != null
+                    ? getArguments().getString("USER_STUDENT_ID", "") : "";
+            adapter = new EventAdapter(eventList, sid);
+            recyclerView.setAdapter(adapter);
+        } catch (Exception e) {
+            Log.e(TAG, "Error in loadEvents", e);
+            eventList = new ArrayList<>();
+            adapter = new EventAdapter(eventList);
+            recyclerView.setAdapter(adapter);
+        }
+    }
+
+    /**
+     * Refresh pass — re-queries the DB, updates the adapter in place, then
+     * scrolls smoothly back to the top so the user can see the updated list.
+     */
+    private void reloadEvents() {
+        try {
+            List<Event> fresh = dbHelper.getAllEvents();
+            if (fresh == null) fresh = new ArrayList<>();
+            eventList.clear();
+            eventList.addAll(fresh);
+            adapter.notifyDataSetChanged();
+            // Scroll back to the top with a smooth animation
+            recyclerView.smoothScrollToPosition(0);
+        } catch (Exception e) {
+            Log.e(TAG, "Error in reloadEvents", e);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Keep list fresh when user navigates back (e.g. after admin approved/cancelled events)
+        if (adapter != null) reloadEvents();
     }
 
     private void addDefaultEvents() {
-        String resPrefix = ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + 
-                           requireContext().getPackageName() + "/";
-
-        dbHelper.addEvent(new Event("Tech Summit 2026", "An annual conference about the future of technology.", "2026-03-15", "#tech #summit", "College of Engineering", "Academic", resPrefix + R.drawable.banner_tech_summit, "APPROVED"));
-        dbHelper.addEvent(new Event("Campus Art Fair", "Featuring artwork from students across all departments.", "2026-03-20", "#art #fair", "Fine Arts Department", "Social", resPrefix + R.drawable.banner_art_fair, "APPROVED"));
-        dbHelper.addEvent(new Event("Career Week", "Connect with top employers and find your dream job.", "2026-04-10", "#career #jobs", "Career Services", "Academic", resPrefix + R.drawable.banner_career_week, "APPROVED"));
+        try {
+            dbHelper.addEvent(new Event("Tech Summit 2026",
+                    "An annual conference about the future of technology, innovation, and engineering. " +
+                    "Join industry leaders, faculty, and students for talks, workshops, and networking.",
+                    "2026-03-15", "#tech #summit #engineering",
+                    "College of Engineering", "Academic", "", "APPROVED"));
+            dbHelper.addEvent(new Event("Campus Art Fair",
+                    "Featuring artwork from students across all departments. Explore paintings, sculptures, " +
+                    "digital art, and live performances throughout the campus grounds.",
+                    "2026-03-20", "#art #fair #culture",
+                    "Fine Arts Department", "Social", "", "APPROVED"));
+            dbHelper.addEvent(new Event("Career Week",
+                    "Connect with top employers and find your dream job. Attend mock interviews, resume " +
+                    "workshops, and company booths from leading local and international firms.",
+                    "2026-04-10", "#career #jobs #networking",
+                    "Career Services", "Academic", "", "APPROVED"));
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding default events", e);
+        }
     }
 }

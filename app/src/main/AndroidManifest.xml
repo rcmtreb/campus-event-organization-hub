@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
+        android:name=".CEOHApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -35,11 +36,27 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.admin.UserManagementActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.main.MainActivity"
             android:exported="false" />
 
         <activity
             android:name=".ui.events.EventDetailActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.admin.AdminEventControlActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.admin.AdminSystemStatsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.admin.AdminEditEventActivity"
             android:exported="false" />
 
     </application>

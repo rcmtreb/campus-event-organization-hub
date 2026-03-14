@@ -1,7 +1,6 @@
 package com.example.campus_event_org_hub.ui.events;
 
 import android.content.Intent;
-import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.model.Event;
+import com.example.campus_event_org_hub.util.ImageUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,10 +22,18 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
     private List<Event> eventList;
     private List<Event> eventListFull;
+    private String studentId;
 
     public EventAdapter(List<Event> eventList) {
         this.eventList = eventList;
         this.eventListFull = new ArrayList<>(eventList);
+        this.studentId = "";
+    }
+
+    public EventAdapter(List<Event> eventList, String studentId) {
+        this.eventList = eventList;
+        this.eventListFull = new ArrayList<>(eventList);
+        this.studentId = studentId != null ? studentId : "";
     }
 
     @NonNull
@@ -41,20 +49,33 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         holder.title.setText(event.getTitle());
         holder.date.setText(event.getDate());
         holder.description.setText(event.getDescription());
+        if (holder.category != null) {
+            holder.category.setText(event.getCategory() != null ? event.getCategory() : "");
+        }
 
-        if (event.getImagePath() != null && !event.getImagePath().isEmpty()) {
-            try {
-                holder.image.setImageURI(Uri.parse(event.getImagePath()));
-            } catch (Exception e) {
-                holder.image.setImageResource(R.drawable.ic_image_placeholder);
+        ImageUtils.load(holder.itemView.getContext(), holder.image,
+                event.getImagePath(), R.drawable.ic_image_placeholder);
+
+        // Status badge for CANCELLED / POSTPONED
+        if (holder.statusBadge != null) {
+            String status = event.getStatus();
+            if ("CANCELLED".equals(status)) {
+                holder.statusBadge.setVisibility(View.VISIBLE);
+                holder.statusBadge.setText("CANCELLED");
+                holder.statusBadge.setBackgroundColor(0xFFD32F2F); // error red
+            } else if ("POSTPONED".equals(status)) {
+                holder.statusBadge.setVisibility(View.VISIBLE);
+                holder.statusBadge.setText("POSTPONED");
+                holder.statusBadge.setBackgroundColor(0xFF7B1FA2); // purple
+            } else {
+                holder.statusBadge.setVisibility(View.GONE);
             }
-        } else {
-            holder.image.setImageResource(R.drawable.ic_image_placeholder);
         }
 
         holder.itemView.setOnClickListener(v -> {
             Intent intent = new Intent(v.getContext(), EventDetailActivity.class);
             intent.putExtra("event", event);
+            intent.putExtra("USER_STUDENT_ID", studentId);
             v.getContext().startActivity(intent);
         });
     }
@@ -115,14 +136,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     }
 
     public static class EventViewHolder extends RecyclerView.ViewHolder {
-        TextView title, date, description;
+        TextView title, date, description, category, statusBadge;
         ImageView image;
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
-            title = itemView.findViewById(R.id.event_title);
-            date = itemView.findViewById(R.id.event_date);
+            title       = itemView.findViewById(R.id.event_title);
+            date        = itemView.findViewById(R.id.event_date);
             description = itemView.findViewById(R.id.event_description);
-            image = itemView.findViewById(R.id.event_image);
+            category    = itemView.findViewById(R.id.event_category);
+            image       = itemView.findViewById(R.id.event_image);
+            statusBadge = itemView.findViewById(R.id.tv_event_status_badge);
         }
     }
 }

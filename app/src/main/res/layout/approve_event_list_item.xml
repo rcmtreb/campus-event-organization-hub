@@ -41,16 +41,38 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Organizer"
+                android:textColor="#666666"
                 android:textSize="12sp" />
 
-            <Button
-                android:id="@+id/btn_approve_now"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Approve"
-                android:textSize="12sp" />
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/btn_approve_now"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Approve"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/success_green"
+                    android:textColor="@color/white" />
+
+                <Button
+                    android:id="@+id/btn_reject_now"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Reject"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/error_red"
+                    android:textColor="@color/white" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

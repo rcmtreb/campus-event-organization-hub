@@ -3,21 +3,26 @@ package com.example.campus_event_org_hub.model;
 import java.io.Serializable;
 
 public class Event implements Serializable {
-    private int id; // Added ID
+    private int id;
     private String title;
     private String description;
     private String date;
+    private String time;
     private String tags;
     private String organizer;
     private String category;
     private String imagePath;
     private String status;
+    private String creatorSid; // student_id of the officer who submitted this event
 
-    public Event(int id, String title, String description, String date, String tags, String organizer, String category, String imagePath, String status) {
+    // Full constructor (with id and time)
+    public Event(int id, String title, String description, String date, String time,
+                 String tags, String organizer, String category, String imagePath, String status) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.date = date;
+        this.time = time;
         this.tags = tags;
         this.organizer = organizer;
         this.category = category;
@@ -25,11 +30,13 @@ public class Event implements Serializable {
         this.status = status;
     }
 
-    // Overloaded constructor for creation (without ID)
-    public Event(String title, String description, String date, String tags, String organizer, String category, String imagePath, String status) {
+    // Legacy constructor without id (for creation flows without time)
+    public Event(String title, String description, String date, String tags, String organizer,
+                 String category, String imagePath, String status) {
         this.title = title;
         this.description = description;
         this.date = date;
+        this.time = "";
         this.tags = tags;
         this.organizer = organizer;
         this.category = category;
@@ -37,13 +44,46 @@ public class Event implements Serializable {
         this.status = status;
     }
 
-    public int getId() { return id; }
-    public String getTitle() { return title; }
+    // Creation constructor with time
+    public Event(String title, String description, String date, String time, String tags,
+                 String organizer, String category, String imagePath, String status) {
+        this.title = title;
+        this.description = description;
+        this.date = date;
+        this.time = time;
+        this.tags = tags;
+        this.organizer = organizer;
+        this.category = category;
+        this.imagePath = imagePath;
+        this.status = status;
+    }
+
+    // Legacy constructor with id, without time
+    public Event(int id, String title, String description, String date, String tags,
+                 String organizer, String category, String imagePath, String status) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.date = date;
+        this.time = "";
+        this.tags = tags;
+        this.organizer = organizer;
+        this.category = category;
+        this.imagePath = imagePath;
+        this.status = status;
+    }
+
+    public int getId()          { return id; }
+    public String getTitle()       { return title; }
     public String getDescription() { return description; }
-    public String getDate() { return date; }
-    public String getTags() { return tags; }
-    public String getOrganizer() { return organizer; }
-    public String getCategory() { return category; }
-    public String getImagePath() { return imagePath; }
-    public String getStatus() { return status; }
+    public String getDate()        { return date; }
+    public String getTime()        { return time != null ? time : ""; }
+    public String getTags()        { return tags; }
+    public String getOrganizer()   { return organizer; }
+    public String getCategory()    { return category; }
+    public String getImagePath()   { return imagePath; }
+    public String getStatus()      { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getCreatorSid()  { return creatorSid != null ? creatorSid : ""; }
+    public void setCreatorSid(String creatorSid) { this.creatorSid = creatorSid; }
 }

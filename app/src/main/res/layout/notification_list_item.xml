@@ -56,6 +56,27 @@
                 android:textColor="@android:color/black"
                 android:textSize="13sp" />
 
+            <!-- Reason (only shown when non-empty) -->
+            <TextView
+                android:id="@+id/notif_reason"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/text_hint"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <!-- Suggested date (only shown for POSTPONED) -->
+            <TextView
+                android:id="@+id/notif_suggested_date"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/primary_blue"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/notif_time"
                 android:layout_width="match_parent"

@@ -1,26 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/background_gray">
+    android:background="@color/background_gray"
+    tools:context=".ui.main.MenuFragment">
 
-    <!-- Header -->
+    <!-- ── Header ─────────────────────────────────────────────────────────── -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/primary_blue"
         android:orientation="horizontal"
-        android:padding="24dp"
+        android:padding="20dp"
         android:gravity="center_vertical">
 
-        <ImageView
-            android:id="@+id/iv_user_avatar"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:src="@drawable/ic_image_placeholder"
-            app:tint="@android:color/white" />
+        <!-- Avatar circle -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/menu_avatar"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_person_placeholder"
+            app:shapeAppearanceOverlay="@style/CircleImageStyle"
+            android:background="@color/primary_dark" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -42,12 +47,14 @@
                 android:id="@+id/tv_menu_user_role"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Student | College of CS"
+                android:text="Student \u2022 College of CS"
                 android:textColor="#BBDEFB"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:layout_marginTop="2dp" />
         </LinearLayout>
     </LinearLayout>
 
+    <!-- ── Scrollable Content ──────────────────────────────────────────────── -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -58,7 +65,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Officer Tools Section (Initially Hidden) -->
+            <!-- ── OFFICER TOOLS (hidden for Students) ────────────────────── -->
             <LinearLayout
                 android:id="@+id/section_officer_tools"
                 android:layout_width="match_parent"
@@ -74,7 +81,7 @@
                     android:textColor="@color/primary_blue"
                     android:textSize="11sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.1" />
+                    android:letterSpacing="0.12" />
 
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
@@ -90,66 +97,34 @@
 
                         <LinearLayout
                             android:id="@+id/menu_officer_my_events"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?attr/selectableItemBackground"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="16dp" android:paddingEnd="16dp">
-                            <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                            style="@style/MenuRow">
+                            <ImageView style="@style/MenuRowIcon"
                                 android:src="@drawable/ic_events"
                                 app:tint="@color/primary_blue" />
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="16dp"
-                                android:layout_weight="1"
-                                android:text="Manage My Events"
-                                android:textColor="@android:color/black"
-                                android:textSize="15sp" />
+                            <TextView style="@style/MenuRowLabel"
+                                android:text="Manage My Events" />
+                            <ImageView style="@style/MenuRowChevron" />
                         </LinearLayout>
 
-                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+                        <View style="@style/MenuDivider" />
 
                         <LinearLayout
                             android:id="@+id/menu_officer_analytics"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?attr/selectableItemBackground"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="16dp" android:paddingEnd="16dp">
-                            <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:src="@drawable/ic_settings"
+                            style="@style/MenuRow">
+                            <ImageView style="@style/MenuRowIcon"
+                                android:src="@drawable/ic_analytics"
                                 app:tint="@color/primary_blue" />
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="16dp"
-                                android:layout_weight="1"
-                                android:text="Event Analytics"
-                                android:textColor="@android:color/black"
-                                android:textSize="15sp" />
+                            <TextView style="@style/MenuRowLabel"
+                                android:text="Event Analytics" />
+                            <ImageView style="@style/MenuRowChevron" />
                         </LinearLayout>
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
-            <!-- Account Section -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="ACCOUNT"
-                android:textColor="@color/text_hint"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
+            <!-- ── ACCOUNT ─────────────────────────────────────────────────── -->
+            <TextView style="@style/MenuSectionLabel" android:text="ACCOUNT" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -165,75 +140,33 @@
 
                     <LinearLayout
                         android:id="@+id/menu_profile"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="16dp" android:paddingEnd="16dp">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_events"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
+                            android:src="@drawable/ic_person"
                             app:tint="@color/primary_blue" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="My Profile"
-                            android:textColor="@android:color/black"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_share"
-                            app:tint="@color/text_hint" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="My Profile" />
+                        <ImageView style="@style/MenuRowChevron" />
                     </LinearLayout>
 
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+                    <View style="@style/MenuDivider" />
 
                     <LinearLayout
                         android:id="@+id/menu_my_events"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="16dp" android:paddingEnd="16dp">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
                             android:src="@drawable/ic_bookmark"
                             app:tint="@color/primary_blue" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="My Registered Events"
-                            android:textColor="@android:color/black"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_share"
-                            app:tint="@color/text_hint" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="My Registered Events" />
+                        <ImageView style="@style/MenuRowChevron" />
                     </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- App Settings Section -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="SETTINGS"
-                android:textColor="@color/text_hint"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
+            <!-- ── SETTINGS ────────────────────────────────────────────────── -->
+            <TextView style="@style/MenuSectionLabel" android:text="SETTINGS" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -249,105 +182,59 @@
 
                     <LinearLayout
                         android:id="@+id/menu_notifications_settings"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="16dp" android:paddingEnd="16dp">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
                             android:src="@drawable/ic_notifications"
                             app:tint="@color/primary_blue" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="Notification Preferences"
-                            android:textColor="@android:color/black"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_share"
-                            app:tint="@color/text_hint" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="Notification Preferences" />
+                        <ImageView style="@style/MenuRowChevron" />
                     </LinearLayout>
 
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+                    <View style="@style/MenuDivider" />
 
                     <LinearLayout
                         android:id="@+id/menu_dark_mode"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="16dp" android:paddingEnd="16dp">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
                             android:src="@drawable/ic_settings"
                             app:tint="@color/primary_blue" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="Appearance &amp; Theme"
-                            android:textColor="@android:color/black"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_share"
-                            app:tint="@color/text_hint" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="Appearance &amp; Theme" />
+                        <ImageView style="@style/MenuRowChevron" />
                     </LinearLayout>
 
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+                    <View style="@style/MenuDivider" />
 
                     <LinearLayout
                         android:id="@+id/menu_privacy"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="16dp" android:paddingEnd="16dp">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_bookmark"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
+                            android:src="@drawable/ic_lock"
                             app:tint="@color/primary_blue" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="Privacy &amp; Security"
-                            android:textColor="@android:color/black"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_share"
-                            app:tint="@color/text_hint" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="Privacy" />
+                        <ImageView style="@style/MenuRowChevron" />
+                    </LinearLayout>
+
+                    <View style="@style/MenuDivider" />
+
+                    <LinearLayout
+                        android:id="@+id/menu_security"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
+                            android:src="@drawable/ic_lock"
+                            app:tint="@color/primary_blue" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="Security" />
+                        <ImageView style="@style/MenuRowChevron" />
                     </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- About Section -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="ABOUT"
-                android:textColor="@color/text_hint"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
+            <!-- ── ABOUT ───────────────────────────────────────────────────── -->
+            <TextView style="@style/MenuSectionLabel" android:text="ABOUT" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -363,70 +250,36 @@
 
                     <LinearLayout
                         android:id="@+id/menu_help"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="16dp" android:paddingEnd="16dp">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_notifications"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
+                            android:src="@drawable/ic_help"
                             app:tint="@color/primary_blue" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="Help &amp; Support"
-                            android:textColor="@android:color/black"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_share"
-                            app:tint="@color/text_hint" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="Help &amp; Support" />
+                        <ImageView style="@style/MenuRowChevron" />
                     </LinearLayout>
 
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+                    <View style="@style/MenuDivider" />
 
                     <LinearLayout
                         android:id="@+id/menu_about"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="16dp" android:paddingEnd="16dp">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_events"
+                        style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon"
+                            android:src="@drawable/ic_info"
                             app:tint="@color/primary_blue" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="About CEOH"
-                            android:textColor="@android:color/black"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_share"
-                            app:tint="@color/text_hint" />
+                        <TextView style="@style/MenuRowLabel"
+                            android:text="About CEOH" />
+                        <ImageView style="@style/MenuRowChevron" />
                     </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Logout -->
+            <!-- ── LOG OUT ─────────────────────────────────────────────────── -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
+                android:layout_marginBottom="32dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp">
 
@@ -435,18 +288,24 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_share"
+                        android:src="@drawable/ic_logout"
                         app:tint="@color/error_red" />
+
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
+                        android:layout_weight="1"
                         android:text="Log Out"
                         android:textColor="@color/error_red"
                         android:textSize="15sp"
@@ -457,5 +316,4 @@
 
         </LinearLayout>
     </ScrollView>
-
 </LinearLayout>
