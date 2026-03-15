@@ -697,8 +697,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Officer proposes/confirms a new date for a postponed event.
-     * Sets the event's date to the proposed date and restores status to APPROVED.
+     * Officer confirms the admin's suggested date.
+     * Sets the event's date to the given date and restores status to APPROVED.
      */
     public boolean proposeNewDate(int eventId, String newDate) {
         try {
@@ -710,7 +710,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     new String[]{String.valueOf(eventId)});
             db.close();
             if (rows > 0) {
-                // Only update date + status in Firestore
                 new FirestoreHelper().updateEventDateAndStatus(eventId, newDate, "APPROVED");
             }
             return rows > 0;
@@ -718,6 +717,51 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             Log.e("DatabaseHelper", "proposeNewDate failed", e);
             return false;
         }
+    }
+
+    /**
+     * Officer proposes a DIFFERENT date than the admin's suggestion.
+     * Sets the event's date to the proposed date but keeps status as PENDING
+     * so the admin must review and re-approve.
+     */
+    public boolean proposeNewDatePending(int eventId, String newDate) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_DATE,   newDate);
+            v.put(COLUMN_STATUS, "PENDING");
+            int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
+                    new String[]{String.valueOf(eventId)});
+            db.close();
+            if (rows > 0) {
+                new FirestoreHelper().updateEventDateAndStatus(eventId, newDate, "PENDING");
+            }
+            return rows > 0;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "proposeNewDatePending failed", e);
+            return false;
+        }
+    }
+
+    /**
+     * Returns the student_ids of all Admin-role users.
+     * Used to notify every admin when an officer proposes a different reschedule date.
+     */
+    public List<String> getAdminStudentIds() {
+        List<String> ids = new ArrayList<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT " + COLUMN_USER_STUDENT_ID + " FROM " + TABLE_USERS +
+                    " WHERE " + COLUMN_USER_ROLE + " = 'Admin'", null);
+            if (c != null && c.moveToFirst()) {
+                do { ids.add(c.getString(0)); } while (c.moveToNext());
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getAdminStudentIds failed", e);
+        }
+        return ids;
     }
 
     /**

@@ -80,11 +80,18 @@ public class EventsFragment extends Fragment {
             String role = getArguments() != null
                     ? getArguments().getString("USER_ROLE", "Student") : "Student";
             fab.setVisibility("Student".equalsIgnoreCase(role) ? View.GONE : View.VISIBLE);
-            fab.setOnClickListener(v -> requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, new CreateEventFragment())
-                    .addToBackStack(null)
-                    .commit());
+            fab.setOnClickListener(v -> {
+                if (getActivity() instanceof com.example.campus_event_org_hub.ui.main.MainActivity) {
+                    ((com.example.campus_event_org_hub.ui.main.MainActivity) getActivity())
+                            .loadFragment(new CreateEventFragment(), true);
+                } else {
+                    requireActivity().getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.fragment_container, new CreateEventFragment())
+                            .addToBackStack(null)
+                            .commit();
+                }
+            });
 
             // ── Search ───────────────────────────────────────────────────────
             if (searchView != null) {

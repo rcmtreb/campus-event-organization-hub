@@ -71,6 +71,11 @@ public class MenuFragment extends Fragment {
                 ((MainActivity) getActivity()).loadFragment(new OfficerMyEventsFragment(), true);
             }
         });
+        view.findViewById(R.id.menu_officer_pending_events).setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).loadFragment(new OfficerPendingEventsFragment(), true);
+            }
+        });
         view.findViewById(R.id.menu_officer_analytics).setOnClickListener(v -> {
             if (getActivity() instanceof MainActivity) {
                 ((MainActivity) getActivity()).loadFragment(new OfficerAnalyticsFragment(), true);

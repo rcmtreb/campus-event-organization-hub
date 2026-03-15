@@ -21,7 +21,6 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.google.android.material.tabs.TabLayout;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -65,7 +64,7 @@ public class OfficerMyEventsFragment extends Fragment {
             });
         }
 
-        // Set up tabs — 4 tabs now
+        // Set up tabs — 4 tabs
         TabLayout tabs = view.findViewById(R.id.tabs_my_events);
         tabs.addTab(tabs.newTab().setText("Upcoming"));
         tabs.addTab(tabs.newTab().setText("Happening"));
@@ -98,7 +97,19 @@ public class OfficerMyEventsFragment extends Fragment {
 
     private void loadEvents() {
         DatabaseHelper db = new DatabaseHelper(requireContext());
-        allOfficerEvents = db.getEventsByCreatorSid(officerSid);
+
+        // Start with events the officer created
+        List<Event> created = db.getEventsByCreatorSid(officerSid);
+
+        // Also include events the officer registered for (so registered+upcoming events show up)
+        List<Event> registered = db.getRegisteredEvents(officerSid);
+
+        // Merge, deduplicating by event ID so created events aren't listed twice
+        java.util.Map<Integer, Event> merged = new java.util.LinkedHashMap<>();
+        for (Event e : created)    merged.put(e.getId(), e);
+        for (Event e : registered) merged.putIfAbsent(e.getId(), e);
+
+        allOfficerEvents = new ArrayList<>(merged.values());
     }
 
     private void showTab(int tab) {
@@ -108,6 +119,9 @@ public class OfficerMyEventsFragment extends Fragment {
         for (Event e : allOfficerEvents) {
             String status = e.getStatus();
             String date   = e.getDate();
+
+            // PENDING events are excluded entirely — visible only in "Pending Events" section
+            if ("PENDING".equals(status)) continue;
 
             // POSTPONED events go only to the Postponed tab
             if ("POSTPONED".equals(status)) {
@@ -121,7 +135,7 @@ public class OfficerMyEventsFragment extends Fragment {
                 continue;
             }
 
-            // For APPROVED / PENDING — categorise by date
+            // For APPROVED — categorise by date
             int cmp = date.compareTo(today);
             if (tab == TAB_UPCOMING  && cmp > 0)  filtered.add(e);
             if (tab == TAB_HAPPENING && cmp == 0)  filtered.add(e);
@@ -175,16 +189,30 @@ public class OfficerMyEventsFragment extends Fragment {
 
     private void pickNewDate(Event e, DatabaseHelper db) {
         Calendar cal = Calendar.getInstance();
+        // Pre-fill the picker with the event's postponed date using direct field parsing
+        // to avoid timezone shifts that occur when using Date/setTime()
+        String[] parts = e.getDate().split("-");
+        if (parts.length == 3) {
+            try {
+                cal.set(Calendar.YEAR,         Integer.parseInt(parts[0]));
+                cal.set(Calendar.MONTH,        Integer.parseInt(parts[1]) - 1); // 0-based
+                cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(parts[2]));
+            } catch (NumberFormatException ignored) { }
+        }
+
         new DatePickerDialog(requireContext(),
                 (view, year, month, day) -> {
                     String newDate = String.format(Locale.getDefault(),
                             "%04d-%02d-%02d", year, month + 1, day);
-                    boolean ok = db.proposeNewDate(e.getId(), newDate);
+                    // Officer is proposing a DIFFERENT date — must go back to admin for approval
+                    boolean ok = db.proposeNewDatePending(e.getId(), newDate);
                     if (ok) {
-                        e.setStatus("APPROVED");
+                        e.setStatus("PENDING");
+                        // Notify all admins that this officer proposed a new date
+                        notifyAdminsOfProposedDate(e, newDate, db);
                         Toast.makeText(requireContext(),
-                                "New date set to " + newDate + ". Event is now APPROVED.",
-                                Toast.LENGTH_SHORT).show();
+                                "The admin will receive your proposal date.",
+                                Toast.LENGTH_LONG).show();
                         loadEvents();
                         showTab(TAB_POSTPONED);
                     } else {
@@ -193,6 +221,20 @@ public class OfficerMyEventsFragment extends Fragment {
                 },
                 cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
                 .show();
+    }
+
+    /**
+     * Sends a notification to every Admin so they can review and re-approve the
+     * officer's proposed reschedule date.
+     */
+    private void notifyAdminsOfProposedDate(Event e, String proposedDate, DatabaseHelper db) {
+        String message = "Officer proposed a new date (" + proposedDate + ") for the postponed event \""
+                + e.getTitle() + "\". Please review and approve or reject.";
+        List<String> adminIds = db.getAdminStudentIds();
+        for (String adminSid : adminIds) {
+            db.insertNotification(adminSid, e.getId(), "PENDING",
+                    message, "Officer-proposed reschedule date", proposedDate, "");
+        }
     }
 
     // ── Adapter ──────────────────────────────────────────────────────────────
@@ -237,6 +279,10 @@ public class OfficerMyEventsFragment extends Fragment {
             } else if ("POSTPONED".equals(status)) {
                 h.timelineBadge.setText("POSTPONED");
                 h.timelineBadge.setBackgroundColor(0xFF7B1FA2);
+                h.timelineBadge.setVisibility(View.VISIBLE);
+            } else if ("PENDING".equals(status)) {
+                h.timelineBadge.setText("PENDING");
+                h.timelineBadge.setBackgroundColor(0xFFF57C00);
                 h.timelineBadge.setVisibility(View.VISIBLE);
             } else {
                 // APPROVED / PENDING — compute from date

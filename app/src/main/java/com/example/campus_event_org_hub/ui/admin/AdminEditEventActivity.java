@@ -1,6 +1,5 @@
 package com.example.campus_event_org_hub.ui.admin;
 
-import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.widget.ImageButton;
@@ -54,10 +53,7 @@ public class AdminEditEventActivity extends AppCompatActivity {
         ImageButton btnBack = findViewById(R.id.btn_back_edit_event);
         btnBack.setOnClickListener(v -> finish());
 
-        // Date picker
-        TextInputLayout tilDate = findViewById(R.id.til_edit_date);
-        etDate.setOnClickListener(v -> openDatePicker());
-        tilDate.setEndIconOnClickListener(v -> openDatePicker());
+        // Date field is locked — no picker attached
 
         // Time picker
         TextInputLayout tilTime = findViewById(R.id.til_edit_time);
@@ -67,18 +63,6 @@ public class AdminEditEventActivity extends AppCompatActivity {
         // Save button
         MaterialButton btnSave = findViewById(R.id.btn_save_event_edit);
         btnSave.setOnClickListener(v -> saveChanges());
-    }
-
-    private void openDatePicker() {
-        Calendar cal = Calendar.getInstance();
-        new DatePickerDialog(this,
-                (view, year, month, day) -> {
-                    String formatted = String.format(Locale.getDefault(),
-                            "%04d-%02d-%02d", year, month + 1, day);
-                    etDate.setText(formatted);
-                },
-                cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
-        ).show();
     }
 
     private void openTimePicker() {

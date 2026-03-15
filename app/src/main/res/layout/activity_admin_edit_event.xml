@@ -81,13 +81,14 @@
                 android:hint="Date (yyyy-MM-dd)"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 app:endIconMode="custom"
-                app:endIconDrawable="@drawable/ic_calendar"
+                app:endIconDrawable="@drawable/ic_lock"
                 android:layout_marginBottom="12dp">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_edit_date"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:focusable="false"
+                    android:enabled="false"
                     android:inputType="none" />
             </com.google.android.material.textfield.TextInputLayout>
 

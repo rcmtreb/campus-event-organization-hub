@@ -109,6 +109,19 @@
                         <View style="@style/MenuDivider" />
 
                         <LinearLayout
+                            android:id="@+id/menu_officer_pending_events"
+                            style="@style/MenuRow">
+                            <ImageView style="@style/MenuRowIcon"
+                                android:src="@drawable/ic_clock"
+                                app:tint="@color/primary_blue" />
+                            <TextView style="@style/MenuRowLabel"
+                                android:text="Pending Events" />
+                            <ImageView style="@style/MenuRowChevron" />
+                        </LinearLayout>
+
+                        <View style="@style/MenuDivider" />
+
+                        <LinearLayout
                             android:id="@+id/menu_officer_analytics"
                             style="@style/MenuRow">
                             <ImageView style="@style/MenuRowIcon"

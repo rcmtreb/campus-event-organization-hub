@@ -209,6 +209,17 @@ public class AdminEventControlActivity extends AppCompatActivity {
 
     private void showPostponeDialog(Event e, int pos) {
         Calendar cal = Calendar.getInstance();
+        // Pre-fill the picker with the event's current date using direct field parsing
+        // to avoid timezone shifts that occur when using Date/setTime()
+        String[] parts = e.getDate().split("-");
+        if (parts.length == 3) {
+            try {
+                cal.set(Calendar.YEAR,         Integer.parseInt(parts[0]));
+                cal.set(Calendar.MONTH,        Integer.parseInt(parts[1]) - 1); // 0-based
+                cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(parts[2]));
+            } catch (NumberFormatException ignored) { }
+        }
+
         DatePickerDialog dpd = new DatePickerDialog(this,
                 (view, year, month, day) -> {
                     String suggestedDate = String.format(Locale.getDefault(),
