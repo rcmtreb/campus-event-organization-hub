@@ -2,9 +2,9 @@
     <!-- Base application theme for Dark Mode -->
     <style name="Base.Theme.Campuseventorghub" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Optimized Dark Colors -->
-        <item name="colorPrimary">@color/primaryLightBlue</item>
-        <item name="colorSecondary">@color/accentOrange</item>
-        <item name="android:statusBarColor">@color/primaryDarkBlue</item>
+        <item name="colorPrimary">@color/primary_green</item>
+        <item name="colorSecondary">@color/primary_orange</item>
+        <item name="android:statusBarColor">@color/primary_green_dark</item>
 
         <!-- Surface and Background -->
         <item name="android:windowBackground">#121212</item>

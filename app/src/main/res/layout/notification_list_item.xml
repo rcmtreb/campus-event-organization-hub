@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/notif_card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="6dp"
@@ -11,9 +12,20 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="14dp">
+        android:padding="14dp"
+        android:gravity="center_vertical">
 
-        <!-- Icon dot -->
+        <!-- Checkbox — visible only in multi-select mode -->
+        <CheckBox
+            android:id="@+id/notif_checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:visibility="gone"
+            android:clickable="false"
+            android:focusable="false" />
+
+        <!-- Icon area with red alert dot badge -->
         <FrameLayout
             android:layout_width="44dp"
             android:layout_height="44dp"
@@ -32,6 +44,16 @@
                 android:layout_gravity="center"
                 android:src="@drawable/ic_notifications"
                 app:tint="@color/primary_blue" />
+
+            <!-- Red alert dot — shown when notification is unread -->
+            <View
+                android:id="@+id/notif_unread_dot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_gravity="top|end"
+                android:background="#F44336"
+                android:visibility="gone" />
+
         </FrameLayout>
 
         <LinearLayout
@@ -66,7 +88,7 @@
                 android:textSize="12sp"
                 android:visibility="gone" />
 
-            <!-- Suggested date (only shown for POSTPONED) -->
+            <!-- Suggested date+time (only shown for POSTPONED) -->
             <TextView
                 android:id="@+id/notif_suggested_date"
                 android:layout_width="match_parent"
@@ -77,6 +99,31 @@
                 android:textStyle="bold"
                 android:visibility="gone" />
 
+            <!-- Respond button — only visible for POSTPONED notifications -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_respond_postpone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Respond"
+                android:textSize="12sp"
+                app:cornerRadius="20dp"
+                android:visibility="gone"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <!-- Mark as read / unread toggle — hidden in multi-select mode -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_mark_read_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Mark as read"
+                android:textSize="11sp"
+                app:cornerRadius="20dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="@color/primary_blue"
+                android:textColor="@color/primary_blue" />
+
             <TextView
                 android:id="@+id/notif_time"
                 android:layout_width="match_parent"
@@ -85,16 +132,6 @@
                 android:textColor="@color/text_hint"
                 android:textSize="11sp" />
         </LinearLayout>
-
-        <!-- Unread dot -->
-        <View
-            android:id="@+id/notif_unread_dot"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:layout_gravity="top"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_login_header"
-            android:visibility="gone" />
 
     </LinearLayout>
 

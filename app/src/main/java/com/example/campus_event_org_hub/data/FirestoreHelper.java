@@ -111,6 +111,16 @@ public class FirestoreHelper {
                 .addOnFailureListener(e -> Log.e(TAG, "updateEventDateAndStatus failed", e));
     }
 
+    public void updateEventDateTimeAndStatus(int localId, String date, String time, String status) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("date",       date);
+        data.put("event_time", time  != null ? time  : "");
+        data.put("status",     status);
+        db.collection(COL_EVENTS).document(String.valueOf(localId))
+                .update(data)
+                .addOnFailureListener(e -> Log.e(TAG, "updateEventDateTimeAndStatus failed", e));
+    }
+
     public void updateEventFields(int localId, String title, String description,
                                   String date, String time, String tags,
                                   String organizer, String category) {
@@ -150,7 +160,8 @@ public class FirestoreHelper {
 
     public void upsertNotification(int localNotifId, String recipientSid, int eventId,
                                    String type, String message, String reason,
-                                   String suggestedDate, String instructions,
+                                   String suggestedDate, String suggestedTime,
+                                   String instructions,
                                    boolean isRead, String createdAt) {
         Map<String, Object> data = new HashMap<>();
         data.put("local_notif_id",  localNotifId);
@@ -160,6 +171,7 @@ public class FirestoreHelper {
         data.put("message",         message);
         data.put("reason",          reason        != null ? reason        : "");
         data.put("suggested_date",  suggestedDate != null ? suggestedDate : "");
+        data.put("suggested_time",  suggestedTime != null ? suggestedTime : "");
         data.put("instructions",    instructions  != null ? instructions  : "");
         data.put("is_read",         isRead ? 1 : 0);
         data.put("created_at",      createdAt);

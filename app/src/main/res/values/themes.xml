@@ -2,9 +2,9 @@
     <!-- Base application theme. Uses DayNight but forced to Light by default in code -->
     <style name="Base.Theme.Campuseventorghub" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
-        <item name="colorPrimary">@color/primaryLightBlue</item>
-        <item name="colorSecondary">@color/accentOrange</item>
-        <item name="android:statusBarColor">@color/primaryDarkBlue</item>
+        <item name="colorPrimary">@color/primary_green</item>
+        <item name="colorSecondary">@color/primary_orange</item>
+        <item name="android:statusBarColor">@color/primary_green_dark</item>
         <item name="android:windowBackground">@color/background_gray</item>
         <item name="materialCardViewStyle">@style/App.CardView</item>
 
@@ -44,6 +44,12 @@
     <style name="Widget.App.SearchView" parent="Widget.AppCompat.SearchView">
         <item name="android:textColor">@android:color/white</item>
         <item name="android:textColorHint">@android:color/white</item>
+        <item name="queryBackground">@android:color/transparent</item>
+    </style>
+
+    <style name="Widget.App.SearchView.Dark" parent="Widget.AppCompat.SearchView">
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:textColorHint">#888888</item>
         <item name="queryBackground">@android:color/transparent</item>
     </style>
 

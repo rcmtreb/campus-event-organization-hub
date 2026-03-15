@@ -62,7 +62,7 @@ public class ApproveEventsActivity extends AppCompatActivity {
         String message = approved
                 ? "Your event \"" + e.getTitle() + "\" has been approved and is now live!"
                 : "Your event \"" + e.getTitle() + "\" was rejected by the admin.";
-        db.insertNotification(officerSid, e.getId(), type, message, "", "", "");
+        db.insertNotification(officerSid, e.getId(), type, message, "", "", "", "");
     }
 
     /**
@@ -90,7 +90,7 @@ public class ApproveEventsActivity extends AppCompatActivity {
             for (String sid : studentIds) {
                 if (notifiedSids.contains(sid)) continue; // don't double-notify
                 notifiedSids.add(sid);
-                db.insertNotification(sid, e.getId(), "NEW_EVENT", message, "", "", "");
+                db.insertNotification(sid, e.getId(), "NEW_EVENT", message, "", "", "", "");
             }
         }
     }

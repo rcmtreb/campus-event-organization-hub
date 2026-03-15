@@ -25,7 +25,7 @@
             android:scaleType="centerCrop"
             android:src="@drawable/ic_person_placeholder"
             app:shapeAppearanceOverlay="@style/CircleImageStyle"
-            android:background="@color/primary_dark" />
+            android:background="@color/primary_green_dark" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -48,7 +48,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Student \u2022 College of CS"
-                android:textColor="#BBDEFB"
+                android:textColor="#C8F5A8"
                 android:textSize="13sp"
                 android:layout_marginTop="2dp" />
         </LinearLayout>

@@ -2,6 +2,7 @@ package com.example.campus_event_org_hub.ui.admin;
 
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -199,7 +200,7 @@ public class AdminEventControlActivity extends AppCompatActivity {
                     String instructions = etInstructions.getText().toString().trim();
                     db.cancelEvent(e.getId());
                     e.setStatus("CANCELLED");
-                    notifyOfficer(e, "CANCELLED", reason, "", instructions);
+                    notifyOfficer(e, "CANCELLED", reason, "", "", instructions);
                     adapter.notifyItemChanged(pos);
                     Toast.makeText(this, "Event cancelled.", Toast.LENGTH_SHORT).show();
                 })
@@ -224,28 +225,51 @@ public class AdminEventControlActivity extends AppCompatActivity {
                 (view, year, month, day) -> {
                     String suggestedDate = String.format(Locale.getDefault(),
                             "%04d-%02d-%02d", year, month + 1, day);
-                    showPostponeReasonDialog(e, pos, suggestedDate);
+                    // After picking date, prompt for a suggested time
+                    Calendar timeCal = Calendar.getInstance();
+                    TimePickerDialog tpd = new TimePickerDialog(this,
+                            (tv, hourOfDay, minute) -> {
+                                String suggestedTime = String.format(Locale.getDefault(),
+                                        "%02d:%02d", hourOfDay, minute);
+                                showPostponeReasonDialog(e, pos, suggestedDate, suggestedTime);
+                            },
+                            timeCal.get(Calendar.HOUR_OF_DAY),
+                            timeCal.get(Calendar.MINUTE),
+                            false /* 12-hour clock */);
+                    tpd.setTitle("Select Suggested New Time");
+                    tpd.show();
                 },
                 cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
         dpd.setTitle("Select Suggested New Date");
         dpd.show();
     }
 
-    private void showPostponeReasonDialog(Event e, int pos, String suggestedDate) {
+    private void showPostponeReasonDialog(Event e, int pos, String suggestedDate, String suggestedTime) {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_reason, null);
         EditText etReason = dialogView.findViewById(R.id.et_reason);
         EditText etInstructions = dialogView.findViewById(R.id.et_instructions);
 
+        // Format time to 12-hour display for the message
+        String timeDisplay = suggestedTime;
+        try {
+            String[] tp = suggestedTime.split(":");
+            int h = Integer.parseInt(tp[0]);
+            int m = Integer.parseInt(tp[1]);
+            String ampm = h >= 12 ? "PM" : "AM";
+            int h12 = h % 12; if (h12 == 0) h12 = 12;
+            timeDisplay = String.format(Locale.getDefault(), "%d:%02d %s", h12, m, ampm);
+        } catch (Exception ignored) { }
+
         new AlertDialog.Builder(this)
                 .setTitle("Postpone Event")
-                .setMessage("Suggested new date: " + suggestedDate)
+                .setMessage("Suggested new date: " + suggestedDate + "\nSuggested new time: " + timeDisplay)
                 .setView(dialogView)
                 .setPositiveButton("Confirm Postpone", (d, w) -> {
                     String reason = etReason.getText().toString().trim();
                     String instructions = etInstructions.getText().toString().trim();
                     db.postponeEvent(e.getId());
                     e.setStatus("POSTPONED");
-                    notifyOfficer(e, "POSTPONED", reason, suggestedDate, instructions);
+                    notifyOfficer(e, "POSTPONED", reason, suggestedDate, suggestedTime, instructions);
                     adapter.notifyItemChanged(pos);
                     Toast.makeText(this, "Event postponed.", Toast.LENGTH_SHORT).show();
                 })
@@ -259,7 +283,8 @@ public class AdminEventControlActivity extends AppCompatActivity {
      * Falls back to the old organizer-name lookup for events created before v11.
      */
     private void notifyOfficer(Event e, String type, String reason,
-                                String suggestedDate, String instructions) {
+                                String suggestedDate, String suggestedTime,
+                                String instructions) {
         String officerSid = e.getCreatorSid();
         if (officerSid == null || officerSid.isEmpty()) {
             // Fallback for pre-v11 events that don't have a stored creator_sid
@@ -272,12 +297,18 @@ public class AdminEventControlActivity extends AppCompatActivity {
             return;
         }
 
-        String message = "POSTPONED".equals(type)
-                ? "Your event \"" + e.getTitle() + "\" has been postponed to " + suggestedDate + "."
-                : "Your event \"" + e.getTitle() + "\" has been cancelled.";
+        String message;
+        if ("POSTPONED".equals(type)) {
+            String timeDisplay = (suggestedTime != null && !suggestedTime.isEmpty())
+                    ? " at " + suggestedTime : "";
+            message = "Your event \"" + e.getTitle() + "\" has been postponed."
+                    + " Suggested new schedule: " + suggestedDate + timeDisplay + ".";
+        } else {
+            message = "Your event \"" + e.getTitle() + "\" has been cancelled.";
+        }
 
         long id = db.insertNotification(officerSid, e.getId(), type, message,
-                reason, suggestedDate, instructions);
+                reason, suggestedDate, suggestedTime, instructions);
         if (id == -1) {
             Toast.makeText(this, "Warning: notification could not be saved.", Toast.LENGTH_SHORT).show();
         }

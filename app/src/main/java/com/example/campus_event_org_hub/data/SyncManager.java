@@ -135,13 +135,14 @@ public class SyncManager {
                 String message       = str(d, "message");
                 String reason        = str(d, "reason");
                 String suggestedDate = str(d, "suggested_date");
+                String suggestedTime = str(d, "suggested_time");
                 String instructions  = str(d, "instructions");
                 int    isRead        = intVal(d, "is_read");
                 String createdAt     = str(d, "created_at");
                 if (notifId <= 0 || recipientSid == null) continue;
                 db.syncUpsertNotification(notifId, recipientSid, eventId,
-                        type, message, reason, suggestedDate, instructions,
-                        isRead, createdAt);
+                        type, message, reason, suggestedDate, suggestedTime,
+                        instructions, isRead, createdAt);
             }
             Log.d(TAG, "Synced " + docs.size() + " notifications");
         } catch (Exception e) {

@@ -2,6 +2,7 @@ package com.example.campus_event_org_hub.ui.events;
 
 import android.os.Bundle;
 import android.view.ContextThemeWrapper;
+import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -15,6 +16,7 @@ import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
@@ -44,6 +46,7 @@ public class EventDetailActivity extends AppCompatActivity {
             ImageButton bookmarkButton = findViewById(R.id.btn_bookmark);
             ImageButton shareButton    = findViewById(R.id.btn_share);
             Button registerButton      = findViewById(R.id.btn_register);
+            MaterialCardView postponedBanner = findViewById(R.id.card_postponed_banner);
 
             ImageUtils.load(this, eventImage, event.getImagePath(), R.drawable.ic_image_placeholder);
 
@@ -76,7 +79,14 @@ public class EventDetailActivity extends AppCompatActivity {
             final String finalStudentId = studentId;
             final int eventId = event.getId();
 
-            if (finalStudentId.isEmpty()) {
+            if ("POSTPONED".equals(event.getStatus())) {
+                // Event is postponed — show banner, disable registration
+                postponedBanner.setVisibility(View.VISIBLE);
+                registerButton.setEnabled(false);
+                registerButton.setText("Registration Unavailable");
+                registerButton.setBackgroundTintList(
+                        ContextCompat.getColorStateList(this, android.R.color.darker_gray));
+            } else if (finalStudentId.isEmpty()) {
                 // Not a student (e.g., admin/officer viewing) — disable button
                 registerButton.setEnabled(false);
                 registerButton.setText("Register for Event");

@@ -59,7 +59,7 @@
                     android:layout_height="88dp"
                     android:scaleType="centerCrop"
                     android:src="@drawable/ic_person"
-                    android:background="@color/primary_dark"
+                    android:background="@color/primary_green_dark"
                     android:padding="20dp" />
 
                 <ImageView
@@ -86,7 +86,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:background="@color/primary_dark"
+                android:background="@color/primary_green_dark"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:paddingTop="3dp"

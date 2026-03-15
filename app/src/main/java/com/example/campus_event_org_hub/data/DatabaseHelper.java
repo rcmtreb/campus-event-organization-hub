@@ -23,7 +23,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "ceoh.db";
-    private static final int DATABASE_VERSION = 11; // v11: added creator_sid to events
+    private static final int DATABASE_VERSION = 13; // v13: added is_archived + archived_at to notifications
 
     // Table: Events
     public static final String TABLE_EVENTS       = "events";
@@ -69,9 +69,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_NOTIF_MESSAGE        = "message";
     public static final String COLUMN_NOTIF_REASON         = "reason";
     public static final String COLUMN_NOTIF_SUGGESTED_DATE = "suggested_date";
+    public static final String COLUMN_NOTIF_SUGGESTED_TIME = "suggested_time";
     public static final String COLUMN_NOTIF_INSTRUCTIONS   = "instructions";
     public static final String COLUMN_NOTIF_IS_READ        = "is_read";
     public static final String COLUMN_NOTIF_CREATED_AT     = "created_at";
+    public static final String COLUMN_NOTIF_IS_ARCHIVED    = "is_archived";
+    public static final String COLUMN_NOTIF_ARCHIVED_AT    = "archived_at";
 
     // ── CREATE statements ────────────────────────────────────────────────────
 
@@ -120,9 +123,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_NOTIF_MESSAGE        + " TEXT, " +
             COLUMN_NOTIF_REASON         + " TEXT, " +
             COLUMN_NOTIF_SUGGESTED_DATE + " TEXT DEFAULT '', " +
+            COLUMN_NOTIF_SUGGESTED_TIME + " TEXT DEFAULT '', " +
             COLUMN_NOTIF_INSTRUCTIONS   + " TEXT DEFAULT '', " +
             COLUMN_NOTIF_IS_READ        + " INTEGER DEFAULT 0, " +
-            COLUMN_NOTIF_CREATED_AT     + " TEXT)";
+            COLUMN_NOTIF_CREATED_AT     + " TEXT, " +
+            COLUMN_NOTIF_IS_ARCHIVED    + " INTEGER DEFAULT 0, " +
+            COLUMN_NOTIF_ARCHIVED_AT    + " TEXT DEFAULT '')";
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -168,6 +174,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         backfillCreatorSid(db);
         // Pass db directly — avoids recursive getWritableDatabase() call inside onOpen
         deleteEndedEventsOlderThan(db, 30);
+        // Purge notifications archived more than 30 days ago
+        deleteExpiredArchivedNotifications();
     }
 
     // ── Defensive repair ─────────────────────────────────────────────────────
@@ -321,9 +329,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     COLUMN_NOTIF_MESSAGE        + " TEXT, " +
                     COLUMN_NOTIF_REASON         + " TEXT, " +
                     COLUMN_NOTIF_SUGGESTED_DATE + " TEXT DEFAULT '', " +
+                    COLUMN_NOTIF_SUGGESTED_TIME + " TEXT DEFAULT '', " +
                     COLUMN_NOTIF_INSTRUCTIONS   + " TEXT DEFAULT '', " +
                     COLUMN_NOTIF_IS_READ        + " INTEGER DEFAULT 0, " +
-                    COLUMN_NOTIF_CREATED_AT     + " TEXT)");
+                    COLUMN_NOTIF_CREATED_AT     + " TEXT, " +
+                    COLUMN_NOTIF_IS_ARCHIVED    + " INTEGER DEFAULT 0, " +
+                    COLUMN_NOTIF_ARCHIVED_AT    + " TEXT DEFAULT '')" );
+            // Add columns that may be missing from older schema versions (silent fail if present)
+            try { db.execSQL("ALTER TABLE " + TABLE_NOTIFICATIONS + " ADD COLUMN " + COLUMN_NOTIF_SUGGESTED_TIME + " TEXT DEFAULT ''"); } catch (Exception ignored) {}
+            try { db.execSQL("ALTER TABLE " + TABLE_NOTIFICATIONS + " ADD COLUMN " + COLUMN_NOTIF_IS_ARCHIVED   + " INTEGER DEFAULT 0"); } catch (Exception ignored) {}
+            try { db.execSQL("ALTER TABLE " + TABLE_NOTIFICATIONS + " ADD COLUMN " + COLUMN_NOTIF_ARCHIVED_AT   + " TEXT DEFAULT ''");   } catch (Exception ignored) {}
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureNotificationsTable failed", e);
         }
@@ -605,7 +620,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      */
     public void syncUpsertNotification(int localNotifId, String recipientSid, int eventId,
                                         String type, String message, String reason,
-                                        String suggestedDate, String instructions,
+                                        String suggestedDate, String suggestedTime,
+                                        String instructions,
                                         int isRead, String createdAt) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
@@ -617,6 +633,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_NOTIF_MESSAGE,        message);
             v.put(COLUMN_NOTIF_REASON,         reason        != null ? reason        : "");
             v.put(COLUMN_NOTIF_SUGGESTED_DATE, suggestedDate != null ? suggestedDate : "");
+            v.put(COLUMN_NOTIF_SUGGESTED_TIME, suggestedTime != null ? suggestedTime : "");
             v.put(COLUMN_NOTIF_INSTRUCTIONS,   instructions  != null ? instructions  : "");
             v.put(COLUMN_NOTIF_IS_READ,        isRead);
             v.put(COLUMN_NOTIF_CREATED_AT,     createdAt     != null ? createdAt     : "");
@@ -720,25 +737,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Officer proposes a DIFFERENT date than the admin's suggestion.
-     * Sets the event's date to the proposed date but keeps status as PENDING
-     * so the admin must review and re-approve.
+     * Officer confirms the admin's suggested date and time.
+     * Sets the event's date+time and sets status to PENDING for admin re-approval.
      */
-    public boolean proposeNewDatePending(int eventId, String newDate) {
+    public boolean proposeNewDateTimePending(int eventId, String newDate, String newTime) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
             ContentValues v = new ContentValues();
-            v.put(COLUMN_DATE,   newDate);
-            v.put(COLUMN_STATUS, "PENDING");
+            v.put(COLUMN_DATE,       newDate);
+            v.put(COLUMN_EVENT_TIME, newTime != null ? newTime : "");
+            v.put(COLUMN_STATUS,     "PENDING");
             int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                     new String[]{String.valueOf(eventId)});
             db.close();
             if (rows > 0) {
-                new FirestoreHelper().updateEventDateAndStatus(eventId, newDate, "PENDING");
+                new FirestoreHelper().updateEventDateTimeAndStatus(eventId, newDate, newTime, "PENDING");
             }
             return rows > 0;
         } catch (Exception e) {
-            Log.e("DatabaseHelper", "proposeNewDatePending failed", e);
+            Log.e("DatabaseHelper", "proposeNewDateTimePending failed", e);
             return false;
         }
     }
@@ -1008,7 +1025,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     public long insertNotification(String recipientSid, int eventId, String type,
                                    String message, String reason,
-                                   String suggestedDate, String instructions) {
+                                   String suggestedDate, String suggestedTime,
+                                   String instructions) {
         try {
             String createdAt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                     .format(new Date());
@@ -1020,6 +1038,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_NOTIF_MESSAGE, message);
             v.put(COLUMN_NOTIF_REASON, reason);
             v.put(COLUMN_NOTIF_SUGGESTED_DATE, suggestedDate != null ? suggestedDate : "");
+            v.put(COLUMN_NOTIF_SUGGESTED_TIME, suggestedTime != null ? suggestedTime : "");
             v.put(COLUMN_NOTIF_INSTRUCTIONS, instructions != null ? instructions : "");
             v.put(COLUMN_NOTIF_IS_READ, 0);
             v.put(COLUMN_NOTIF_CREATED_AT, createdAt);
@@ -1027,7 +1046,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.close();
             if (id != -1) {
                 new FirestoreHelper().upsertNotification((int) id, recipientSid, eventId,
-                        type, message, reason, suggestedDate, instructions, false, createdAt);
+                        type, message, reason, suggestedDate, suggestedTime, instructions,
+                        false, createdAt);
             }
             return id;
         } catch (Exception e) {
@@ -1043,6 +1063,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             Cursor c = db.rawQuery(
                     "SELECT * FROM " + TABLE_NOTIFICATIONS +
                     " WHERE " + COLUMN_NOTIF_RECIPIENT_SID + "=?" +
+                    " AND (" + COLUMN_NOTIF_IS_ARCHIVED + "=0 OR " + COLUMN_NOTIF_IS_ARCHIVED + " IS NULL)" +
                     " ORDER BY " + COLUMN_NOTIF_ID + " DESC",
                     new String[]{studentId});
             if (c != null && c.moveToFirst()) {
@@ -1069,6 +1090,134 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    public void markNotificationUnread(int notifId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_NOTIF_IS_READ, 0);
+            db.update(TABLE_NOTIFICATIONS, v, COLUMN_NOTIF_ID + "=?",
+                    new String[]{String.valueOf(notifId)});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "markNotificationUnread failed", e);
+        }
+    }
+
+    /**
+     * Marks the given notification IDs as archived (sets is_archived=1, archived_at=now).
+     * Archived notifications are hidden from the normal list and auto-deleted after 30 days.
+     */
+    public void archiveNotifications(List<Integer> notifIds) {
+        if (notifIds == null || notifIds.isEmpty()) return;
+        try {
+            String archivedAt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    .format(new Date());
+            SQLiteDatabase db = this.getWritableDatabase();
+            for (int id : notifIds) {
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_NOTIF_IS_ARCHIVED, 1);
+                v.put(COLUMN_NOTIF_ARCHIVED_AT, archivedAt);
+                db.update(TABLE_NOTIFICATIONS, v, COLUMN_NOTIF_ID + "=?",
+                        new String[]{String.valueOf(id)});
+            }
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "archiveNotifications failed", e);
+        }
+    }
+
+    /**
+     * Permanently deletes notifications that were archived more than 30 days ago.
+     * Called on every app open so the DB stays clean automatically.
+     */
+    public void deleteExpiredArchivedNotifications() {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            // SQLite date math: delete rows where archived_at < (now - 30 days)
+            db.execSQL(
+                "DELETE FROM " + TABLE_NOTIFICATIONS +
+                " WHERE " + COLUMN_NOTIF_IS_ARCHIVED + "=1" +
+                " AND " + COLUMN_NOTIF_ARCHIVED_AT + " != ''" +
+                " AND datetime(" + COLUMN_NOTIF_ARCHIVED_AT + ") < datetime('now', '-30 days')"
+            );
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "deleteExpiredArchivedNotifications failed", e);
+        }
+    }
+
+    /**
+     * Returns all archived notifications for the given user, newest first.
+     */
+    public List<NotifModel> getArchivedNotificationsForUser(String studentId) {
+        List<NotifModel> list = new ArrayList<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT * FROM " + TABLE_NOTIFICATIONS +
+                    " WHERE " + COLUMN_NOTIF_RECIPIENT_SID + "=?" +
+                    " AND " + COLUMN_NOTIF_IS_ARCHIVED + "=1" +
+                    " ORDER BY " + COLUMN_NOTIF_ARCHIVED_AT + " DESC",
+                    new String[]{studentId});
+            if (c != null && c.moveToFirst()) {
+                do { list.add(notifFromCursor(c)); } while (c.moveToNext());
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getArchivedNotificationsForUser failed", e);
+        }
+        return list;
+    }
+
+    /**
+     * Returns the count of archived notifications for the given user.
+     */
+    public int getArchivedNotificationCount(String studentId) {
+        int count = 0;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT COUNT(*) FROM " + TABLE_NOTIFICATIONS +
+                    " WHERE " + COLUMN_NOTIF_RECIPIENT_SID + "=?" +
+                    " AND " + COLUMN_NOTIF_IS_ARCHIVED + "=1",
+                    new String[]{studentId});
+            if (c != null && c.moveToFirst()) { count = c.getInt(0); c.close(); }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getArchivedNotificationCount failed", e);
+        }
+        return count;
+    }
+
+    /**
+     * Unarchives a single notification (sets is_archived=0, clears archived_at).
+     */
+    public void unarchiveNotification(int notifId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_NOTIF_IS_ARCHIVED, 0);
+            v.put(COLUMN_NOTIF_ARCHIVED_AT, "");
+            db.update(TABLE_NOTIFICATIONS, v, COLUMN_NOTIF_ID + "=?",
+                    new String[]{String.valueOf(notifId)});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "unarchiveNotification failed", e);
+        }
+    }
+
+    /**
+     * Permanently deletes a single notification from the DB.
+     */
+    public void deleteNotification(int notifId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            db.delete(TABLE_NOTIFICATIONS, COLUMN_NOTIF_ID + "=?",
+                    new String[]{String.valueOf(notifId)});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "deleteNotification failed", e);
+        }
+    }
     public int getUnreadNotificationCount(String studentId) {
         int count = 0;
         try {
@@ -1209,7 +1358,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     private NotifModel notifFromCursor(Cursor c) {
-        return new NotifModel(
+        int sugTimeIdx = c.getColumnIndex(COLUMN_NOTIF_SUGGESTED_TIME);
+        String suggestedTime = sugTimeIdx >= 0 ? c.getString(sugTimeIdx) : "";
+        if (suggestedTime == null) suggestedTime = "";
+
+        int isArchivedIdx = c.getColumnIndex(COLUMN_NOTIF_IS_ARCHIVED);
+        boolean isArchived = isArchivedIdx >= 0 && c.getInt(isArchivedIdx) == 1;
+
+        int archivedAtIdx = c.getColumnIndex(COLUMN_NOTIF_ARCHIVED_AT);
+        String archivedAt = archivedAtIdx >= 0 ? c.getString(archivedAtIdx) : "";
+        if (archivedAt == null) archivedAt = "";
+
+        NotifModel m = new NotifModel(
                 c.getInt(c.getColumnIndexOrThrow(COLUMN_NOTIF_ID)),
                 c.getString(c.getColumnIndexOrThrow(COLUMN_NOTIF_RECIPIENT_SID)),
                 c.getInt(c.getColumnIndexOrThrow(COLUMN_NOTIF_EVENT_ID)),
@@ -1217,10 +1377,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 c.getString(c.getColumnIndexOrThrow(COLUMN_NOTIF_MESSAGE)),
                 c.getString(c.getColumnIndexOrThrow(COLUMN_NOTIF_REASON)),
                 c.getString(c.getColumnIndexOrThrow(COLUMN_NOTIF_SUGGESTED_DATE)),
+                suggestedTime,
                 c.getString(c.getColumnIndexOrThrow(COLUMN_NOTIF_INSTRUCTIONS)),
                 c.getInt(c.getColumnIndexOrThrow(COLUMN_NOTIF_IS_READ)) == 1,
                 c.getString(c.getColumnIndexOrThrow(COLUMN_NOTIF_CREATED_AT))
         );
+        m.setArchived(isArchived);
+        m.setArchivedAt(archivedAt);
+        return m;
     }
 
     // ── Export / Import ───────────────────────────────────────────────────────

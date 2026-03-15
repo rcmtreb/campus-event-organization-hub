@@ -2,19 +2,42 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="primary_blue">#1976D2</color>
-    <color name="primary_dark">#1565C0</color>
-    <color name="primary_light">#BBDEFB</color>
+
+    <!-- ── Primary Green palette ───────────────────────────────────────── -->
+    <!-- Dark green: toolbars, buttons, active bottom-nav, status bar -->
+    <color name="primary_green">#5A9E3A</color>
+    <!-- Deeper dark green: gradient end, role badge bg -->
+    <color name="primary_green_dark">#3D7A28</color>
+    <!-- Light green: category badges, info card backgrounds -->
+    <color name="primary_green_light">#D1FFBD</color>
+
+    <!-- ── Accent Orange palette ────────────────────────────────────────── -->
+    <!-- Dark orange: FAB, archive badge, active accents -->
+    <color name="primary_orange">#E8935A</color>
+    <!-- Light orange: secondary tints -->
+    <color name="primary_orange_light">#FED8B1</color>
+
+    <!-- ── Legacy aliases (kept so existing references still resolve) ──── -->
+    <!-- primary_blue → dark green (toolbars / buttons) -->
+    <color name="primary_blue">#5A9E3A</color>
+    <!-- primary_dark → deeper green (status bar / gradient end) -->
+    <color name="primary_dark">#3D7A28</color>
+    <!-- primary_light → light green (category badge backgrounds) -->
+    <color name="primary_light">#D1FFBD</color>
+    <!-- Theme aliases -->
+    <color name="primaryLightBlue">#5A9E3A</color>
+    <color name="primaryDarkBlue">#3D7A28</color>
+    <!-- accent_gold stays for stats-pending text in admin stats screen -->
     <color name="accent_gold">#FFC107</color>
+    <!-- accentOrange → dark orange -->
+    <color name="accentOrange">#E8935A</color>
+    <!-- purple_500 kept for archive badge -->
+    <color name="purple_500">#6200EE</color>
+
+    <!-- ── Functional / semantic (unchanged) ────────────────────────────── -->
     <color name="text_hint">#9E9E9E</color>
     <color name="background_gray">#F5F5F5</color>
     <color name="card_border">#E0E0E0</color>
     <color name="error_red">#D32F2F</color>
     <color name="success_green">#388E3C</color>
-    <!-- Aliases used by themes.xml -->
-    <color name="primaryLightBlue">#1976D2</color>
-    <color name="primaryDarkBlue">#1565C0</color>
-    <color name="accentOrange">#FFA000</color>
-    <!-- Legacy/other references -->
-    <color name="purple_500">#6200EE</color>
 </resources>

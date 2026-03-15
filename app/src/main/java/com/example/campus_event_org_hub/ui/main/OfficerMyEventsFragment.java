@@ -205,7 +205,7 @@ public class OfficerMyEventsFragment extends Fragment {
                     String newDate = String.format(Locale.getDefault(),
                             "%04d-%02d-%02d", year, month + 1, day);
                     // Officer is proposing a DIFFERENT date — must go back to admin for approval
-                    boolean ok = db.proposeNewDatePending(e.getId(), newDate);
+                    boolean ok = db.proposeNewDateTimePending(e.getId(), newDate, "");
                     if (ok) {
                         e.setStatus("PENDING");
                         // Notify all admins that this officer proposed a new date
@@ -233,7 +233,7 @@ public class OfficerMyEventsFragment extends Fragment {
         List<String> adminIds = db.getAdminStudentIds();
         for (String adminSid : adminIds) {
             db.insertNotification(adminSid, e.getId(), "PENDING",
-                    message, "Officer-proposed reschedule date", proposedDate, "");
+                    message, "Officer-proposed reschedule date", proposedDate, "", "");
         }
     }
 

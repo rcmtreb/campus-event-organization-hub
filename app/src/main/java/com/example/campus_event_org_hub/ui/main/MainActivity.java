@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.campus_event_org_hub.R;
+import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.ui.events.EventsFragment;
 
@@ -27,6 +28,7 @@ public class MainActivity extends AppCompatActivity
     private LinearLayout tabEvents, tabNotifications, tabMenu;
     private ImageView iconEvents, iconNotifications, iconMenu;
     private TextView textEvents, textNotifications, textMenu;
+    private TextView badgeNotifications;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +65,8 @@ public class MainActivity extends AppCompatActivity
             textNotifications = findViewById(R.id.tab_notifications_text);
             textMenu          = findViewById(R.id.tab_menu_text);
 
+            badgeNotifications = findViewById(R.id.tab_notifications_badge);
+
             // Wire up click listeners
             tabEvents.setOnClickListener(v -> selectTab(0));
             tabNotifications.setOnClickListener(v -> selectTab(1));
@@ -85,6 +89,30 @@ public class MainActivity extends AppCompatActivity
         // Background sync so data stays fresh on every return to the app.
         // No loading indicator here — data updates silently.
         SyncManager.sync(this, null);
+        // Refresh unread notification badge
+        updateNotificationBadge();
+    }
+
+    /** Reads unread notification count from DB and shows/hides the red badge. */
+    public void updateNotificationBadge() {
+        if (badgeNotifications == null || userStudentId == null || userStudentId.isEmpty()) return;
+        try {
+            DatabaseHelper db = new DatabaseHelper(this);
+            int unread = db.getUnreadNotificationCount(userStudentId);
+            if (unread > 0) {
+                badgeNotifications.setText(unread > 99 ? "99+" : String.valueOf(unread));
+                badgeNotifications.setVisibility(View.VISIBLE);
+            } else {
+                badgeNotifications.setVisibility(View.GONE);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "updateNotificationBadge failed", e);
+        }
+    }
+
+    /** Called by NotificationsFragment when "Clear All" is tapped — hides nav badge immediately. */
+    public void clearNotificationBadge() {
+        if (badgeNotifications != null) badgeNotifications.setVisibility(View.GONE);
     }
 
     private void selectTab(int index) {

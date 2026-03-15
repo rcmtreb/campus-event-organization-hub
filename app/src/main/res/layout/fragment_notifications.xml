@@ -16,22 +16,136 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <!-- Title row: title + unread badge -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Notifications"
-            android:textColor="@android:color/white"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Notifications"
+                android:textColor="@android:color/white"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <!-- Red pill badge showing unread count -->
+            <TextView
+                android:id="@+id/tv_notif_unread_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="#F44336"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:visibility="gone"
+                tools:text="3 unread"
+                tools:visibility="visible" />
+
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:text="Stay up to date with campus events"
-            android:textColor="#BBDEFB"
+            android:textColor="#C8F5A8"
             android:textSize="13sp" />
+
+        <!-- Clear All button — only visible when there are notifications -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_all_notifications"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginTop="12dp"
+            android:text="Clear All Notifications"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            app:strokeColor="@android:color/white"
+            app:strokeWidth="1dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <!-- Archive Selected button — only visible in multi-select mode -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_archive_selected"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginTop="8dp"
+            android:text="Archive Selected"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:backgroundTint="@color/primary_orange"
+            app:cornerRadius="8dp"
+            android:visibility="gone" />
+
     </LinearLayout>
+
+    <!-- Archive row — tappable entry point to archived notifications -->
+    <LinearLayout
+        android:id="@+id/row_archive"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_bookmark"
+            android:tint="#6A1B9A"
+            android:contentDescription="Archive" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="Archive"
+            android:textColor="#4A4A4A"
+            android:textSize="15sp" />
+
+        <!-- Item count badge -->
+        <TextView
+            android:id="@+id/tv_archive_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#6A1B9A"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:visibility="gone"
+            tools:text="5"
+            tools:visibility="visible" />
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="6dp"
+            android:src="@drawable/ic_chevron_right"
+            android:tint="#AAAAAA"
+            android:contentDescription="Open archive" />
+
+    </LinearLayout>
+
+    <!-- Thin divider below archive row -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E0E0E0" />
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh_notifications"

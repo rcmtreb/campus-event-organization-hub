@@ -13,20 +13,20 @@
     android:orientation="vertical"
     android:background="@android:color/white">
 
-    <!-- Search Bar: Black Card, White Text/Placeholder -->
+    <!-- Search Bar -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="8dp"
         app:cardCornerRadius="8dp"
         app:cardElevation="2dp"
-        app:cardBackgroundColor="@android:color/black">
+        app:cardBackgroundColor="@android:color/white">
 
         <androidx.appcompat.widget.SearchView
             android:id="@+id/search_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            style="@style/Widget.App.SearchView"
+            style="@style/Widget.App.SearchView.Dark"
             app:iconifiedByDefault="false"
             app:queryHint="Search events..." />
     </androidx.cardview.widget.CardView>
@@ -111,7 +111,7 @@
         android:layout_margin="16dp"
         android:contentDescription="Create Event"
         android:src="@drawable/ic_add"
-        app:backgroundTint="@color/primary_blue"
+        app:backgroundTint="@color/primary_orange"
         app:tint="@android:color/white" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
