@@ -11,7 +11,7 @@ CEOH is a specialized Android application designed for University of the Cordill
 - **Notification Pipeline**: Instant push notifications triggered when new events are published, automatically filtered by student tags.
 - **Admin & Officer Dashboard**: Specialized interfaces for organization officers (to manage events) and administrators (to approve events and generate reports).
 
-## 🏛️ Project Architecture
+##  Project Architecture
 
 CEOH follows a modern Android architectural approach:
 - **UI Framework**: Android Jetpack (AppCompat, Material Design, ConstraintLayout).
