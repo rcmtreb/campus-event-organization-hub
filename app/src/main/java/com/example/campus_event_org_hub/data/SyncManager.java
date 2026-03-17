@@ -10,6 +10,7 @@ import com.google.firebase.firestore.QuerySnapshot;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Pulls all 4 Firestore collections into the local SQLite database.
@@ -27,6 +28,8 @@ public class SyncManager {
 
     private static final String TAG = "SyncManager";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
+    /** Max time to wait for each Firestore collection fetch. */
+    private static final long TIMEOUT_SECONDS = 10;
 
     /**
      * Pull Firestore → SQLite on a background thread.
@@ -55,7 +58,8 @@ public class SyncManager {
     private static void syncUsers(DatabaseHelper db, FirestoreHelper fsh) {
         try {
             QuerySnapshot snap = Tasks.await(
-                    fsh.getDb().collection(FirestoreHelper.COL_USERS).get());
+                    fsh.getDb().collection(FirestoreHelper.COL_USERS).get(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
             List<DocumentSnapshot> docs = snap.getDocuments();
             for (DocumentSnapshot d : docs) {
                 String sid         = str(d, "student_id");
@@ -67,9 +71,10 @@ public class SyncManager {
                 String mobile      = str(d, "mobile");
                 String profileImg  = str(d, "profile_image");
                 String notifPref   = str(d, "notif_pref");
+                String password    = str(d, "password");
                 if (sid == null || sid.isEmpty()) continue;
                 db.syncUpsertUser(sid, name, email, role, dept,
-                        gender, mobile, profileImg, notifPref);
+                        gender, mobile, profileImg, notifPref, password);
             }
             Log.d(TAG, "Synced " + docs.size() + " users");
         } catch (Exception e) {
@@ -80,7 +85,8 @@ public class SyncManager {
     private static void syncEvents(DatabaseHelper db, FirestoreHelper fsh) {
         try {
             QuerySnapshot snap = Tasks.await(
-                    fsh.getDb().collection(FirestoreHelper.COL_EVENTS).get());
+                    fsh.getDb().collection(FirestoreHelper.COL_EVENTS).get(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
             List<DocumentSnapshot> docs = snap.getDocuments();
             for (DocumentSnapshot d : docs) {
                 int    localId    = intVal(d, "local_id");
@@ -107,7 +113,8 @@ public class SyncManager {
     private static void syncRegistrations(DatabaseHelper db, FirestoreHelper fsh) {
         try {
             QuerySnapshot snap = Tasks.await(
-                    fsh.getDb().collection(FirestoreHelper.COL_REGISTRATIONS).get());
+                    fsh.getDb().collection(FirestoreHelper.COL_REGISTRATIONS).get(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
             List<DocumentSnapshot> docs = snap.getDocuments();
             for (DocumentSnapshot d : docs) {
                 String sid       = str(d, "student_id");
@@ -125,7 +132,8 @@ public class SyncManager {
     private static void syncNotifications(DatabaseHelper db, FirestoreHelper fsh) {
         try {
             QuerySnapshot snap = Tasks.await(
-                    fsh.getDb().collection(FirestoreHelper.COL_NOTIFICATIONS).get());
+                    fsh.getDb().collection(FirestoreHelper.COL_NOTIFICATIONS).get(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
             List<DocumentSnapshot> docs = snap.getDocuments();
             for (DocumentSnapshot d : docs) {
                 int    notifId       = intVal(d, "local_notif_id");

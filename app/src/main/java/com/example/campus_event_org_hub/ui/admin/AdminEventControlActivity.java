@@ -301,10 +301,15 @@ public class AdminEventControlActivity extends AppCompatActivity {
         if ("POSTPONED".equals(type)) {
             String timeDisplay = (suggestedTime != null && !suggestedTime.isEmpty())
                     ? " at " + suggestedTime : "";
-            message = "Your event \"" + e.getTitle() + "\" has been postponed."
-                    + " Suggested new schedule: " + suggestedDate + timeDisplay + ".";
+            message = "\u23F3 Your event \u201c" + e.getTitle() + "\u201d has been postponed by the admin.\n"
+                    + "Suggested new schedule: " + suggestedDate + timeDisplay + ".\n"
+                    + (!reason.isEmpty() ? "Reason: " + reason + "\n" : "")
+                    + (!instructions.isEmpty() ? "Instructions: " + instructions + "\n" : "")
+                    + "Open your Notifications to confirm or propose a different date.";
         } else {
-            message = "Your event \"" + e.getTitle() + "\" has been cancelled.";
+            message = "\u274C Your event \u201c" + e.getTitle() + "\u201d has been cancelled by the admin.\n"
+                    + (!reason.isEmpty() ? "Reason: " + reason + "\n" : "")
+                    + (!instructions.isEmpty() ? "Instructions: " + instructions : "");
         }
 
         long id = db.insertNotification(officerSid, e.getId(), type, message,

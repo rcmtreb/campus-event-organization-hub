@@ -18,6 +18,7 @@ import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.ui.auth.LoginActivity;
 import com.example.campus_event_org_hub.util.ImageUtils;
+import com.example.campus_event_org_hub.util.SessionManager;
 import com.google.android.material.imageview.ShapeableImageView;
 
 public class MenuFragment extends Fragment {
@@ -230,6 +231,7 @@ public class MenuFragment extends Fragment {
                 .setTitle("Log Out")
                 .setMessage("Are you sure you want to log out? Your data will be saved.")
                 .setPositiveButton("Log Out", (dialog, which) -> {
+                    new SessionManager(requireContext()).clearSession();
                     Intent intent = new Intent(getActivity(), LoginActivity.class);
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(intent);

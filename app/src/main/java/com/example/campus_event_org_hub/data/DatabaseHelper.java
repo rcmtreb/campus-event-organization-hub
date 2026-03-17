@@ -538,25 +538,32 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     /**
      * Upsert a user row from Firestore. Uses INSERT OR REPLACE so existing rows
      * are overwritten with the latest cloud data.
-     * NOTE: password is NOT synced from Firestore — it stays local only.
+     * Password priority: local password wins if it exists; otherwise use the Firestore password
+     * (handles fresh-install case where user has changed their password on another device).
      */
     public void syncUpsertUser(String studentId, String name, String email,
                                 String role, String department,
                                 String gender, String mobile,
-                                String profileImage, String notifPref) {
+                                String profileImage, String notifPref,
+                                String firestorePassword) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
-            // Use INSERT OR REPLACE — preserve the local password by reading it first
+            // Preserve local password if it exists; fall back to Firestore password for fresh installs
             String localPassword = "";
             Cursor c = db.rawQuery("SELECT " + COLUMN_USER_PASSWORD + " FROM " + TABLE_USERS +
                     " WHERE " + COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
             if (c != null && c.moveToFirst()) { localPassword = c.getString(0); c.close(); }
 
+            // Use local password if available, otherwise use the one from Firestore
+            String passwordToStore = (localPassword != null && !localPassword.isEmpty())
+                    ? localPassword
+                    : (firestorePassword != null ? firestorePassword : "");
+
             ContentValues v = new ContentValues();
             v.put(COLUMN_USER_STUDENT_ID,  studentId);
             v.put(COLUMN_USER_NAME,        name);
             v.put(COLUMN_USER_EMAIL,       email);
-            v.put(COLUMN_USER_PASSWORD,    localPassword); // keep local password
+            v.put(COLUMN_USER_PASSWORD,    passwordToStore);
             v.put(COLUMN_USER_ROLE,        role);
             v.put(COLUMN_USER_DEPARTMENT,  department);
             v.put(COLUMN_USER_GENDER,      gender        != null ? gender        : "");
@@ -667,6 +674,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     event.getTime(), event.getTags(), event.getOrganizer(),
                     event.getCategory(), event.getImagePath(), event.getStatus(),
                     event.getCreatorSid());
+
+            // Notify admin that a new event is awaiting approval
+            if ("PENDING".equals(event.getStatus())) {
+                String timeStr = (event.getTime() != null && !event.getTime().isEmpty())
+                        ? " at " + event.getTime() : "";
+                String adminMsg = "\uD83D\uDD14 New event pending approval: \u201c" + event.getTitle() + "\u201d\n"
+                        + "Submitted by: " + event.getOrganizer() + "\n"
+                        + "Date: " + event.getDate() + timeStr + "\n"
+                        + "Open the Pending Approvals screen to review.";
+                // "admin" is the fixed sentinel recipient_sid for the hardcoded admin account
+                insertNotification("admin", (int) id, "NEW_PENDING", adminMsg, "", "", "", "");
+            }
         }
         return id;
     }
@@ -1302,6 +1321,43 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
+     * Returns [student_id, notif_pref] pairs for all Student-role users whose department
+     * contains the given abbreviation. If abbr is "ALL", returns every Student.
+     * Used by ApproveEventsActivity to enforce per-user notification preferences.
+     */
+    public List<String[]> getStudentIdsByDeptAbbrWithPref(String abbr) {
+        List<String[]> result = new ArrayList<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c;
+            if ("ALL".equalsIgnoreCase(abbr)) {
+                c = db.rawQuery(
+                        "SELECT " + COLUMN_USER_STUDENT_ID + ", " + COLUMN_USER_NOTIF_PREF +
+                        " FROM " + TABLE_USERS +
+                        " WHERE " + COLUMN_USER_ROLE + " = 'Student'", null);
+            } else {
+                c = db.rawQuery(
+                        "SELECT " + COLUMN_USER_STUDENT_ID + ", " + COLUMN_USER_NOTIF_PREF +
+                        " FROM " + TABLE_USERS +
+                        " WHERE " + COLUMN_USER_ROLE + " = 'Student'" +
+                        " AND UPPER(" + COLUMN_USER_DEPARTMENT + ") LIKE ?",
+                        new String[]{"%" + abbr.toUpperCase(Locale.getDefault()) + "%"});
+            }
+            if (c != null && c.moveToFirst()) {
+                do {
+                    String sid  = c.getString(0);
+                    String pref = c.getString(1);
+                    result.add(new String[]{sid, pref != null ? pref : "All Events"});
+                } while (c.moveToNext());
+                c.close();
+            }
+        } catch (Exception ex) {
+            Log.e("DatabaseHelper", "getStudentIdsByDeptAbbrWithPref failed", ex);
+        }
+        return result;
+    }
+
+    /**
      * Returns the student_ids of all Student-role users whose department contains
      * the given abbreviation (e.g. "CBA").  Matches are case-insensitive via UPPER().
      * If abbr is "ALL", returns every Student's student_id.
@@ -1489,7 +1545,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                             syncUpsertUser(cols[2], cols[1], cols[3], cols[5], cols[6],
                                     cols[7], cols[8],
                                     cols.length > 9 ? cols[9] : "",
-                                    cols.length > 10 ? cols[10] : "All Events");
+                                    cols.length > 10 ? cols[10] : "All Events",
+                                    "" /* password not imported from CSV */);
                             count++;
                         } catch (Exception ignored) {}
                     }

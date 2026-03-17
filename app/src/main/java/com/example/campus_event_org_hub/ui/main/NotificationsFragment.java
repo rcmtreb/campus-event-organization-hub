@@ -289,6 +289,17 @@ public class NotificationsFragment extends Fragment {
                 int h12 = h % 12; if (h12 == 0) h12 = 12;
                 timeDisplay = String.format(Locale.getDefault(), "%d:%02d %s", h12, m, ampm);
             } catch (Exception ignored) { }
+
+            // Notify admin that the officer proposed a new date for review
+            Bundle args = getArguments();
+            String officerName = args != null ? args.getString("USER_NAME", "An officer") : "An officer";
+            String adminMsg = "\uD83D\uDD04 An officer has proposed a new schedule for a postponed event.\n"
+                    + "Proposed by: " + officerName + "\n"
+                    + "New date: " + chosenDate + " at " + timeDisplay + "\n"
+                    + "Open Pending Approvals to review and approve.";
+            db.insertNotification("admin", item.getEventId(), "RESUBMIT", adminMsg,
+                    "", chosenDate, chosenTime, "");
+
             Toast.makeText(requireContext(),
                     "Rescheduled to " + chosenDate + " at " + timeDisplay
                             + ". Awaiting admin approval.",

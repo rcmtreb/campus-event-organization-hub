@@ -56,39 +56,77 @@ public class ApproveEventsActivity extends AppCompatActivity {
         if (officerSid == null || officerSid.isEmpty()) {
             officerSid = db.getOfficerStudentIdFromOrganizer(e.getOrganizer());
         }
-        if (officerSid == null || officerSid.isEmpty()) return; // silently skip — no officer found
+        if (officerSid == null || officerSid.isEmpty()) return;
 
-        String type    = approved ? "APPROVED" : "REJECTED";
-        String message = approved
-                ? "Your event \"" + e.getTitle() + "\" has been approved and is now live!"
-                : "Your event \"" + e.getTitle() + "\" was rejected by the admin.";
+        String type;
+        String message;
+        if (approved) {
+            type = "APPROVED";
+            message = "Your event \u201c" + e.getTitle() + "\u201d has been approved by the admin "
+                    + "and is now live for students to see."
+                    + (e.getDate() != null && !e.getDate().isEmpty()
+                        ? " It is scheduled for " + e.getDate()
+                          + (e.getTime() != null && !e.getTime().isEmpty()
+                              ? " at " + e.getTime() : "")
+                          + "."
+                        : "");
+        } else {
+            type = "REJECTED";
+            message = "Your event \u201c" + e.getTitle() + "\u201d was not approved by the admin. "
+                    + "You may review the details and re-submit if needed.";
+        }
         db.insertNotification(officerSid, e.getId(), type, message, "", "", "", "");
     }
 
     /**
-     * Notify students whose department matches the event's audience tags.
-     * Tags are stored as "#CBA #CCS" or "#ALL". Each tag maps to the department
-     * abbreviation used in the users table (e.g. "CBA" matches "College of Business and Accountancy (CBA)").
+     * Notify students whose department matches the event\u2019s audience tags,
+     * respecting each student\u2019s notification preference.
+     *
+     * Preferences:
+     *   \u2022 All Events             \u2014 always notify
+     *   \u2022 My Department Only     \u2014 notify only if event tags match their department
+     *   \u2022 Registered Events Only \u2014 notify only if already registered
+     *   \u2022 None                   \u2014 never notify
      */
     private void notifyTargetedStudents(Event e) {
         String tags = e.getTags();
         if (tags == null || tags.isEmpty()) return;
 
-        String message = "New event for your department: \"" + e.getTitle() +
-                "\" on " + e.getDate() +
-                (e.getTime() != null && !e.getTime().isEmpty() ? " at " + e.getTime() : "") + ".";
+        String timeStr = (e.getTime() != null && !e.getTime().isEmpty())
+                ? " at " + e.getTime() : "";
+        String message = "\uD83D\uDCE2 New event: \u201c" + e.getTitle() + "\u201d\n"
+                + "Date: " + e.getDate() + timeStr + "\n"
+                + "Organized by: " + e.getOrganizer() + "\n"
+                + "Open the Events tab to view details and register.";
 
         String[] parts = tags.trim().split("\\s+");
         java.util.Set<String> notifiedSids = new java.util.HashSet<>();
 
         for (String part : parts) {
-            // Strip leading "#"
             String abbr = part.startsWith("#") ? part.substring(1) : part;
             if (abbr.isEmpty()) continue;
 
-            List<String> studentIds = db.getStudentIdsByDeptAbbr(abbr);
-            for (String sid : studentIds) {
-                if (notifiedSids.contains(sid)) continue; // don't double-notify
+            // getStudentIdsByDeptAbbrWithPref returns student_id + notif_pref pairs
+            java.util.List<String[]> students = db.getStudentIdsByDeptAbbrWithPref(abbr);
+            for (String[] row : students) {
+                String sid  = row[0];
+                String pref = row[1] != null ? row[1] : "All Events";
+                if (notifiedSids.contains(sid)) continue;
+
+                // Enforce notification preference
+                switch (pref) {
+                    case "None":
+                        continue; // skip entirely
+                    case "Registered Events Only":
+                        if (!db.isRegistered(sid, e.getId())) continue;
+                        break;
+                    case "My Department Only":
+                        // Already filtered by dept abbr above — always qualifies here
+                        break;
+                    default:
+                        break; // "All Events" — always include
+                }
+
                 notifiedSids.add(sid);
                 db.insertNotification(sid, e.getId(), "NEW_EVENT", message, "", "", "", "");
             }

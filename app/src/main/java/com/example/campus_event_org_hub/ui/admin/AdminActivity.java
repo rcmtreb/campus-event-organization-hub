@@ -12,6 +12,7 @@ import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.ui.auth.LoginActivity;
+import com.example.campus_event_org_hub.util.SessionManager;
 
 public class AdminActivity extends AppCompatActivity {
 
@@ -34,6 +35,7 @@ public class AdminActivity extends AppCompatActivity {
         LinearLayout cardExportImport = findViewById(R.id.card_export_import);
 
         btnLogout.setOnClickListener(v -> {
+            new SessionManager(this).clearSession();
             Toast.makeText(this, "Admin Logged Out", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(AdminActivity.this, LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);

@@ -64,6 +64,33 @@ public class FirestoreHelper {
                 .addOnFailureListener(e -> Log.e(TAG, "updateUserField failed", e));
     }
 
+    /**
+     * Store the device's FCM registration token in the user's Firestore document.
+     * The Cloud Function reads this token to address push notifications to the correct device.
+     */
+    public void saveFcmToken(String studentId, String token) {
+        if (studentId == null || studentId.isEmpty() || token == null || token.isEmpty()) return;
+        db.collection(COL_USERS).document(studentId)
+                .update("fcm_token", token)
+                .addOnFailureListener(e ->
+                        // Document may not exist yet — use set(merge) as fallback
+                        db.collection(COL_USERS).document(studentId)
+                                .set(java.util.Collections.singletonMap("fcm_token", token),
+                                        SetOptions.merge())
+                                .addOnFailureListener(e2 ->
+                                        Log.e(TAG, "saveFcmToken failed: " + studentId, e2)));
+    }
+
+    /**
+     * Sync a changed password to Firestore so other devices can pull it on next login sync.
+     * The password is stored in the users document under the "password" field.
+     */
+    public void updatePassword(String studentId, String newPassword) {
+        db.collection(COL_USERS).document(studentId)
+                .update("password", newPassword)
+                .addOnFailureListener(e -> Log.e(TAG, "updatePassword failed: " + studentId, e));
+    }
+
     public void deleteUser(String studentId) {
         db.collection(COL_USERS).document(studentId)
                 .delete()

@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.FirestoreHelper;
 import com.google.android.material.textfield.TextInputEditText;
 
 public class SecurityFragment extends Fragment {
@@ -61,6 +62,8 @@ public class SecurityFragment extends Fragment {
             DatabaseHelper db = new DatabaseHelper(requireContext());
             boolean ok = db.changePassword(sid, currentPw, newPw);
             if (ok) {
+                // Sync new password to Firestore so other devices pick it up on next login
+                new FirestoreHelper().updatePassword(sid, newPw);
                 Toast.makeText(getContext(), "Password updated successfully!", Toast.LENGTH_SHORT).show();
                 etCurrentPw.setText("");
                 etNewPw.setText("");
