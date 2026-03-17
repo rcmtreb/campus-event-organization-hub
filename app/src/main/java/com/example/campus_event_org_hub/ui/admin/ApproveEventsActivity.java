@@ -158,6 +158,9 @@ public class ApproveEventsActivity extends AppCompatActivity {
             h.btnApprove.setOnClickListener(v -> {
                 int adapterPos = h.getAdapterPosition();
                 if (adapterPos == RecyclerView.NO_ID) return;
+                // Disable both buttons immediately to prevent double-tap double-send
+                h.btnApprove.setEnabled(false);
+                h.btnReject.setEnabled(false);
                 db.approveEvent(e.getId());
                 notifyOfficerOfDecision(e, true);   // tell the officer it was approved
                 notifyTargetedStudents(e);           // tell relevant students a new event is live
@@ -169,6 +172,9 @@ public class ApproveEventsActivity extends AppCompatActivity {
             h.btnReject.setOnClickListener(v -> {
                 int adapterPos = h.getAdapterPosition();
                 if (adapterPos == RecyclerView.NO_ID) return;
+                // Disable both buttons immediately to prevent double-tap double-send
+                h.btnApprove.setEnabled(false);
+                h.btnReject.setEnabled(false);
                 notifyOfficerOfDecision(e, false);  // tell the officer it was rejected
                 db.deleteEvent(e.getId());
                 list.remove(adapterPos);

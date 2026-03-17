@@ -9,6 +9,7 @@ import android.util.Log;
 
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.model.NotifModel;
+import com.example.campus_event_org_hub.service.FcmSender;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "ceoh.db";
     private static final int DATABASE_VERSION = 13; // v13: added is_archived + archived_at to notifications
+
+    private final Context mContext;
 
     // Table: Events
     public static final String TABLE_EVENTS       = "events";
@@ -134,6 +137,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     public DatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        mContext = context.getApplicationContext();
     }
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -175,7 +179,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         // Pass db directly — avoids recursive getWritableDatabase() call inside onOpen
         deleteEndedEventsOlderThan(db, 30);
         // Purge notifications archived more than 30 days ago
-        deleteExpiredArchivedNotifications();
+        deleteExpiredArchivedNotifications(db);
     }
 
     // ── Defensive repair ─────────────────────────────────────────────────────
@@ -1067,6 +1071,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 new FirestoreHelper().upsertNotification((int) id, recipientSid, eventId,
                         type, message, reason, suggestedDate, suggestedTime, instructions,
                         false, createdAt);
+                // Send FCM push notification to the recipient's device
+                FcmSender.send(mContext, recipientSid,
+                        type, FcmSender.pickTitle(type), message);
             }
             return id;
         } catch (Exception e) {
@@ -1148,10 +1155,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     /**
      * Permanently deletes notifications that were archived more than 30 days ago.
      * Called on every app open so the DB stays clean automatically.
+     * Accepts db directly to avoid recursive getWritableDatabase() call inside onOpen.
      */
-    public void deleteExpiredArchivedNotifications() {
+    public void deleteExpiredArchivedNotifications(SQLiteDatabase db) {
         try {
-            SQLiteDatabase db = this.getWritableDatabase();
             // SQLite date math: delete rows where archived_at < (now - 30 days)
             db.execSQL(
                 "DELETE FROM " + TABLE_NOTIFICATIONS +
@@ -1159,7 +1166,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 " AND " + COLUMN_NOTIF_ARCHIVED_AT + " != ''" +
                 " AND datetime(" + COLUMN_NOTIF_ARCHIVED_AT + ") < datetime('now', '-30 days')"
             );
-            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "deleteExpiredArchivedNotifications failed", e);
+        }
+    }
+
+    /** Overload for callers outside onOpen that don't have a db reference. */
+    public void deleteExpiredArchivedNotifications() {
+        try {
+            deleteExpiredArchivedNotifications(this.getWritableDatabase());
         } catch (Exception e) {
             Log.e("DatabaseHelper", "deleteExpiredArchivedNotifications failed", e);
         }

@@ -22,6 +22,9 @@ app/google-services.json
 nul
 app/nul
 
+# ADB debug log dumps — temporary debug files, never commit
+adb_*.txt
+
 # Local developer build helper — contains machine-specific paths
 build_deploy.ps1
 
@@ -42,3 +45,6 @@ functions/node_modules/
 .env.*
 service-account*.json
 *-service-account.json
+
+# Firebase service account key used for FCM HTTP v1 — NEVER commit this
+app/src/main/assets/service_account.json
