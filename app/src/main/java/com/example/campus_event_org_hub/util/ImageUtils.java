@@ -6,6 +6,10 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.widget.ImageView;
 
+import androidx.annotation.DrawableRes;
+
+import com.example.campus_event_org_hub.R;
+
 import java.io.InputStream;
 
 /**
@@ -23,6 +27,30 @@ import java.io.InputStream;
 public final class ImageUtils {
 
     private ImageUtils() {}
+
+    /**
+     * Returns the appropriate 9-patch banner drawable for a given event category.
+     *
+     * The six .9.png banners in res/drawable/ are stretchable NinePatch assets.
+     * They are used as the default/fallback image when an event has no uploaded banner.
+     * Each category maps to a visually relevant banner; unrecognised categories fall
+     * back to banner_tech_summit.
+     *
+     * @param category  The event's category string (case-insensitive)
+     * @return          A @DrawableRes int pointing to the matching .9.png banner
+     */
+    @DrawableRes
+    public static int getDefaultBannerForCategory(String category) {
+        if (category == null || category.isEmpty()) return R.drawable.banner_tech_summit;
+        switch (category.trim().toLowerCase()) {
+            case "workshop":            return R.drawable.banner_android_workshop;
+            case "sports":              return R.drawable.banner_basketball_finals;
+            case "social":              return R.drawable.banner_music_festival;
+            case "arts": case "cultural": return R.drawable.banner_art_fair;
+            case "academic": case "career": return R.drawable.banner_career_week;
+            default:                    return R.drawable.banner_tech_summit;
+        }
+    }
 
     /**
      * Load an image into {@code imageView} from {@code path}, falling back to

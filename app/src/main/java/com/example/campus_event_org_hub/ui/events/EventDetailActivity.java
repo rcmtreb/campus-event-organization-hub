@@ -48,7 +48,9 @@ public class EventDetailActivity extends AppCompatActivity {
             Button registerButton      = findViewById(R.id.btn_register);
             MaterialCardView postponedBanner = findViewById(R.id.card_postponed_banner);
 
-            ImageUtils.load(this, eventImage, event.getImagePath(), R.drawable.ic_image_placeholder);
+            // Use the category-mapped 9-patch banner as the fallback when no image is uploaded
+            int fallbackBanner = ImageUtils.getDefaultBannerForCategory(event.getCategory());
+            ImageUtils.load(this, eventImage, event.getImagePath(), fallbackBanner);
 
             title.setText(event.getTitle());
             date.setText(event.getDate());

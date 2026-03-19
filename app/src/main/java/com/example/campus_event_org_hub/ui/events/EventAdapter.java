@@ -58,8 +58,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             holder.category.setText(event.getCategory() != null ? event.getCategory() : "");
         }
 
+        // Use the category-mapped 9-patch banner as the fallback when no image is uploaded
+        int fallbackBanner = ImageUtils.getDefaultBannerForCategory(event.getCategory());
         ImageUtils.load(holder.itemView.getContext(), holder.image,
-                event.getImagePath(), R.drawable.ic_image_placeholder);
+                event.getImagePath(), fallbackBanner);
 
         // Status badge for CANCELLED / POSTPONED (below description)
         if (holder.statusBadge != null) {
