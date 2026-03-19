@@ -1,59 +1,128 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. Uses DayNight but forced to Light by default in code -->
+    <!-- ── Base Application Theme ──────────────────────────────────────── -->
     <style name="Base.Theme.Campuseventorghub" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
+        <!-- Brand Colors -->
         <item name="colorPrimary">@color/primary_green</item>
         <item name="colorSecondary">@color/primary_orange</item>
         <item name="android:statusBarColor">@color/primary_green_dark</item>
+
+        <!-- Window -->
         <item name="android:windowBackground">@color/background_gray</item>
-        <item name="materialCardViewStyle">@style/App.CardView</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
 
-        <!-- Surface colors for BottomNavigationView and other widgets -->
-        <item name="colorSurface">@color/white</item>
-        <item name="colorOnSurface">@color/black</item>
-        <item name="colorOnSurfaceVariant">#424242</item>
+        <!-- Surface -->
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
 
-        <!-- Standard text colors -->
-        <item name="android:textColorPrimary">@color/black</item>
-        <item name="android:textColorSecondary">#424242</item>
+        <!-- Text -->
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+
+        <!-- Components -->
+        <item name="materialCardViewStyle">@style/PremiumCard</item>
+        <item name="chipStyle">@style/PremiumChip</item>
     </style>
 
     <style name="Theme.Campuseventorghub" parent="Base.Theme.Campuseventorghub" />
 
-    <style name="App.CardView" parent="Widget.MaterialComponents.CardView">
-        <item name="cardBackgroundColor">@android:color/white</item>
-        <item name="strokeColor">@color/card_stroke_color</item>
+    <!-- ── Premium Card Styles ──────────────────────────────────────────── -->
+    <style name="PremiumCard" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">@dimen/card_corner_radius</item>
+        <item name="cardElevation">@dimen/card_elevation</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="cardBackgroundColor">@color/surface</item>
+    </style>
+
+    <style name="PremiumCard.Elevated" parent="PremiumCard">
+        <item name="cardElevation">@dimen/elevation_high</item>
+        <item name="cardBackgroundColor">@color/surface_elevated</item>
+    </style>
+
+    <style name="PremiumCard.Event" parent="PremiumCard">
+        <item name="cardCornerRadius">@dimen/event_card_corner_radius</item>
+        <item name="cardElevation">6dp</item>
+        <item name="rippleColor">@color/primary_green_light</item>
+    </style>
+
+    <style name="PremiumCard.Stats" parent="PremiumCard">
+        <item name="cardCornerRadius">@dimen/radius_full</item>
+        <item name="cardElevation">0dp</item>
         <item name="strokeWidth">1dp</item>
+        <item name="strokeColor">@color/card_border</item>
     </style>
 
-    <!-- Custom Chip Style -->
-    <style name="Widget.App.Chip" parent="Widget.MaterialComponents.Chip.Filter">
+    <!-- ── Premium Chip Styles ──────────────────────────────────────────── -->
+    <style name="PremiumChip" parent="Widget.MaterialComponents.Chip.Filter">
+        <item name="chipCornerRadius">@dimen/chip_corner_radius</item>
+        <item name="chipMinHeight">@dimen/chip_height</item>
+        <item name="chipStrokeWidth">1.5dp</item>
+        <item name="android:textColor">@color/chip_text_white</item>
         <item name="chipBackgroundColor">@color/chip_bg_black</item>
-        <item name="android:textColor">@color/chip_text_white</item>
         <item name="chipStrokeColor">@color/chip_stroke_black</item>
-        <item name="chipStrokeWidth">1dp</item>
-        <item name="chipIconTint">@android:color/white</item>
+        <item name="chipStartPadding">12dp</item>
+        <item name="chipEndPadding">12dp</item>
     </style>
 
-    <style name="Widget.App.Chip.Detail" parent="Widget.App.Chip">
+    <style name="PremiumChip.Badge" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="chipCornerRadius">16dp</item>
+        <item name="chipMinHeight">28dp</item>
+        <item name="chipStrokeWidth">0dp</item>
+        <item name="chipBackgroundColor">@color/primary_green</item>
+        <item name="android:textColor">@color/text_on_primary</item>
+        <item name="android:textSize">12sp</item>
+        <item name="chipStartPadding">10dp</item>
+        <item name="chipEndPadding">10dp</item>
+    </style>
+
+    <style name="Widget.App.Chip" parent="PremiumChip" />
+    <style name="Widget.App.Chip.Detail" parent="PremiumChip">
         <item name="chipBackgroundColor">@color/chip_bg_gray</item>
-        <item name="android:textColor">@color/chip_text_white</item>
         <item name="chipStrokeWidth">0dp</item>
     </style>
 
+    <!-- ── Premium Button Styles ────────────────────────────────────────── -->
+    <style name="PremiumButton" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">@dimen/radius_full</item>
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="backgroundTint">@color/primary_green</item>
+    </style>
+
+    <style name="PremiumButton.Secondary" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="cornerRadius">@dimen/radius_full</item>
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="strokeColor">@color/primary_green</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="android:textColor">@color/primary_green</item>
+    </style>
+
+    <style name="PremiumButton.Ghost" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="cornerRadius">@dimen/radius_full</item>
+        <item name="android:minHeight">@dimen/button_height_small</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/primary_green</item>
+    </style>
+
+    <!-- ── SearchView Styles ─────────────────────────────────────────── -->
     <style name="Widget.App.SearchView" parent="Widget.AppCompat.SearchView">
-        <item name="android:textColor">@android:color/white</item>
-        <item name="android:textColorHint">@android:color/white</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_hint</item>
         <item name="queryBackground">@android:color/transparent</item>
     </style>
 
     <style name="Widget.App.SearchView.Dark" parent="Widget.AppCompat.SearchView">
-        <item name="android:textColor">@android:color/black</item>
-        <item name="android:textColorHint">#888888</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_hint</item>
         <item name="queryBackground">@android:color/transparent</item>
     </style>
 
-    <!-- ── Menu row reusable styles ──────────────────────────────────────── -->
+    <!-- ── Menu Styles ───────────────────────────────────────────────── -->
     <style name="MenuRow">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">56dp</item>
@@ -76,7 +145,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_weight">1</item>
         <item name="android:layout_marginStart">16dp</item>
-        <item name="android:textColor">@android:color/black</item>
+        <item name="android:textColor">@color/text_primary</item>
         <item name="android:textSize">15sp</item>
     </style>
 
@@ -102,11 +171,21 @@
         <item name="android:textColor">@color/text_hint</item>
         <item name="android:textSize">11sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">0.12</item>
+        <item name="android:letterSpacing">0.1</item>
     </style>
 
-    <!-- Circular image overlay for ShapeableImageView -->
+    <!-- ── Avatar Style ─────────────────────────────────────────────── -->
     <style name="CircleImageStyle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <style name="PremiumAvatar" parent="CircleImageStyle">
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- ── FAB Shape Appearance ────────────────────────────────────── -->
+    <style name="ShapeAppearance.Premium.FAB" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>

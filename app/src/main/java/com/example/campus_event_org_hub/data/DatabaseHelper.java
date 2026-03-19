@@ -41,6 +41,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_IMAGE_PATH  = "image_path";
     public static final String COLUMN_STATUS      = "status";
     public static final String COLUMN_CREATOR_SID = "creator_sid";
+    public static final String COLUMN_IS_HIDDEN   = "is_hidden";
 
     // Table: Users
     public static final String TABLE_USERS             = "users";
@@ -93,7 +94,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_CATEGORY   + " TEXT, " +
             COLUMN_IMAGE_PATH + " TEXT, " +
             COLUMN_STATUS     + " TEXT DEFAULT 'PENDING', " +
-            COLUMN_CREATOR_SID + " TEXT DEFAULT '')";
+            COLUMN_CREATOR_SID + " TEXT DEFAULT '', " +
+            COLUMN_IS_HIDDEN   + " INTEGER DEFAULT 0)";
 
     private static final String CREATE_TABLE_USERS =
             "CREATE TABLE " + TABLE_USERS + " (" +
@@ -316,6 +318,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_EVENT_TIME + " TEXT DEFAULT ''");
             if (!cols.contains(COLUMN_CREATOR_SID))
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_CREATOR_SID + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_IS_HIDDEN))
+                db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_IS_HIDDEN + " INTEGER DEFAULT 0");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureEventTableColumns failed", e);
         } finally {
@@ -849,7 +853,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Returns all non-PENDING events (APPROVED, CANCELLED, POSTPONED) for the student browse list.
+     * Returns all non-PENDING, non-hidden events for the student browse list.
      */
     public List<Event> getAllEvents() {
         List<Event> events = new ArrayList<>();
@@ -858,6 +862,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             Cursor c = db.rawQuery(
                     "SELECT * FROM " + TABLE_EVENTS +
                     " WHERE " + COLUMN_STATUS + " != 'PENDING'" +
+                    " AND (IFNULL(" + COLUMN_IS_HIDDEN + ",0) = 0)" +
                     " ORDER BY " + COLUMN_DATE + " DESC", null);
             if (c != null && c.moveToFirst()) {
                 do { events.add(eventFromCursor(c)); } while (c.moveToNext());
@@ -1024,7 +1029,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // ── Notification Operations ───────────────────────────────────────────────
 
     /**
-     * Parses organizer string (e.g. "Alberto – CCS") and looks up the officer's student_id.
+     * Parses organizer string (e.g. "Alberto – CLAS") and looks up the officer's student_id.
      */
     public String getOfficerStudentIdFromOrganizer(String organizer) {
         if (organizer == null || organizer.isEmpty()) return null;
@@ -1401,6 +1406,136 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             Log.e("DatabaseHelper", "getStudentIdsByDeptAbbr failed", ex);
         }
         return ids;
+    }
+
+    // ── New query methods (Steps 3–7) ─────────────────────────────────────────
+
+    /**
+     * Returns all non-PENDING, non-hidden events matching the given department abbreviation
+     * (matched against the tags column, e.g. "#CLAS #CBA"). Pass null or "" to get all.
+     */
+    public List<Event> getAllEvents(String deptAbbr) {
+        List<Event> events = new ArrayList<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            String hiddenCol = " AND (IFNULL(" + COLUMN_IS_HIDDEN + ",0) = 0)";
+            if (deptAbbr == null || deptAbbr.isEmpty()) {
+                Cursor c = db.rawQuery(
+                        "SELECT * FROM " + TABLE_EVENTS +
+                        " WHERE " + COLUMN_STATUS + " != 'PENDING'" + hiddenCol +
+                        " ORDER BY " + COLUMN_DATE + " DESC", null);
+                if (c != null && c.moveToFirst()) {
+                    do { events.add(eventFromCursor(c)); } while (c.moveToNext());
+                    c.close();
+                }
+            } else {
+                Cursor c = db.rawQuery(
+                        "SELECT * FROM " + TABLE_EVENTS +
+                        " WHERE " + COLUMN_STATUS + " != 'PENDING'" + hiddenCol +
+                        " AND UPPER(IFNULL(" + COLUMN_TAGS + ",'')) LIKE ?" +
+                        " ORDER BY " + COLUMN_DATE + " DESC",
+                        new String[]{"%" + deptAbbr.toUpperCase(Locale.getDefault()) + "%"});
+                if (c != null && c.moveToFirst()) {
+                    do { events.add(eventFromCursor(c)); } while (c.moveToNext());
+                    c.close();
+                }
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getAllEvents(dept) failed", e);
+        }
+        return events;
+    }
+
+    /**
+     * Returns a ranked list of top event creators (officers) by number of APPROVED events.
+     * Each entry is String[]{name, dept, approvedCount}.
+     * Limited to top 10.
+     */
+    public List<String[]> getTopEventCreators() {
+        List<String[]> result = new ArrayList<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            // Join events to users via creator_sid, count approved events per creator
+            Cursor c = db.rawQuery(
+                    "SELECT u." + COLUMN_USER_NAME + ", u." + COLUMN_USER_DEPARTMENT +
+                    ", COUNT(e." + COLUMN_ID + ") as cnt" +
+                    " FROM " + TABLE_EVENTS + " e" +
+                    " INNER JOIN " + TABLE_USERS + " u ON e." + COLUMN_CREATOR_SID +
+                    " = u." + COLUMN_USER_STUDENT_ID +
+                    " WHERE e." + COLUMN_STATUS + " = 'APPROVED'" +
+                    " GROUP BY u." + COLUMN_USER_STUDENT_ID +
+                    " ORDER BY cnt DESC LIMIT 10", null);
+            if (c != null && c.moveToFirst()) {
+                do {
+                    result.add(new String[]{
+                            c.getString(0),               // name
+                            c.getString(1),               // dept
+                            String.valueOf(c.getInt(2))   // count
+                    });
+                } while (c.moveToNext());
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getTopEventCreators failed", e);
+        }
+        return result;
+    }
+
+    /**
+     * Returns APPROVED events whose organizer field starts with (or contains) the given venue name
+     * and whose date equals the given date string (yyyy-MM-dd).
+     * Used by VenueFragment to show booking slots.
+     */
+    public List<Event> getEventsByVenueAndDate(String venueName, String date) {
+        List<Event> events = new ArrayList<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT * FROM " + TABLE_EVENTS +
+                    " WHERE " + COLUMN_STATUS + " = 'APPROVED'" +
+                    " AND " + COLUMN_DATE + " = ?" +
+                    " AND UPPER(IFNULL(" + COLUMN_ORGANIZER + ",'')) LIKE ?" +
+                    " ORDER BY " + COLUMN_EVENT_TIME + " ASC",
+                    new String[]{date, "%" + venueName.toUpperCase(Locale.getDefault()) + "%"});
+            if (c != null && c.moveToFirst()) {
+                do { events.add(eventFromCursor(c)); } while (c.moveToNext());
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getEventsByVenueAndDate failed", e);
+        }
+        return events;
+    }
+
+    /**
+     * Hides an event locally (sets is_hidden=1). Hidden events are excluded from
+     * the student browse list but remain in the DB.
+     */
+    public void hideEvent(int eventId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_IS_HIDDEN, 1);
+            db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "hideEvent failed", e);
+        }
+    }
+
+    /**
+     * Unhides an event (sets is_hidden=0).
+     */
+    public void unhideEvent(int eventId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_IS_HIDDEN, 0);
+            db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "unhideEvent failed", e);
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

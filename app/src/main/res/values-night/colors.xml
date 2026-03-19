@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ── Primary Green palette (SHADES for dark mode) ───────────────── -->
+    <color name="primary_green">#6AAF45</color>
+    <color name="primary_green_dark">#4A8E2A</color>
+    <color name="primary_green_light">#2A3D20</color>
+
+    <!-- ── Accent Orange palette (SHADES for dark mode) ────────────────── -->
+    <color name="primary_orange">#F0A070</color>
+    <color name="primary_orange_light">#4D3020</color>
+
+    <!-- ── Legacy aliases (matching shades) ────────────────────────────── -->
+    <color name="primary_blue">#6AAF45</color>
+    <color name="primary_dark">#4A8E2A</color>
+    <color name="primary_light">#2A3D20</color>
+    <color name="primaryLightBlue">#6AAF45</color>
+    <color name="primaryDarkBlue">#4A8E2A</color>
+    <color name="accentOrange">#F0A070</color>
+    <color name="accent_gold">#FFD54F</color>
+    <color name="purple_500">#CE93D8</color>
+
+    <!-- ── Premium Dark Surface Colors (White shades) ─────────────────── -->
+    <color name="surface">#1E1E1E</color>
+    <color name="surface_elevated">#2A2A2A</color>
+    <color name="background_gray">#121212</color>
+    <color name="card_bg">#2D2D2D</color>
+
+    <!-- ── Premium Text Colors (White shades) ─────────────────────────── -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B3B3B3</color>
+    <color name="text_hint">#757575</color>
+    <color name="text_on_primary">#FFFFFF</color>
+
+    <!-- ── Premium Dark Borders & Dividers ────────────────────────────── -->
+    <color name="card_border">#3D3D3D</color>
+    <color name="divider">#2D2D2D</color>
+
+    <!-- ── Functional Colors (adjusted for dark) ──────────────────────── -->
+    <color name="error_red">#EF5350</color>
+    <color name="success_green">#66BB6A</color>
+
+    <!-- ── Basic Colors ───────────────────────────────────────────────── -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+</resources>

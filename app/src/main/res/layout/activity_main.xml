@@ -5,28 +5,127 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="@color/background_gray"
     tools:context=".ui.main.MainActivity">
 
+    <!-- ── Top App Bar ──────────────────────────────────────────────────── -->
+    <LinearLayout
+        android:id="@+id/top_app_bar"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/top_bar_height"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/gradient_header"
+        android:elevation="0dp"
+        android:paddingStart="@dimen/space_4"
+        android:paddingEnd="@dimen/space_3"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Page title -->
+        <TextView
+            android:id="@+id/tv_page_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Discover"
+            android:textColor="@color/text_on_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"/>
+
+        <!-- Notification bell + badge -->
+        <FrameLayout
+            android:layout_width="48dp"
+            android:layout_height="48dp">
+
+            <ImageView
+                android:id="@+id/iv_notif_bell"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_notifications"
+                android:tint="@color/text_on_primary"
+                android:contentDescription="Notifications"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"/>
+
+            <!-- Unread badge -->
+            <TextView
+                android:id="@+id/tv_notif_badge"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="6dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/badge_timeline"
+                android:textColor="@color/text_on_primary"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:visibility="gone"/>
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- ── Fragment container ───────────────────────────────────────────── -->
     <FrameLayout
         android:id="@+id/fragment_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/top_app_bar"
         app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"/>
 
-    <!-- Custom bottom navigation bar (replaces BottomNavigationView) -->
+    <!-- ── Custom bottom navigation bar (4 tabs) ────────────────────────── -->
     <LinearLayout
         android:id="@+id/bottom_navigation"
         android:layout_width="0dp"
-        android:layout_height="56dp"
+        android:layout_height="@dimen/bottom_nav_height"
         android:orientation="horizontal"
-        android:background="@color/white"
+        android:background="@color/surface"
         android:elevation="8dp"
+        android:paddingHorizontal="@dimen/space_2"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Discover tab -->
+        <LinearLayout
+            android:id="@+id/tab_discover"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/nav_item_background"
+            android:paddingVertical="@dimen/space_2">
+
+            <ImageView
+                android:id="@+id/tab_discover_icon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:src="@drawable/ic_discover"
+                android:tint="@color/primary_green"
+                android:contentDescription="Discover"/>
+
+            <TextView
+                android:id="@+id/tab_discover_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Discover"
+                android:textSize="11sp"
+                android:textColor="@color/primary_green"
+                android:fontFamily="sans-serif-medium"/>
+        </LinearLayout>
 
         <!-- Events tab -->
         <LinearLayout
@@ -38,28 +137,31 @@
             android:gravity="center"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/nav_item_background"
+            android:paddingVertical="@dimen/space_2">
 
             <ImageView
                 android:id="@+id/tab_events_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
                 android:src="@drawable/ic_events"
-                android:tint="@color/primary_blue"
-                android:contentDescription="Events" />
+                android:tint="@color/text_hint"
+                android:contentDescription="Events"/>
 
             <TextView
                 android:id="@+id/tab_events_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="Events"
-                android:textSize="10sp"
-                android:textColor="@color/primary_blue" />
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:fontFamily="sans-serif-medium"/>
         </LinearLayout>
 
-        <!-- Notifications tab -->
+        <!-- Venue tab -->
         <LinearLayout
-            android:id="@+id/tab_notifications"
+            android:id="@+id/tab_venue"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -67,74 +169,58 @@
             android:gravity="center"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
-
-            <!-- Icon + badge wrapper -->
-            <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
-
-                <ImageView
-                    android:id="@+id/tab_notifications_icon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_notifications"
-                    android:tint="@color/text_hint"
-                    android:contentDescription="Notifications" />
-
-                <!-- Red badge showing unread count -->
-                <TextView
-                    android:id="@+id/tab_notifications_badge"
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_gravity="top|end"
-                    android:layout_marginTop="-4dp"
-                    android:layout_marginEnd="-4dp"
-                    android:background="#F44336"
-                    android:textColor="@android:color/white"
-                    android:textSize="9sp"
-                    android:textStyle="bold"
-                    android:gravity="center"
-                    android:visibility="gone" />
-
-            </FrameLayout>
-
-            <TextView
-                android:id="@+id/tab_notifications_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Notifications"
-                android:textSize="10sp"
-                android:textColor="@color/text_hint" />
-        </LinearLayout>
-
-        <!-- Menu tab -->
-        <LinearLayout
-            android:id="@+id/tab_menu"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/nav_item_background"
+            android:paddingVertical="@dimen/space_2">
 
             <ImageView
-                android:id="@+id/tab_menu_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_menu"
+                android:id="@+id/tab_venue_icon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:src="@drawable/ic_venue"
                 android:tint="@color/text_hint"
-                android:contentDescription="Menu" />
+                android:contentDescription="Venue"/>
 
             <TextView
-                android:id="@+id/tab_menu_text"
+                android:id="@+id/tab_venue_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Menu"
-                android:textSize="10sp"
-                android:textColor="@color/text_hint" />
+                android:layout_marginTop="2dp"
+                android:text="Venue"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:fontFamily="sans-serif-medium"/>
+        </LinearLayout>
+
+        <!-- Profile tab -->
+        <LinearLayout
+            android:id="@+id/tab_profile"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/nav_item_background"
+            android:paddingVertical="@dimen/space_2">
+
+            <ImageView
+                android:id="@+id/tab_profile_icon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:src="@drawable/ic_person"
+                android:tint="@color/text_hint"
+                android:contentDescription="Profile"/>
+
+            <TextView
+                android:id="@+id/tab_profile_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Profile"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:fontFamily="sans-serif-medium"/>
         </LinearLayout>
 
     </LinearLayout>

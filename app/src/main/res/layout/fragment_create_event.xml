@@ -4,36 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_gray"
+    android:fitsSystemWindows="true"
     android:orientation="vertical">
-
-    <!-- Header -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/primary_blue"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="16dp">
-
-        <ImageButton
-            android:id="@+id/btn_back"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_back"
-            app:tint="@android:color/white"
-            android:contentDescription="Back" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="Create New Event"
-            android:textColor="@android:color/white"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-    </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -66,16 +38,16 @@
 
                     <Button
                         android:id="@+id/btn_pick_banner"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_margin="12dp"
-                        android:backgroundTint="@android:color/white"
                         android:text="Choose Banner Image"
-                        android:textColor="@color/primary_blue"
                         android:textAllCaps="false"
                         android:textSize="14sp"
+                        android:textColor="@color/primary_green"
                         app:cornerRadius="8dp"
-                        app:strokeColor="@color/primary_blue"
+                        app:strokeColor="@color/primary_green"
                         app:strokeWidth="1dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -115,8 +87,8 @@
                             android:id="@+id/et_create_title"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/black"
-                            android:textColorHint="#757575"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
                             android:inputType="textCapWords" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -133,8 +105,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="top"
-                            android:textColor="@color/black"
-                            android:textColorHint="#757575"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
                             android:inputType="textMultiLine"
                             android:lines="3"
                             android:maxLines="6" />
@@ -156,8 +128,8 @@
                             android:id="@+id/et_create_date"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/black"
-                            android:textColorHint="#757575"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
                             android:inputType="none"
                             android:focusable="false"
                             android:focusableInTouchMode="false"
@@ -180,8 +152,29 @@
                             android:id="@+id/et_create_time"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/black"
-                            android:textColorHint="#757575"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
+                            android:inputType="none"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:cursorVisible="false" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Venue — dropdown from available venues in DB -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/til_create_venue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:hint="Venue *"
+                        app:hintTextColor="@color/primary_blue"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                        <AutoCompleteTextView
+                            android:id="@+id/acv_create_venue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
                             android:inputType="none"
                             android:focusable="false"
                             android:focusableInTouchMode="false"
@@ -200,8 +193,8 @@
                             android:id="@+id/et_create_organizer"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/black"
-                            android:textColorHint="#757575"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
                             android:inputType="none"
                             android:focusable="false"
                             android:focusableInTouchMode="false"
@@ -221,8 +214,8 @@
                             android:id="@+id/acv_create_department"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/black"
-                            android:textColorHint="#757575"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
                             android:inputType="none"
                             android:focusable="false"
                             android:focusableInTouchMode="false"
@@ -260,7 +253,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
                         android:text="Select which departments to notify. Your department is pre-selected."
-                        android:textColor="#757575"
+                        android:textColor="@color/text_hint"
                         android:textSize="12sp" />
 
                     <com.google.android.material.chip.ChipGroup
@@ -270,11 +263,11 @@
                         app:singleSelection="false">
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_dept_ccs"
+                            android:id="@+id/chip_dept_clas"
                             style="@style/Widget.App.Chip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="CCS" />
+                            android:text="CLAS" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_dept_coe"
@@ -361,33 +354,47 @@
                         app:selectionRequired="true">
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_cat_academic"
+                            android:id="@+id/chip_cat_academic_professional"
                             style="@style/Widget.App.Chip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Academic"
+                            android:text="Academic &amp; Professional"
                             android:checked="true" />
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_cat_workshop"
+                            android:id="@+id/chip_cat_student_life_social"
                             style="@style/Widget.App.Chip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Workshop" />
+                            android:text="Student Life &amp; Social" />
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_cat_social"
+                            android:id="@+id/chip_cat_athletics_wellness"
                             style="@style/Widget.App.Chip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Social" />
+                            android:text="Athletics &amp; Wellness" />
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_cat_sports"
+                            android:id="@+id/chip_cat_arts_culture"
                             style="@style/Widget.App.Chip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Sports" />
+                            android:text="Arts &amp; Culture" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_cat_admin_ceremonial"
+                            style="@style/Widget.App.Chip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Administrative &amp; Ceremonial" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_cat_competitions_interest"
+                            style="@style/Widget.App.Chip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Competitions &amp; Special Interest" />
 
                     </com.google.android.material.chip.ChipGroup>
                 </LinearLayout>
@@ -399,10 +406,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginBottom="24dp"
-                android:backgroundTint="@color/primary_blue"
+                android:backgroundTint="@color/primary_green"
                 android:text="Publish Event"
                 android:textAllCaps="false"
-                android:textColor="@android:color/white"
+                android:textColor="@color/text_on_primary"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 app:cornerRadius="12dp" />

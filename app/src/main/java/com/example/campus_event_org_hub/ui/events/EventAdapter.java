@@ -1,5 +1,6 @@
 package com.example.campus_event_org_hub.ui.events;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -8,10 +9,13 @@ import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campus_event_org_hub.R;
+import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
 
@@ -28,23 +32,44 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     private List<Event> eventList;
     private List<Event> eventListFull;
     private String studentId;
+    private String userRole;
+    private DatabaseHelper dbHelper;
+
+    // ── Constructors ─────────────────────────────────────────────────────────
 
     public EventAdapter(List<Event> eventList) {
-        this.eventList = eventList;
+        this.eventList     = eventList;
         this.eventListFull = new ArrayList<>(eventList);
-        this.studentId = "";
+        this.studentId     = "";
+        this.userRole      = "Student";
+        this.dbHelper      = null;
     }
 
     public EventAdapter(List<Event> eventList, String studentId) {
-        this.eventList = eventList;
+        this.eventList     = eventList;
         this.eventListFull = new ArrayList<>(eventList);
-        this.studentId = studentId != null ? studentId : "";
+        this.studentId     = studentId != null ? studentId : "";
+        this.userRole      = "Student";
+        this.dbHelper      = null;
     }
+
+    /** Full constructor used by EventsFragment — enables long-press hide for Students. */
+    public EventAdapter(List<Event> eventList, String studentId, String userRole,
+                        DatabaseHelper dbHelper) {
+        this.eventList     = eventList;
+        this.eventListFull = new ArrayList<>(eventList);
+        this.studentId     = studentId != null ? studentId : "";
+        this.userRole      = userRole  != null ? userRole  : "Student";
+        this.dbHelper      = dbHelper;
+    }
+
+    // ── ViewHolder lifecycle ─────────────────────────────────────────────────
 
     @NonNull
     @Override
     public EventViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.event_list_item, parent, false);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.event_list_item, parent, false);
         return new EventViewHolder(view);
     }
 
@@ -69,17 +94,17 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             if ("CANCELLED".equals(status)) {
                 holder.statusBadge.setVisibility(View.VISIBLE);
                 holder.statusBadge.setText("CANCELLED");
-                holder.statusBadge.setBackgroundColor(0xFFD32F2F); // error red
+                holder.statusBadge.setBackgroundColor(0xFFD32F2F);
             } else if ("POSTPONED".equals(status)) {
                 holder.statusBadge.setVisibility(View.VISIBLE);
                 holder.statusBadge.setText("POSTPONED");
-                holder.statusBadge.setBackgroundColor(0xFF7B1FA2); // purple
+                holder.statusBadge.setBackgroundColor(0xFF7B1FA2);
             } else {
                 holder.statusBadge.setVisibility(View.GONE);
             }
         }
 
-        // Timeline badge (top row, beside date): UPCOMING / HAPPENING / ENDED / POSTPONED / CANCELLED
+        // Timeline badge: UPCOMING / HAPPENING / ENDED / POSTPONED / CANCELLED
         if (holder.timelineBadge != null) {
             String status = event.getStatus();
             if ("CANCELLED".equals(status)) {
@@ -91,7 +116,6 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 holder.timelineBadge.setBackgroundColor(0xFF7B1FA2);
                 holder.timelineBadge.setVisibility(View.VISIBLE);
             } else if ("APPROVED".equals(status)) {
-                // Compute UPCOMING / HAPPENING / ENDED from date
                 Calendar todayCal = Calendar.getInstance();
                 todayCal.set(Calendar.HOUR_OF_DAY, 0);
                 todayCal.set(Calendar.MINUTE, 0);
@@ -104,15 +128,15 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         holder.timelineBadge.setVisibility(View.GONE);
                     } else if (eventDate.before(todayCal.getTime())) {
                         holder.timelineBadge.setText("ENDED");
-                        holder.timelineBadge.setBackgroundColor(0xFF757575); // gray
+                        holder.timelineBadge.setBackgroundColor(0xFF757575);
                         holder.timelineBadge.setVisibility(View.VISIBLE);
                     } else if (eventDate.equals(todayCal.getTime())) {
                         holder.timelineBadge.setText("HAPPENING");
-                        holder.timelineBadge.setBackgroundColor(0xFF0288D1); // light blue
+                        holder.timelineBadge.setBackgroundColor(0xFF0288D1);
                         holder.timelineBadge.setVisibility(View.VISIBLE);
                     } else {
                         holder.timelineBadge.setText("UPCOMING");
-                        holder.timelineBadge.setBackgroundColor(0xFF388E3C); // green
+                        holder.timelineBadge.setBackgroundColor(0xFF388E3C);
                         holder.timelineBadge.setVisibility(View.VISIBLE);
                     }
                 } catch (ParseException ex) {
@@ -123,11 +147,33 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
         }
 
+        // ── Tap: open detail ────────────────────────────────────────────────
         holder.itemView.setOnClickListener(v -> {
             Intent intent = new Intent(v.getContext(), EventDetailActivity.class);
             intent.putExtra("event", event);
             intent.putExtra("USER_STUDENT_ID", studentId);
             v.getContext().startActivity(intent);
+        });
+
+        // ── Long-press: Students can hide an event from their feed ───────────
+        holder.itemView.setOnLongClickListener(v -> {
+            if (!"Student".equalsIgnoreCase(userRole) || dbHelper == null) return false;
+            new AlertDialog.Builder(v.getContext())
+                    .setTitle("Hide event?")
+                    .setMessage("\"" + event.getTitle() + "\" will be removed from your feed.")
+                    .setPositiveButton("Hide", (dialog, which) -> {
+                        dbHelper.hideEvent(event.getId());
+                        int idx = holder.getAdapterPosition();
+                        if (idx != RecyclerView.NO_ID) {
+                            eventList.remove(idx);
+                            eventListFull.remove(event);
+                            notifyItemRemoved(idx);
+                        }
+                        Toast.makeText(v.getContext(), "Event hidden", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return true;
         });
     }
 
@@ -136,12 +182,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         return eventList.size();
     }
 
+    // ── Filtering ────────────────────────────────────────────────────────────
+
     @Override
     public Filter getFilter() {
         return eventFilter;
     }
 
-    private Filter eventFilter = new Filter() {
+    private final Filter eventFilter = new Filter() {
         @Override
         protected FilterResults performFiltering(CharSequence constraint) {
             List<Event> filteredList = new ArrayList<>();
@@ -150,9 +198,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             } else {
                 String filterPattern = constraint.toString().toLowerCase().trim();
                 for (Event item : eventListFull) {
-                    if (item.getTitle().toLowerCase().contains(filterPattern) || 
+                    if (item.getTitle().toLowerCase().contains(filterPattern) ||
                         item.getDescription().toLowerCase().contains(filterPattern) ||
-                        item.getCategory().toLowerCase().contains(filterPattern)) {
+                        (item.getCategory() != null &&
+                         item.getCategory().toLowerCase().contains(filterPattern))) {
                         filteredList.add(item);
                     }
                 }
@@ -163,9 +212,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         protected void publishResults(CharSequence constraint, FilterResults results) {
             eventList.clear();
-            eventList.addAll((List) results.values);
+            eventList.addAll((List<Event>) results.values);
             notifyDataSetChanged();
         }
     };
@@ -176,7 +226,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             filteredList.addAll(eventListFull);
         } else {
             for (Event item : eventListFull) {
-                if (item.getCategory().equalsIgnoreCase(category)) {
+                if (item.getCategory() != null &&
+                    item.getCategory().equalsIgnoreCase(category)) {
                     filteredList.add(item);
                 }
             }
@@ -185,6 +236,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         eventList.addAll(filteredList);
         notifyDataSetChanged();
     }
+
+    // ── ViewHolder ───────────────────────────────────────────────────────────
 
     public static class EventViewHolder extends RecyclerView.ViewHolder {
         TextView title, date, description, category, statusBadge, timelineBadge;

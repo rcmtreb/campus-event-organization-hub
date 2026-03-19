@@ -4,13 +4,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     android:background="@color/background_gray">
 
     <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/primary_blue"
+        android:background="@drawable/bg_header_green"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="16dp">
@@ -72,7 +73,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="CEOH stores the following data locally on your device:\n\n\u2022 Full name, student ID, email address\n\u2022 Department and role (Student / Officer)\n\u2022 Events you register for or create\n\u2022 Profile picture (stored on device)\n\n\u26a0 No data is transmitted to external servers. All information remains on your device."
-                        android:textColor="#333333"
+                        android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:lineSpacingMultiplier="1.4" />
                 </LinearLayout>
@@ -119,7 +120,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Allow event recommendations"
-                                android:textColor="@android:color/black"
+                                android:textColor="@color/text_primary"
                                 android:textSize="14sp" />
 
                             <TextView
@@ -159,7 +160,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Show my profile to other students"
-                                android:textColor="@android:color/black"
+                                android:textColor="@color/text_primary"
                                 android:textSize="14sp" />
 
                             <TextView
@@ -207,7 +208,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="You may request deletion of your account by contacting the Admin. All associated event data will be anonymized upon deletion.\n\nFor data deletion requests, contact:\nprivacy@ucc.edu.ph\n\nLast updated: March 2026"
-                        android:textColor="#333333"
+                        android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:lineSpacingMultiplier="1.4" />
                 </LinearLayout>

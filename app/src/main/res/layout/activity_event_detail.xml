@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:background="@color/background_gray">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -43,7 +43,7 @@
                         android:layout_height="wrap_content"
                         android:layout_toStartOf="@id/action_buttons"
                         android:textAppearance="?attr/textAppearanceHeadline5"
-                        android:textColor="@android:color/black"
+                        android:textColor="@color/text_primary"
                         android:textStyle="bold"
                         tools:text="Event Title" />
 
@@ -61,7 +61,7 @@
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:contentDescription="Bookmark"
                             android:src="@drawable/ic_bookmark"
-                            app:tint="@android:color/black" />
+                            app:tint="@color/text_primary" />
 
                         <ImageButton
                             android:id="@+id/btn_share"
@@ -70,7 +70,7 @@
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:contentDescription="Share"
                             android:src="@drawable/ic_share"
-                            app:tint="@android:color/black" />
+                            app:tint="@color/text_primary" />
                     </LinearLayout>
 
                     <TextView
@@ -81,7 +81,7 @@
                         android:layout_marginTop="8dp"
                         android:drawablePadding="8dp"
                         android:textAppearance="?attr/textAppearanceCaption"
-                        android:textColor="@android:color/black"
+                        android:textColor="@color/text_primary"
                         tools:text="March 15, 2026 • 10:00 AM" />
 
                 </RelativeLayout>
@@ -107,7 +107,7 @@
                     android:layout_height="wrap_content"
                     android:text="About this Event"
                     android:textAppearance="?attr/textAppearanceSubtitle1"
-                    android:textColor="@android:color/black"
+                    android:textColor="@color/text_primary"
                     android:textStyle="bold" />
 
                 <TextView
@@ -117,7 +117,7 @@
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="4dp"
                     android:textAppearance="?attr/textAppearanceBody1"
-                    android:textColor="@android:color/black"
+                    android:textColor="@color/text_primary"
                     tools:text="Detailed event description goes here. This explains what the event is about and why students should join." />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -141,7 +141,7 @@
                     android:layout_height="wrap_content"
                     android:text="Tags"
                     android:textAppearance="?attr/textAppearanceSubtitle1"
-                    android:textColor="@android:color/black"
+                    android:textColor="@color/text_primary"
                     android:textStyle="bold" />
 
                 <com.google.android.material.chip.ChipGroup
@@ -171,7 +171,7 @@
                     android:layout_height="wrap_content"
                     android:text="Organizer Information"
                     android:textAppearance="?attr/textAppearanceSubtitle1"
-                    android:textColor="@android:color/black"
+                    android:textColor="@color/text_primary"
                     android:textStyle="bold" />
 
                 <TextView
@@ -180,7 +180,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:textAppearance="?attr/textAppearanceBody2"
-                    android:textColor="@android:color/black"
+                    android:textColor="@color/text_primary"
                     android:textStyle="bold"
                     tools:text="Computer Science Society" />
 
@@ -191,7 +191,7 @@
                     android:layout_marginTop="4dp"
                     android:text="Contact: css@university.edu"
                     android:textAppearance="?attr/textAppearanceCaption"
-                    android:textColor="@android:color/black" />
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

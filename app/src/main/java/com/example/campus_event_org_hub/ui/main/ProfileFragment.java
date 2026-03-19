@@ -13,7 +13,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -143,14 +142,6 @@ public class ProfileFragment extends Fragment {
                 profileUpdatedListener.onProfilePictureUpdated(selectedImagePath);
             }
         });
-
-        // Back button
-        ImageButton btnBack = view.findViewById(R.id.btn_back_profile);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> {
-                if (getActivity() != null) getActivity().onBackPressed();
-            });
-        }
 
         return view;
     }

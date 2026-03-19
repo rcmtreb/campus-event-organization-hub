@@ -4,90 +4,59 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     android:background="@color/background_gray"
     android:orientation="vertical"
     tools:context=".ui.main.NotificationsFragment">
 
-    <!-- Header -->
+    <!-- Mini Header below main toolbar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/primary_blue"
-        android:orientation="vertical"
-        android:padding="24dp">
-
-        <!-- Title row: title + unread badge -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Notifications"
-                android:textColor="@android:color/white"
-                android:textSize="26sp"
-                android:textStyle="bold" />
-
-            <!-- Red pill badge showing unread count -->
-            <TextView
-                android:id="@+id/tv_notif_unread_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#F44336"
-                android:textColor="@android:color/white"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:visibility="gone"
-                tools:text="3 unread"
-                tools:visibility="visible" />
-
-        </LinearLayout>
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="@dimen/space_4"
+        android:paddingVertical="@dimen/space_3"
+        android:background="@color/surface">
 
         <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Notifications"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+
+        <!-- Red pill badge showing unread count -->
+        <TextView
+            android:id="@+id/tv_notif_unread_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Stay up to date with campus events"
-            android:textColor="#C8F5A8"
-            android:textSize="13sp" />
+            android:background="@drawable/badge_timeline"
+            android:textColor="@color/text_on_primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:visibility="gone"
+            tools:text="3"
+            tools:visibility="visible"/>
 
-        <!-- Clear All button — only visible when there are notifications -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_clear_all_notifications"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/PremiumButton.Ghost"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:layout_marginTop="12dp"
-            android:text="Clear All Notifications"
-            android:textColor="@android:color/white"
+            android:layout_marginStart="@dimen/space_2"
+            android:text="Clear All"
             android:textSize="12sp"
-            app:strokeColor="@android:color/white"
-            app:strokeWidth="1dp"
             android:visibility="gone"
-            tools:visibility="visible" />
-
-        <!-- Archive Selected button — only visible in multi-select mode -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_archive_selected"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:layout_marginTop="8dp"
-            android:text="Archive Selected"
-            android:textColor="@android:color/white"
-            android:textSize="12sp"
-            android:backgroundTint="@color/primary_orange"
-            app:cornerRadius="8dp"
-            android:visibility="gone" />
+            tools:visibility="visible"/>
 
     </LinearLayout>
 
-    <!-- Archive row — tappable entry point to archived notifications -->
+    <!-- Archive row -->
     <LinearLayout
         android:id="@+id/row_archive"
         android:layout_width="match_parent"
@@ -97,55 +66,64 @@
         android:focusable="true"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp">
+        android:paddingHorizontal="@dimen/space_4"
+        android:paddingVertical="@dimen/space_2">
 
         <ImageView
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:src="@drawable/ic_bookmark"
-            android:tint="#6A1B9A"
-            android:contentDescription="Archive" />
+            android:tint="@color/primary_green"
+            android:contentDescription="Archive"/>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="@dimen/space_3"
             android:text="Archive"
-            android:textColor="#4A4A4A"
-            android:textSize="15sp" />
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"/>
 
-        <!-- Item count badge -->
         <TextView
             android:id="@+id/tv_archive_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#6A1B9A"
-            android:textColor="@android:color/white"
+            android:background="@drawable/badge_timeline"
+            android:textColor="@color/text_on_primary"
             android:textSize="11sp"
             android:textStyle="bold"
             android:paddingHorizontal="8dp"
             android:paddingVertical="3dp"
             android:visibility="gone"
             tools:text="5"
-            tools:visibility="visible" />
+            tools:visibility="visible"/>
 
         <ImageView
             android:layout_width="16dp"
             android:layout_height="16dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="@dimen/space_2"
             android:src="@drawable/ic_chevron_right"
-            android:tint="#AAAAAA"
-            android:contentDescription="Open archive" />
+            android:tint="@color/text_hint"
+            android:contentDescription="Open archive"/>
 
     </LinearLayout>
 
-    <!-- Thin divider below archive row -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#E0E0E0" />
+        android:background="@color/divider"/>
+
+    <!-- Archive Selected button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_archive_selected"
+        style="@style/PremiumButton.Secondary"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginHorizontal="@dimen/space_4"
+        android:layout_marginVertical="@dimen/space_2"
+        android:text="Archive Selected"
+        android:visibility="gone"/>
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh_notifications"
@@ -156,8 +134,8 @@
             android:id="@+id/notifications_recycler"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="8dp"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            android:padding="@dimen/space_2"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 

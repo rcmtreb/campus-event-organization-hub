@@ -90,7 +90,7 @@
                             android:layout_height="wrap_content"
                             android:text="Total Students"
                             android:textSize="12sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -118,7 +118,7 @@
                             android:layout_height="wrap_content"
                             android:text="Active Officers"
                             android:textSize="12sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -146,7 +146,7 @@
                             android:layout_height="wrap_content"
                             android:text="Live Events"
                             android:textSize="12sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -174,7 +174,7 @@
                             android:layout_height="wrap_content"
                             android:text="To Approve"
                             android:textSize="12sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </GridLayout>
@@ -222,7 +222,7 @@
                             android:layout_marginStart="16dp"
                             android:text="Approve Event Proposals"
                             android:textSize="15sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                         <TextView
                             android:id="@+id/tv_pending_badge"
                             android:layout_width="wrap_content"
@@ -256,7 +256,7 @@
                             android:layout_marginStart="16dp"
                             android:text="User Roles &amp; Permissions"
                             android:textSize="15sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
 
                     <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginHorizontal="16dp"/>
@@ -280,7 +280,7 @@
                             android:layout_marginStart="16dp"
                             android:text="Event Control"
                             android:textSize="15sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
 
                     <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginHorizontal="16dp"/>
@@ -304,7 +304,7 @@
                             android:layout_marginStart="16dp"
                             android:text="System Statistics &amp; Reports"
                             android:textSize="15sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
 
                     <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/card_border" android:layout_marginHorizontal="16dp"/>
@@ -328,7 +328,7 @@
                             android:layout_marginStart="16dp"
                             android:text="Export / Import Data"
                             android:textSize="15sp"
-                            android:textColor="@color/black"/>
+                            android:textColor="@color/text_primary"/>
                     </LinearLayout>
 
                 </LinearLayout>

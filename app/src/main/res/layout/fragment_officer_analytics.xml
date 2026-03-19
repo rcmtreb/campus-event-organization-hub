@@ -4,13 +4,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     android:background="@color/background_gray">
 
     <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/primary_blue"
+        android:background="@drawable/bg_header_green"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="16dp">
@@ -95,7 +96,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Events Created"
-                                android:textColor="#666666"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="12sp" />
                         </LinearLayout>
 
@@ -126,7 +127,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Total Attendees"
-                                android:textColor="#666666"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="12sp" />
                         </LinearLayout>
                     </LinearLayout>
@@ -169,7 +170,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center"
                         android:text="No events submitted yet."
-                        android:textColor="#999999"
+                        android:textColor="@color/text_secondary"
                         android:textSize="13sp"
                         android:paddingTop="8dp"
                         android:paddingBottom="8dp"

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base spacing unit: 4dp grid -->
+
+    <!-- Micro spacing -->
+    <dimen name="space_1">4dp</dimen>
+    <dimen name="space_2">8dp</dimen>
+
+    <!-- Default spacing -->
+    <dimen name="space_3">12dp</dimen>
+    <dimen name="space_4">16dp</dimen>
+
+    <!-- Large spacing -->
+    <dimen name="space_5">20dp</dimen>
+    <dimen name="space_6">24dp</dimen>
+    <dimen name="space_8">32dp</dimen>
+
+    <!-- Hero spacing -->
+    <dimen name="space_10">40dp</dimen>
+    <dimen name="space_12">48dp</dimen>
+
+    <!-- Corner radius -->
+    <dimen name="radius_small">8dp</dimen>
+    <dimen name="radius_medium">12dp</dimen>
+    <dimen name="radius_large">16dp</dimen>
+    <dimen name="radius_xl">20dp</dimen>
+    <dimen name="radius_full">24dp</dimen>
+
+    <!-- Elevation -->
+    <dimen name="elevation_low">2dp</dimen>
+    <dimen name="elevation_medium">4dp</dimen>
+    <dimen name="elevation_high">8dp</dimen>
+
+    <!-- Component sizes -->
+    <dimen name="button_height">52dp</dimen>
+    <dimen name="button_height_small">44dp</dimen>
+    <dimen name="icon_small">16dp</dimen>
+    <dimen name="icon_medium">24dp</dimen>
+    <dimen name="icon_large">32dp</dimen>
+    <dimen name="avatar_small">40dp</dimen>
+    <dimen name="avatar_medium">64dp</dimen>
+    <dimen name="avatar_large">100dp</dimen>
+
+    <!-- Card dimensions -->
+    <dimen name="card_corner_radius">16dp</dimen>
+    <dimen name="card_elevation">4dp</dimen>
+    <dimen name="card_padding">16dp</dimen>
+    <dimen name="card_margin">8dp</dimen>
+
+    <!-- Event card -->
+    <dimen name="event_card_image_height">180dp</dimen>
+    <dimen name="event_card_corner_radius">20dp</dimen>
+
+    <!-- Bottom navigation -->
+    <dimen name="bottom_nav_height">60dp</dimen>
+    <dimen name="top_bar_height">56dp</dimen>
+
+    <!-- Chip -->
+    <dimen name="chip_height">36dp</dimen>
+    <dimen name="chip_corner_radius">18dp</dimen>
+
+    <!-- FAB -->
+    <dimen name="fab_margin">16dp</dimen>
+</resources>

@@ -48,3 +48,12 @@ service-account*.json
 
 # Firebase service account key used for FCM HTTP v1 — NEVER commit this
 app/src/main/assets/service_account.json
+
+# Java crash logs
+hs_err_pid*.log
+
+# Gradle Wrapper JAR
+gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ/Android Studio configuration files
+.idea/*.xml

@@ -4,114 +4,159 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:fitsSystemWindows="true"
+    android:background="@color/background_gray"
     tools:context=".ui.events.EventsFragment">
 
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@android:color/white">
-
-    <!-- Search Bar -->
-    <androidx.cardview.widget.CardView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="8dp"
-        app:cardCornerRadius="8dp"
-        app:cardElevation="2dp"
-        app:cardBackgroundColor="@android:color/white">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@color/background_gray">
 
-        <androidx.appcompat.widget.SearchView
-            android:id="@+id/search_view"
+        <!-- Search Bar - Premium Card Style -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            style="@style/Widget.App.SearchView.Dark"
-            app:iconifiedByDefault="false"
-            app:queryHint="Search events..." />
-    </androidx.cardview.widget.CardView>
+            android:layout_marginHorizontal="@dimen/space_4"
+            android:layout_marginTop="@dimen/space_3"
+            app:cardCornerRadius="@dimen/radius_large"
+            app:cardElevation="@dimen/elevation_low"
+            app:cardBackgroundColor="@color/surface">
 
-    <!-- Categories / Tags: Black Background for Chips, White Text -->
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="@dimen/space_3">
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chip_group_filter"
-            android:layout_width="wrap_content"
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@android:drawable/ic_menu_search"
+                    app:tint="@color/text_secondary"/>
+
+                <EditText
+                    android:id="@+id/search_view"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/space_2"
+                    android:background="@android:color/transparent"
+                    android:hint="Search events..."
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:singleLine="true"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Categories / Tags - Premium Chips -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:singleSelection="true"
-            app:selectionRequired="true">
+            android:scrollbars="none"
+            android:paddingStart="@dimen/space_4"
+            android:paddingEnd="@dimen/space_4"
+            android:paddingTop="@dimen/space_3">
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_all"
-                style="@style/Widget.App.Chip"
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chip_group_filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="All"
-                android:checked="true" />
+                app:singleSelection="true"
+                app:selectionRequired="true"
+                app:chipSpacingHorizontal="@dimen/space_2">
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_academic"
-                style="@style/Widget.App.Chip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Academic" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_all"
+                    style="@style/PremiumChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="All"
+                    android:checked="true" />
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_workshop"
-                style="@style/Widget.App.Chip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Workshop" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_academic_professional"
+                    style="@style/PremiumChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Academic &amp; Professional" />
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_sports"
-                style="@style/Widget.App.Chip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sports" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_student_life_social"
+                    style="@style/PremiumChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Student Life &amp; Social" />
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_social"
-                style="@style/Widget.App.Chip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Social" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_athletics_wellness"
+                    style="@style/PremiumChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Athletics &amp; Wellness" />
 
-        </com.google.android.material.chip.ChipGroup>
-    </HorizontalScrollView>
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_arts_culture"
+                    style="@style/PremiumChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Arts &amp; Culture" />
 
-    <!-- Event List with pull-to-refresh -->
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipe_refresh_events"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_admin_ceremonial"
+                    style="@style/PremiumChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Administrative &amp; Ceremonial" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/events_recycler_view"
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_competitions_interest"
+                    style="@style/PremiumChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Competitions &amp; Special Interest" />
+
+            </com.google.android.material.chip.ChipGroup>
+        </HorizontalScrollView>
+
+        <!-- Event List with pull-to-refresh -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_refresh_events"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="4dp"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-            tools:listitem="@layout/event_list_item" />
+            android:layout_marginTop="@dimen/space_2">
 
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/events_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingHorizontal="@dimen/space_3"
+                android:paddingBottom="@dimen/space_3"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                tools:listitem="@layout/event_list_item" />
 
-</LinearLayout>
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    </LinearLayout>
+
+    <!-- Premium FAB -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_create_event"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
+        android:layout_margin="@dimen/fab_margin"
         android:contentDescription="Create Event"
         android:src="@drawable/ic_add"
         app:backgroundTint="@color/primary_orange"
-        app:tint="@android:color/white" />
+        app:tint="@color/text_on_primary"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Premium.FAB"
+        app:elevation="@dimen/elevation_high"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

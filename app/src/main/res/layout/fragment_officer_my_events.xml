@@ -4,13 +4,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     android:background="@color/background_gray">
 
     <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/primary_blue"
+        android:background="@drawable/bg_header_green"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="16dp">
@@ -65,7 +66,7 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="No events in this category."
-        android:textColor="#999999"
+                android:textColor="@color/text_secondary"
         android:textSize="14sp"
         android:visibility="gone" />
 

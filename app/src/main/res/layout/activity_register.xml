@@ -60,8 +60,8 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_edit_text_rounded"
                         android:hint="Full Name"
-                        android:textColor="@color/black"
-                        android:textColorHint="#757575"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_hint"
                         android:inputType="textPersonName"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -79,8 +79,8 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_edit_text_rounded"
                         android:hint="Student ID"
-                        android:textColor="@color/black"
-                        android:textColorHint="#757575"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_hint"
                         android:inputType="number"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -98,8 +98,8 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_edit_text_rounded"
                         android:hint="Email Address"
-                        android:textColor="@color/black"
-                        android:textColorHint="#757575"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_hint"
                         android:inputType="textEmailAddress"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -118,8 +118,8 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_edit_text_rounded"
                         android:hint="Password"
-                        android:textColor="@color/black"
-                        android:textColorHint="#757575"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_hint"
                         android:inputType="textPassword"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -138,8 +138,8 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_edit_text_rounded"
                         android:hint="Confirm Password"
-                        android:textColor="@color/black"
-                        android:textColorHint="#757575"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_hint"
                         android:inputType="textPassword"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -149,7 +149,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="Select Role"
-                    android:textColor="@color/black"
+                    android:textColor="@color/text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
@@ -178,7 +178,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="College Department"
-                    android:textColor="@color/black"
+                    android:textColor="@color/text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 

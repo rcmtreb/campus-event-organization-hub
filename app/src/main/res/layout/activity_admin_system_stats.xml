@@ -86,7 +86,7 @@
                             android:layout_height="wrap_content"
                             android:text="Total Students"
                             android:textSize="12sp"
-                            android:textColor="@color/black" />
+                            android:textColor="@color/text_primary" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -114,7 +114,7 @@
                             android:layout_height="wrap_content"
                             android:text="Total Officers"
                             android:textSize="12sp"
-                            android:textColor="@color/black" />
+                            android:textColor="@color/text_primary" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </GridLayout>
@@ -161,7 +161,7 @@
                             android:layout_height="wrap_content"
                             android:text="Approved"
                             android:textSize="12sp"
-                            android:textColor="@color/black" />
+                            android:textColor="@color/text_primary" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -189,7 +189,7 @@
                             android:layout_height="wrap_content"
                             android:text="Pending"
                             android:textSize="12sp"
-                            android:textColor="@color/black" />
+                            android:textColor="@color/text_primary" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -217,7 +217,7 @@
                             android:layout_height="wrap_content"
                             android:text="Cancelled"
                             android:textSize="12sp"
-                            android:textColor="@color/black" />
+                            android:textColor="@color/text_primary" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -245,7 +245,7 @@
                             android:layout_height="wrap_content"
                             android:text="Postponed"
                             android:textSize="12sp"
-                            android:textColor="@color/black" />
+                            android:textColor="@color/text_primary" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </GridLayout>
@@ -286,7 +286,7 @@
                         android:layout_height="wrap_content"
                         android:text="Total Registrations"
                         android:textSize="12sp"
-                        android:textColor="@color/black" />
+                            android:textColor="@color/text_primary" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

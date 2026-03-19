@@ -10,7 +10,7 @@
         android:layout_height="wrap_content"
         android:text="Reason"
         android:textStyle="bold"
-        android:textColor="@android:color/black"
+        android:textColor="@color/text_primary"
         android:textSize="13sp"
         android:layout_marginBottom="4dp" />
 
@@ -29,7 +29,7 @@
         android:layout_height="wrap_content"
         android:text="Instructions for attendees (optional)"
         android:textStyle="bold"
-        android:textColor="@android:color/black"
+        android:textColor="@color/text_primary"
         android:textSize="13sp"
         android:layout_marginBottom="4dp" />
 

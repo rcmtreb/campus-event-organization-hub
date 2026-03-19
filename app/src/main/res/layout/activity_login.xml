@@ -63,7 +63,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Login to your account"
-                android:textColor="@color/black"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -87,8 +87,8 @@
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_edit_text_rounded"
                     android:hint="Student ID / Email"
-                    android:textColor="@color/black"
-                    android:textColorHint="#757575"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
                     android:inputType="textEmailAddress"
                     android:padding="16dp" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -108,8 +108,8 @@
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_edit_text_rounded"
                     android:hint="Password"
-                    android:textColor="@color/black"
-                    android:textColorHint="#757575"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
                     android:inputType="textPassword"
                     android:padding="16dp" />
             </com.google.android.material.textfield.TextInputLayout>

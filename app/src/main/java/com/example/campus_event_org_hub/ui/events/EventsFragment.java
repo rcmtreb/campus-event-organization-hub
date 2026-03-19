@@ -3,15 +3,18 @@ package com.example.campus_event_org_hub.ui.events;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.SearchView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -35,9 +38,12 @@ public class EventsFragment extends Fragment {
     private SwipeRefreshLayout swipeRefresh;
     private EventAdapter adapter;
     private List<Event> eventList;
-    private SearchView searchView;
+    private EditText searchView;
     private ChipGroup chipGroup;
     private DatabaseHelper dbHelper;
+
+    /** Optional dept abbreviation filter passed from DiscoverFragment quick-filter chips. */
+    private String filterDept = "";
 
     @Nullable
     @Override
@@ -54,6 +60,12 @@ public class EventsFragment extends Fragment {
         try {
             dbHelper = new DatabaseHelper(requireContext());
 
+            // Read optional dept filter from args
+            if (getArguments() != null) {
+                String d = getArguments().getString("FILTER_DEPT", "");
+                filterDept = (d != null) ? d : "";
+            }
+
             recyclerView = view.findViewById(R.id.events_recycler_view);
             swipeRefresh = view.findViewById(R.id.swipe_refresh_events);
             searchView   = view.findViewById(R.id.search_view);
@@ -63,7 +75,7 @@ public class EventsFragment extends Fragment {
             recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
             // Brand the refresh spinner with the app's primary colour
-            swipeRefresh.setColorSchemeResources(R.color.primary_blue, R.color.primary_dark);
+            swipeRefresh.setColorSchemeResources(R.color.primary_green, R.color.primary_dark);
 
             loadEvents();
 
@@ -95,12 +107,19 @@ public class EventsFragment extends Fragment {
 
             // ── Search ───────────────────────────────────────────────────────
             if (searchView != null) {
-                searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-                    @Override public boolean onQueryTextSubmit(String q) { return false; }
-                    @Override public boolean onQueryTextChange(String newText) {
-                        if (adapter != null) adapter.getFilter().filter(newText);
-                        return false;
+                searchView.addTextChangedListener(new TextWatcher() {
+                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                    @Override public void afterTextChanged(Editable s) {
+                        if (adapter != null) adapter.getFilter().filter(s.toString());
                     }
+                });
+                searchView.setOnEditorActionListener((v, actionId, event) -> {
+                    if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                        if (adapter != null) adapter.getFilter().filter(searchView.getText().toString());
+                        return true;
+                    }
+                    return false;
                 });
             }
 
@@ -125,15 +144,17 @@ public class EventsFragment extends Fragment {
 
     // ── Data loading ─────────────────────────────────────────────────────────
 
-    /** Load events from DB. */
+    /** Load events from DB, optionally filtered by department abbreviation. */
     private void loadEvents() {
         try {
-            eventList = dbHelper.getAllEvents();
+            eventList = dbHelper.getAllEvents(filterDept);
             if (eventList == null) eventList = new ArrayList<>();
 
             String sid = getArguments() != null
                     ? getArguments().getString("USER_STUDENT_ID", "") : "";
-            adapter = new EventAdapter(eventList, sid);
+            String role = getArguments() != null
+                    ? getArguments().getString("USER_ROLE", "Student") : "Student";
+            adapter = new EventAdapter(eventList, sid, role, dbHelper);
             recyclerView.setAdapter(adapter);
         } catch (Exception e) {
             Log.e(TAG, "Error in loadEvents", e);
@@ -149,12 +170,11 @@ public class EventsFragment extends Fragment {
      */
     private void reloadEvents() {
         try {
-            List<Event> fresh = dbHelper.getAllEvents();
+            List<Event> fresh = dbHelper.getAllEvents(filterDept);
             if (fresh == null) fresh = new ArrayList<>();
             eventList.clear();
             eventList.addAll(fresh);
             adapter.notifyDataSetChanged();
-            // Scroll back to the top with a smooth animation
             recyclerView.smoothScrollToPosition(0);
         } catch (Exception e) {
             Log.e(TAG, "Error in reloadEvents", e);
@@ -164,7 +184,6 @@ public class EventsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Keep list fresh when user navigates back (e.g. after admin approved/cancelled events)
         if (adapter != null) reloadEvents();
     }
 }

@@ -37,7 +37,7 @@ public class CreateEventFragment extends Fragment {
 
     // Maps chip abbreviation → full department name stored in DB
     private static final String[][] DEPT_MAP = {
-            {"CCS",  "College of Computer Studies (CCS)"},
+            {"CLAS", "College of Liberal Arts and Sciences (CLAS)"},
             {"COE",  "College of Engineering (COE)"},
             {"CAS",  "College of Arts and Sciences (CAS)"},
             {"CBA",  "College of Business and Accountancy (CBA)"},
@@ -89,14 +89,11 @@ public class CreateEventFragment extends Fragment {
         TextInputLayout   tilDate       = view.findViewById(R.id.til_create_date);
         TextInputEditText timeEt        = view.findViewById(R.id.et_create_time);
         TextInputLayout   tilTime       = view.findViewById(R.id.til_create_time);
+        AutoCompleteTextView venueAcv   = view.findViewById(R.id.acv_create_venue);
         TextInputEditText organizerEt   = view.findViewById(R.id.et_create_organizer);
         AutoCompleteTextView deptAcv    = view.findViewById(R.id.acv_create_department);
         ChipGroup audienceChipGroup     = view.findViewById(R.id.chip_group_audience);
         ChipGroup categoryChipGroup     = view.findViewById(R.id.chip_group_category);
-
-        // --- Back button ---
-        view.findViewById(R.id.btn_back).setOnClickListener(v ->
-                requireActivity().getSupportFragmentManager().popBackStack());
 
         // --- Banner picker ---
         view.findViewById(R.id.btn_pick_banner).setOnClickListener(v ->
@@ -138,6 +135,16 @@ public class CreateEventFragment extends Fragment {
         timeEt.setOnClickListener(openTimePicker);
         tilTime.setEndIconOnClickListener(openTimePicker);
 
+        // --- Venue dropdown ---
+        String[] venueNames = {
+                "Gymnasium", "Auditorium", "Function Hall",
+                "Basketball Court", "Open Grounds",
+                "Conference Room A", "Conference Room B"
+        };
+        ArrayAdapter<String> venueAdapter = new ArrayAdapter<>(
+                requireContext(), R.layout.spinner_item, venueNames);
+        venueAcv.setAdapter(venueAdapter);
+
         // --- Department dropdown ---
         String[] deptFullNames = requireContext().getResources()
                 .getStringArray(R.array.departments_array);
@@ -166,7 +173,7 @@ public class CreateEventFragment extends Fragment {
             }
         });
         // If any individual chip is unchecked while "All" is checked, uncheck "All"
-        int[] deptChipIds = {R.id.chip_dept_ccs, R.id.chip_dept_coe, R.id.chip_dept_cas,
+        int[] deptChipIds = {R.id.chip_dept_clas, R.id.chip_dept_coe, R.id.chip_dept_cas,
                 R.id.chip_dept_cba, R.id.chip_dept_coed, R.id.chip_dept_coc, R.id.chip_dept_chtm};
         for (int id : deptChipIds) {
             Chip c = view.findViewById(id);
@@ -183,15 +190,16 @@ public class CreateEventFragment extends Fragment {
             String desc     = descEt.getText()  != null ? descEt.getText().toString().trim()  : "";
             String date     = dateEt.getText()  != null ? dateEt.getText().toString().trim()  : "";
             String time     = timeEt.getText()  != null ? timeEt.getText().toString().trim()  : "";
+            String venue    = venueAcv.getText().toString().trim();
             String organizer= organizerEt.getText() != null ? organizerEt.getText().toString().trim() : "";
             String dept     = deptAcv.getText().toString().trim();
 
-            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || time.isEmpty() || dept.isEmpty()) {
+            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || time.isEmpty() || venue.isEmpty() || dept.isEmpty()) {
                 Toast.makeText(getContext(), "Please fill in all required fields", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Collect selected audience chips → store as tags e.g. "#CCS #COE"
+            // Collect selected audience chips → store as tags e.g. "#CLAS #COE"
             List<String> selectedAudience = new ArrayList<>();
             for (int id : deptChipIds) {
                 Chip c = audienceChipGroup.findViewById(id);
@@ -210,16 +218,15 @@ public class CreateEventFragment extends Fragment {
             String tags = android.text.TextUtils.join(" ", selectedAudience);
 
             // Determine category
-            String category = "Academic";
+            String category = "Academic & Professional";
             int checkedId = categoryChipGroup.getCheckedChipId();
             if (checkedId != View.NO_ID) {
                 Chip chip = categoryChipGroup.findViewById(checkedId);
                 if (chip != null) category = chip.getText().toString();
             }
 
-            // organizer field = organizer name; department stored in organizer column for display
-            // We combine "Organizer - Dept" so existing display code still shows meaningful text
-            String organizerDisplay = organizer + " \u2013 " + dept;
+            // organizer field = "Organizer – Venue – Dept" so existing display code still shows meaningful text
+            String organizerDisplay = organizer + " \u2013 " + venue + " \u2013 " + dept;
 
             String imagePath = selectedImageUri != null ? selectedImageUri.toString() : "";
             DatabaseHelper db = new DatabaseHelper(requireContext());
@@ -244,10 +251,10 @@ public class CreateEventFragment extends Fragment {
         if (userDept == null || userDept.isEmpty()) return;
         String upper = userDept.toUpperCase(Locale.getDefault());
 
-        int[] chipIds  = {R.id.chip_dept_ccs, R.id.chip_dept_coe, R.id.chip_dept_cas,
+        int[] chipIds  = {R.id.chip_dept_clas, R.id.chip_dept_coe, R.id.chip_dept_cas,
                           R.id.chip_dept_cba, R.id.chip_dept_coed, R.id.chip_dept_coc,
                           R.id.chip_dept_chtm};
-        String[] abbrs = {"CCS", "COE", "CAS", "CBA", "COED", "COC", "CHTM"};
+        String[] abbrs = {"CLAS", "COE", "CAS", "CBA", "COED", "COC", "CHTM"};
 
         for (int i = 0; i < abbrs.length; i++) {
             if (upper.contains(abbrs[i])) {
@@ -262,7 +269,7 @@ public class CreateEventFragment extends Fragment {
      * Sets all individual department chips to the given checked state.
      */
     private void setAllDeptChips(ChipGroup group, boolean checked) {
-        int[] chipIds = {R.id.chip_dept_ccs, R.id.chip_dept_coe, R.id.chip_dept_cas,
+        int[] chipIds = {R.id.chip_dept_clas, R.id.chip_dept_coe, R.id.chip_dept_cas,
                          R.id.chip_dept_cba, R.id.chip_dept_coed, R.id.chip_dept_coc,
                          R.id.chip_dept_chtm};
         for (int id : chipIds) {

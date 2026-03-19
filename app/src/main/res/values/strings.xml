@@ -6,7 +6,7 @@
         <item>Admin</item>
     </string-array>
     <string-array name="departments_array">
-        <item>College of Computer Studies (CCS)</item>
+        <item>College of Liberal Arts and Sciences (CLAS)</item>
         <item>College of Engineering (COE)</item>
         <item>College of Arts and Sciences (CAS)</item>
         <item>College of Business and Accountancy (CBA)</item>
