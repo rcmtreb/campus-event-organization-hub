@@ -1,5 +1,7 @@
 package com.example.campus_event_org_hub.ui.events;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,6 +15,8 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -41,9 +45,28 @@ public class EventsFragment extends Fragment {
     private EditText searchView;
     private ChipGroup chipGroup;
     private DatabaseHelper dbHelper;
+    private ActivityResultLauncher<Intent> eventDetailLauncher;
 
     /** Optional dept abbreviation filter passed from DiscoverFragment quick-filter chips. */
     private String filterDept = "";
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Register ActivityResultLauncher before fragment view is created
+        eventDetailLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    boolean changed = result.getData().getBooleanExtra("registration_changed", false);
+                    if (changed) {
+                        // Refresh the event list when registration status changes
+                        reloadEvents();
+                    }
+                }
+            });
+    }
 
     @Nullable
     @Override
@@ -154,7 +177,7 @@ public class EventsFragment extends Fragment {
                     ? getArguments().getString("USER_STUDENT_ID", "") : "";
             String role = getArguments() != null
                     ? getArguments().getString("USER_ROLE", "Student") : "Student";
-            adapter = new EventAdapter(eventList, sid, role, dbHelper);
+            adapter = new EventAdapter(eventList, sid, role, dbHelper, eventDetailLauncher);
             recyclerView.setAdapter(adapter);
         } catch (Exception e) {
             Log.e(TAG, "Error in loadEvents", e);

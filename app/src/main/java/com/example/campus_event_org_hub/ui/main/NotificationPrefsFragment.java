@@ -7,7 +7,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
-import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -28,11 +27,6 @@ public class NotificationPrefsFragment extends Fragment {
 
         Bundle args   = getArguments();
         String sid    = args != null ? args.getString("USER_STUDENT_ID", "") : "";
-
-        ImageButton btnBack = view.findViewById(R.id.btn_back_notif);
-        btnBack.setOnClickListener(v -> {
-            if (getActivity() != null) getActivity().onBackPressed();
-        });
 
         AutoCompleteTextView dropdown = view.findViewById(R.id.notif_pref_dropdown);
         String[] prefs = {"All Events", "My Department Only", "Registered Events Only", "None"};

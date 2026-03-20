@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -39,13 +38,6 @@ public class OfficerPendingEventsFragment extends Fragment {
         tvEmpty = view.findViewById(R.id.tv_pending_events_empty);
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        ImageButton btnBack = view.findViewById(R.id.btn_back_pending_events);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> {
-                if (getActivity() != null) getActivity().onBackPressed();
-            });
-        }
-
         loadPendingEvents();
         return view;
     }
@@ -69,7 +61,7 @@ public class OfficerPendingEventsFragment extends Fragment {
         } else {
             rv.setVisibility(View.VISIBLE);
             tvEmpty.setVisibility(View.GONE);
-            rv.setAdapter(new OfficerMyEventsFragment.EventsAdapter(pending, false, null));
+            rv.setAdapter(new OfficerMyEventsFragment.EventsAdapter(pending, false, false, null));
         }
     }
 }

@@ -7,65 +7,39 @@
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
-    <!-- Header -->
+    <!-- Subtle Page Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_header_green"
         android:orientation="vertical"
-        android:padding="24dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <!-- Back button -->
-            <ImageView
-                android:id="@+id/btn_archive_back"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginEnd="12dp"
-                android:src="@drawable/ic_back"
-                android:tint="@android:color/white"
-                android:contentDescription="Back"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="4dp" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Archive"
-                android:textColor="@android:color/white"
-                android:textSize="26sp"
-                android:textStyle="bold" />
-
-            <!-- Archive count badge -->
-            <TextView
-                android:id="@+id/tv_archive_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@color/primary_orange"
-                android:textColor="@android:color/white"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:visibility="gone" />
-
-        </LinearLayout>
+        android:layout_marginBottom="@dimen/space_4"
+        android:paddingHorizontal="@dimen/space_4"
+        android:paddingTop="@dimen/space_4">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Archived messages are removed after 30 days"
-            android:textColor="#C8F5A8"
-            android:textSize="13sp" />
-
+            android:text="ARCHIVED NOTIFICATIONS"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
     </LinearLayout>
+
+    <!-- Archive count badge -->
+    <TextView
+        android:id="@+id/tv_archive_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_4"
+        android:layout_marginBottom="@dimen/space_2"
+        android:background="@color/primary_orange"
+        android:textColor="@android:color/white"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:paddingHorizontal="@dimen/space_3"
+        android:paddingVertical="@dimen/space_1"
+        android:visibility="gone" />
 
     <!-- Empty state -->
     <LinearLayout

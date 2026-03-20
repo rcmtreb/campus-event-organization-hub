@@ -1,12 +1,14 @@
 package com.example.campus_event_org_hub.ui.main;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -16,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
+import com.example.campus_event_org_hub.ui.events.EventDetailActivity;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -26,6 +29,25 @@ import java.util.concurrent.TimeUnit;
 
 public class RegisteredEventsFragment extends Fragment {
 
+    private RecyclerView recycler;
+    private View         emptyState;
+    private String       sid;
+    private String       userRole;
+
+    private ActivityResultLauncher<Intent> detailLauncher;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // Register launcher in onCreate so it survives configuration changes
+        detailLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    // Refresh list in case registration changed inside EventDetailActivity
+                    loadEvents();
+                });
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -33,22 +55,29 @@ public class RegisteredEventsFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_registered_events, container, false);
 
-        Bundle args   = getArguments();
-        String sid    = args != null ? args.getString("USER_STUDENT_ID", "") : "";
+        Bundle args = getArguments();
+        sid      = args != null ? args.getString("USER_STUDENT_ID", "") : "";
+        userRole = args != null ? args.getString("USER_ROLE", "Student") : "Student";
 
-        ImageButton btnBack = view.findViewById(R.id.btn_back_registered);
-        btnBack.setOnClickListener(v -> {
-            if (getActivity() != null) getActivity().onBackPressed();
-        });
-
-        RecyclerView recycler   = view.findViewById(R.id.registered_events_recycler);
-        View         emptyState = view.findViewById(R.id.registered_empty_state);
+        recycler   = view.findViewById(R.id.registered_events_recycler);
+        emptyState = view.findViewById(R.id.registered_empty_state);
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        if (sid.isEmpty()) {
+        loadEvents();
+        return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadEvents();
+    }
+
+    private void loadEvents() {
+        if (sid == null || sid.isEmpty()) {
             emptyState.setVisibility(View.VISIBLE);
             recycler.setVisibility(View.GONE);
-            return view;
+            return;
         }
 
         DatabaseHelper db = new DatabaseHelper(requireContext());
@@ -60,10 +89,8 @@ public class RegisteredEventsFragment extends Fragment {
         } else {
             emptyState.setVisibility(View.GONE);
             recycler.setVisibility(View.VISIBLE);
-            recycler.setAdapter(new RegisteredEventsAdapter(events));
+            recycler.setAdapter(new RegisteredEventsAdapter(events, sid, userRole, detailLauncher));
         }
-
-        return view;
     }
 
     // ── Inner adapter ────────────────────────────────────────────────────────
@@ -72,8 +99,17 @@ public class RegisteredEventsFragment extends Fragment {
             extends RecyclerView.Adapter<RegisteredEventsAdapter.VH> {
 
         private final List<Event> items;
+        private final String      studentId;
+        private final String      userRole;
+        private final ActivityResultLauncher<Intent> launcher;
 
-        RegisteredEventsAdapter(List<Event> items) { this.items = items; }
+        RegisteredEventsAdapter(List<Event> items, String studentId, String userRole,
+                                ActivityResultLauncher<Intent> launcher) {
+            this.items     = items;
+            this.studentId = studentId;
+            this.userRole  = userRole;
+            this.launcher  = launcher;
+        }
 
         @NonNull
         @Override
@@ -90,6 +126,19 @@ public class RegisteredEventsFragment extends Fragment {
             h.date.setText(e.getDate());
             h.category.setText(e.getCategory() != null ? e.getCategory() : "");
             h.countdown.setText(buildCountdown(e.getDate()));
+
+            // Tap to open EventDetailActivity
+            h.itemView.setOnClickListener(v -> {
+                Intent intent = new Intent(v.getContext(), EventDetailActivity.class);
+                intent.putExtra("event", e);
+                intent.putExtra("USER_STUDENT_ID", studentId);
+                intent.putExtra("USER_ROLE", userRole);
+                if (launcher != null) {
+                    launcher.launch(intent);
+                } else {
+                    v.getContext().startActivity(intent);
+                }
+            });
         }
 
         @Override

@@ -6,7 +6,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -56,13 +56,6 @@ public class OfficerMyEventsFragment extends Fragment {
         rv      = view.findViewById(R.id.rv_my_events);
         tvEmpty = view.findViewById(R.id.tv_my_events_empty);
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
-
-        ImageButton btnBack = view.findViewById(R.id.btn_back_my_events);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> {
-                if (getActivity() != null) getActivity().onBackPressed();
-            });
-        }
 
         // Set up tabs — 4 tabs
         TabLayout tabs = view.findViewById(R.id.tabs_my_events);
@@ -148,7 +141,74 @@ public class OfficerMyEventsFragment extends Fragment {
         } else {
             rv.setVisibility(View.VISIBLE);
             tvEmpty.setVisibility(View.GONE);
-            rv.setAdapter(new EventsAdapter(filtered, tab == TAB_POSTPONED, this));
+            boolean canManageAttendance = (tab == TAB_UPCOMING || tab == TAB_HAPPENING);
+            rv.setAdapter(new EventsAdapter(filtered, tab == TAB_POSTPONED, canManageAttendance, this));
+        }
+    }
+
+    // ── Dialog: attendance code management ──────────────────────────────────
+
+    void showAttendanceCodeDialog(Event event) {
+        DatabaseHelper db = new DatabaseHelper(requireContext());
+        List<Event> fresh = db.getEventsByCreatorSid(officerSid);
+        Event ev = event;
+        for (Event fe : fresh) { if (fe.getId() == event.getId()) { ev = fe; break; } }
+        final Event finalEv = ev;
+        final DatabaseHelper finalDb = db;
+
+        View dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_attendance_codes, null);
+
+        TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_event_title);
+        TextView tvTimeInCode = dialogView.findViewById(R.id.tv_time_in_code);
+        TextView tvTimeOutCode = dialogView.findViewById(R.id.tv_time_out_code);
+        TextView tvAttendanceCount = dialogView.findViewById(R.id.tv_attendance_count);
+        Button btnGenerateTimeIn = dialogView.findViewById(R.id.btn_generate_time_in);
+        Button btnGenerateTimeOut = dialogView.findViewById(R.id.btn_generate_time_out);
+
+        tvTitle.setText(finalEv.getTitle());
+        updateCodeDisplay(tvTimeInCode, finalEv.getTimeInCode());
+        updateCodeDisplay(tvTimeOutCode, finalEv.getTimeOutCode());
+        int attendCount = finalDb.getAttendanceCount(finalEv.getId());
+        tvAttendanceCount.setText(attendCount + " student" + (attendCount != 1 ? "s" : "") + " attended");
+
+        btnGenerateTimeIn.setOnClickListener(v -> {
+            String newCode = DatabaseHelper.generateAttendanceCode();
+            boolean ok = finalDb.setTimeInCode(finalEv.getId(), newCode);
+            if (ok) {
+                finalEv.setTimeInCode(newCode);
+                updateCodeDisplay(tvTimeInCode, newCode);
+                Toast.makeText(requireContext(), "New Time-In code: " + newCode, Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(requireContext(), "Failed to set code.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        btnGenerateTimeOut.setOnClickListener(v -> {
+            String newCode = DatabaseHelper.generateAttendanceCode();
+            boolean ok = finalDb.setTimeOutCode(finalEv.getId(), newCode);
+            if (ok) {
+                finalEv.setTimeOutCode(newCode);
+                updateCodeDisplay(tvTimeOutCode, newCode);
+                Toast.makeText(requireContext(), "New Time-Out code: " + newCode, Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(requireContext(), "Failed to set code.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        new AlertDialog.Builder(requireContext())
+                .setView(dialogView)
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void updateCodeDisplay(TextView tv, String code) {
+        if (code == null || code.isEmpty()) {
+            tv.setText("---");
+            tv.setTextColor(getResources().getColor(R.color.text_hint, null));
+        } else {
+            tv.setText(code);
+            tv.setTextColor(getResources().getColor(R.color.text_primary, null));
         }
     }
 
@@ -156,46 +216,70 @@ public class OfficerMyEventsFragment extends Fragment {
 
     void showPostponedActionDialog(Event e) {
         DatabaseHelper db = new DatabaseHelper(requireContext());
-        String adminDate = e.getDate(); // current date stored (admin's suggested date)
+        final String adminDate = e.getDate();
+        final Event finalEvent = e;
+        final DatabaseHelper finalDb = db;
 
-        String[] options = {
-                "Confirm admin's date: " + adminDate,
-                "Propose a different date"
-        };
+        View dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_postponed_action, null);
 
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Reschedule: " + e.getTitle())
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        // Confirm admin's suggested date as-is
-                        boolean ok = db.proposeNewDate(e.getId(), adminDate);
-                        if (ok) {
-                            e.setStatus("APPROVED");
-                            Toast.makeText(requireContext(),
-                                    "Date confirmed. Event is now APPROVED.", Toast.LENGTH_SHORT).show();
-                            loadEvents();
-                            showTab(TAB_POSTPONED);
-                        } else {
-                            Toast.makeText(requireContext(), "Failed to update.", Toast.LENGTH_SHORT).show();
-                        }
-                    } else {
-                        // Let officer pick a new date
-                        pickNewDate(e, db);
-                    }
-                })
+        TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_event_title);
+        TextView tvDate = dialogView.findViewById(R.id.tv_admin_proposed_date);
+        Button btnConfirm = dialogView.findViewById(R.id.btn_confirm_date);
+        Button btnPropose = dialogView.findViewById(R.id.btn_propose_date);
+
+        tvTitle.setText(e.getTitle());
+        tvDate.setText(formatDateDisplay(adminDate));
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setView(dialogView)
                 .setNegativeButton("Cancel", null)
-                .show();
+                .create();
+
+        btnConfirm.setOnClickListener(v -> {
+            boolean ok = finalDb.proposeNewDate(finalEvent.getId(), adminDate);
+            if (ok) {
+                finalEvent.setStatus("APPROVED");
+                Toast.makeText(requireContext(),
+                        "Date confirmed. Event is now APPROVED.", Toast.LENGTH_SHORT).show();
+                loadEvents();
+                showTab(TAB_POSTPONED);
+            } else {
+                Toast.makeText(requireContext(), "Failed to update.", Toast.LENGTH_SHORT).show();
+            }
+            dialog.dismiss();
+        });
+
+        btnPropose.setOnClickListener(v -> {
+            dialog.dismiss();
+            pickNewDate(finalEvent, finalDb);
+        });
+
+        dialog.show();
+    }
+
+    private String formatDateDisplay(String date) {
+        try {
+            String[] parts = date.split("-");
+            if (parts.length == 3) {
+                int year = Integer.parseInt(parts[0]);
+                int month = Integer.parseInt(parts[1]);
+                int day = Integer.parseInt(parts[2]);
+                String[] months = {"January", "February", "March", "April", "May", "June",
+                        "July", "August", "September", "October", "November", "December"};
+                return months[month - 1] + " " + day + ", " + year;
+            }
+        } catch (Exception ignored) { }
+        return date;
     }
 
     private void pickNewDate(Event e, DatabaseHelper db) {
         Calendar cal = Calendar.getInstance();
-        // Pre-fill the picker with the event's postponed date using direct field parsing
-        // to avoid timezone shifts that occur when using Date/setTime()
         String[] parts = e.getDate().split("-");
         if (parts.length == 3) {
             try {
                 cal.set(Calendar.YEAR,         Integer.parseInt(parts[0]));
-                cal.set(Calendar.MONTH,        Integer.parseInt(parts[1]) - 1); // 0-based
+                cal.set(Calendar.MONTH,        Integer.parseInt(parts[1]) - 1);
                 cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(parts[2]));
             } catch (NumberFormatException ignored) { }
         }
@@ -204,11 +288,9 @@ public class OfficerMyEventsFragment extends Fragment {
                 (view, year, month, day) -> {
                     String newDate = String.format(Locale.getDefault(),
                             "%04d-%02d-%02d", year, month + 1, day);
-                    // Officer is proposing a DIFFERENT date — must go back to admin for approval
                     boolean ok = db.proposeNewDateTimePending(e.getId(), newDate, "");
                     if (ok) {
                         e.setStatus("PENDING");
-                        // Notify all admins that this officer proposed a new date
                         notifyAdminsOfProposedDate(e, newDate, db);
                         Toast.makeText(requireContext(),
                                 "The admin will receive your proposal date.",
@@ -223,10 +305,6 @@ public class OfficerMyEventsFragment extends Fragment {
                 .show();
     }
 
-    /**
-     * Sends a notification to every Admin so they can review and re-approve the
-     * officer's proposed reschedule date.
-     */
     private void notifyAdminsOfProposedDate(Event e, String proposedDate, DatabaseHelper db) {
         String message = "Officer proposed a new date (" + proposedDate + ") for the postponed event \""
                 + e.getTitle() + "\". Please review and approve or reject.";
@@ -243,13 +321,15 @@ public class OfficerMyEventsFragment extends Fragment {
 
         private final List<Event> list;
         private final boolean isPostponedTab;
+        private final boolean canManageAttendance;
         private final OfficerMyEventsFragment fragment;
 
-        EventsAdapter(List<Event> list, boolean isPostponedTab,
+        EventsAdapter(List<Event> list, boolean isPostponedTab, boolean canManageAttendance,
                       OfficerMyEventsFragment fragment) {
-            this.list            = list;
-            this.isPostponedTab  = isPostponedTab;
-            this.fragment        = fragment;
+            this.list                = list;
+            this.isPostponedTab      = isPostponedTab;
+            this.canManageAttendance = canManageAttendance;
+            this.fragment            = fragment;
         }
 
         @NonNull
@@ -285,7 +365,6 @@ public class OfficerMyEventsFragment extends Fragment {
                 h.timelineBadge.setBackgroundColor(0xFFF57C00);
                 h.timelineBadge.setVisibility(View.VISIBLE);
             } else {
-                // APPROVED / PENDING — compute from date
                 String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         .format(new Date());
                 int cmp = e.getDate().compareTo(today);
@@ -304,10 +383,11 @@ public class OfficerMyEventsFragment extends Fragment {
                 }
             }
 
-            // ── Tap: postponed tab → reschedule dialog; otherwise no-op ─────
+            // ── Tap handler ──────────────────────────────────────────────────
             if (isPostponedTab) {
-                h.itemView.setOnClickListener(v ->
-                        fragment.showPostponedActionDialog(e));
+                h.itemView.setOnClickListener(v -> fragment.showPostponedActionDialog(e));
+            } else if (canManageAttendance) {
+                h.itemView.setOnClickListener(v -> fragment.showAttendanceCodeDialog(e));
             } else {
                 h.itemView.setOnClickListener(null);
             }

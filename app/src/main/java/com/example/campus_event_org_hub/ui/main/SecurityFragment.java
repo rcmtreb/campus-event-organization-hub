@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -27,11 +26,6 @@ public class SecurityFragment extends Fragment {
 
         Bundle args   = getArguments();
         String sid    = args != null ? args.getString("USER_STUDENT_ID", "") : "";
-
-        ImageButton btnBack = view.findViewById(R.id.btn_back_security);
-        btnBack.setOnClickListener(v -> {
-            if (getActivity() != null) getActivity().onBackPressed();
-        });
 
         TextInputEditText etCurrentPw = view.findViewById(R.id.security_current_pw);
         TextInputEditText etNewPw     = view.findViewById(R.id.security_new_pw);

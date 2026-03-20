@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_checked="true" android:color="@color/primary_green" />
-    <item android:color="@color/surface_elevated" />
+    <item android:color="#3D3D3D" />
 </selector>

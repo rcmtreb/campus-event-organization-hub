@@ -13,6 +13,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+// venue field is preserved from the original event; admin edit form does not expose it
+
 import java.util.Calendar;
 import java.util.Locale;
 
@@ -23,6 +25,7 @@ import java.util.Locale;
 public class AdminEditEventActivity extends AppCompatActivity {
 
     private int eventId;
+    private String originalVenue = "";
     private TextInputEditText etTitle, etDesc, etDate, etTime, etOrganizer, etCategory, etTags;
 
     @Override
@@ -31,6 +34,8 @@ public class AdminEditEventActivity extends AppCompatActivity {
         setContentView(R.layout.activity_admin_edit_event);
 
         eventId = getIntent().getIntExtra("EVENT_ID", -1);
+        originalVenue = getIntent().getStringExtra("EVENT_VENUE") != null
+                ? getIntent().getStringExtra("EVENT_VENUE") : "";
 
         etTitle     = findViewById(R.id.et_edit_title);
         etDesc      = findViewById(R.id.et_edit_desc);
@@ -96,7 +101,7 @@ public class AdminEditEventActivity extends AppCompatActivity {
         }
 
         DatabaseHelper db = new DatabaseHelper(this);
-        boolean ok = db.updateEvent(eventId, title, desc, date, time, tags, organizer, category);
+        boolean ok = db.updateEvent(eventId, title, desc, date, time, tags, organizer, category, originalVenue);
         if (ok) {
             Toast.makeText(this, "Event updated successfully.", Toast.LENGTH_SHORT).show();
             setResult(RESULT_OK);

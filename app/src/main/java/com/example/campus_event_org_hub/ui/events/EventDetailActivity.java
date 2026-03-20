@@ -1,5 +1,6 @@
 package com.example.campus_event_org_hub.ui.events;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.ContextThemeWrapper;
 import android.view.View;
@@ -19,8 +20,11 @@ import com.example.campus_event_org_hub.util.ImageUtils;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.textfield.TextInputEditText;
 
 public class EventDetailActivity extends AppCompatActivity {
+
+    private boolean registrationChanged = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,27 +37,47 @@ public class EventDetailActivity extends AppCompatActivity {
 
         Event event = (Event) getIntent().getSerializableExtra("event");
         String studentId = getIntent().getStringExtra("USER_STUDENT_ID");
+        String userRole  = getIntent().getStringExtra("USER_ROLE");
         if (studentId == null) studentId = "";
+        if (userRole  == null) userRole  = "";
 
         if (event != null) {
-            ImageView eventImage    = findViewById(R.id.detail_event_image);
-            TextView  title         = findViewById(R.id.detail_event_title);
-            TextView  date          = findViewById(R.id.detail_event_date);
-            TextView  description   = findViewById(R.id.detail_event_description);
-            ChipGroup tagsChipGroup = findViewById(R.id.detail_tags_chip_group);
-            TextView  organizer     = findViewById(R.id.detail_event_organizer);
-            TextView  organizerContact = findViewById(R.id.detail_organizer_contact);
+            ImageView  eventImage      = findViewById(R.id.detail_event_image);
+            TextView   title           = findViewById(R.id.detail_event_title);
+            TextView   date            = findViewById(R.id.detail_event_date);
+            TextView   timeTv          = findViewById(R.id.detail_event_time);
+            TextView   venueTv         = findViewById(R.id.detail_event_venue);
+            TextView   description     = findViewById(R.id.detail_event_description);
+            ChipGroup  tagsChipGroup   = findViewById(R.id.detail_tags_chip_group);
+            TextView   organizer       = findViewById(R.id.detail_event_organizer);
+            TextView   organizerContact = findViewById(R.id.detail_organizer_contact);
             ImageButton bookmarkButton = findViewById(R.id.btn_bookmark);
             ImageButton shareButton    = findViewById(R.id.btn_share);
-            Button registerButton      = findViewById(R.id.btn_register);
-            MaterialCardView postponedBanner = findViewById(R.id.card_postponed_banner);
+            Button      registerButton = findViewById(R.id.btn_register);
+            MaterialCardView postponedBanner  = findViewById(R.id.card_postponed_banner);
+            MaterialCardView attendanceCard   = findViewById(R.id.card_attendance);
 
-            // Use the category-mapped 9-patch banner as the fallback when no image is uploaded
+            // Banner image
             int fallbackBanner = ImageUtils.getDefaultBannerForCategory(event.getCategory());
             ImageUtils.load(this, eventImage, event.getImagePath(), fallbackBanner);
 
             title.setText(event.getTitle());
             date.setText(event.getDate());
+
+            // Time (shown only if non-empty)
+            String timeStr = event.getEventTime();
+            if (timeStr != null && !timeStr.isEmpty()) {
+                timeTv.setText(timeStr);
+                timeTv.setVisibility(View.VISIBLE);
+            }
+
+            // Venue (shown only if non-empty)
+            String venueStr = event.getVenue();
+            if (venueStr != null && !venueStr.isEmpty()) {
+                venueTv.setText(venueStr);
+                venueTv.setVisibility(View.VISIBLE);
+            }
+
             description.setText(event.getDescription());
             organizer.setText(event.getOrganizer());
             organizerContact.setText("Contact: " + event.getOrganizer().toLowerCase().replace(" ", ".") + "@university.edu");
@@ -79,36 +103,141 @@ public class EventDetailActivity extends AppCompatActivity {
             // ── Registration state ────────────────────────────────────────────
             DatabaseHelper db = new DatabaseHelper(this);
             final String finalStudentId = studentId;
+            final String finalUserRole  = userRole;
             final int eventId = event.getId();
 
+            boolean isOfficerOrAdmin = "Officer".equals(finalUserRole) || "Admin".equals(finalUserRole);
+
             if ("POSTPONED".equals(event.getStatus())) {
-                // Event is postponed — show banner, disable registration
                 postponedBanner.setVisibility(View.VISIBLE);
                 registerButton.setEnabled(false);
                 registerButton.setText("Registration Unavailable");
                 registerButton.setBackgroundTintList(
                         ContextCompat.getColorStateList(this, android.R.color.darker_gray));
-            } else if (finalStudentId.isEmpty()) {
-                // Not a student (e.g., admin/officer viewing) — disable button
+            } else if (finalStudentId.isEmpty() || isOfficerOrAdmin) {
                 registerButton.setEnabled(false);
                 registerButton.setText("Register for Event");
             } else if (db.isRegistered(finalStudentId, eventId)) {
                 setRegisteredState(registerButton);
+                // Student is registered — show attendance card
+                bindAttendanceCard(attendanceCard, db, event, finalStudentId);
             } else {
                 registerButton.setEnabled(true);
                 registerButton.setText("Register for Event");
                 registerButton.setOnClickListener(v -> {
                     boolean success = db.registerForEvent(finalStudentId, eventId);
                     if (success) {
+                        registrationChanged = true;
                         setRegisteredState(registerButton);
                         Toast.makeText(this, "Successfully registered!", Toast.LENGTH_LONG).show();
+                        // Now show attendance card
+                        bindAttendanceCard(attendanceCard, db, event, finalStudentId);
                     } else {
-                        // Might have been registered from another session
                         setRegisteredState(registerButton);
                         Toast.makeText(this, "You are already registered for this event.", Toast.LENGTH_SHORT).show();
+                        bindAttendanceCard(attendanceCard, db, event, finalStudentId);
                     }
                 });
             }
+        }
+    }
+
+    /**
+     * Sets up and shows the attendance card for a registered student.
+     * Shows Time-In input initially; shows Time-Out input after Time-In is recorded.
+     */
+    private void bindAttendanceCard(MaterialCardView card, DatabaseHelper db,
+                                    Event event, String studentId) {
+        card.setVisibility(View.VISIBLE);
+
+        TextView tvStatus    = card.findViewById(R.id.tv_attendance_status);
+        View     layoutTimeIn  = card.findViewById(R.id.layout_time_in);
+        View     layoutTimeOut = card.findViewById(R.id.layout_time_out);
+        TextInputEditText etTimeIn  = card.findViewById(R.id.et_time_in_code);
+        TextInputEditText etTimeOut = card.findViewById(R.id.et_time_out_code);
+        Button   btnTimeIn  = card.findViewById(R.id.btn_time_in);
+        Button   btnTimeOut = card.findViewById(R.id.btn_time_out);
+
+        refreshAttendanceState(db, event.getId(), studentId,
+                tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+
+        btnTimeIn.setOnClickListener(v -> {
+            String code = etTimeIn.getText() != null ? etTimeIn.getText().toString().trim() : "";
+            if (code.isEmpty()) {
+                Toast.makeText(this, "Enter the Time-In code shown by the officer.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int result = db.submitTimeIn(event.getId(), studentId, code);
+            switch (result) {
+                case 0:
+                    Toast.makeText(this, "Time-In recorded!", Toast.LENGTH_SHORT).show();
+                    etTimeIn.setText("");
+                    break;
+                case 1:
+                    Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
+                    break;
+                case 2:
+                    Toast.makeText(this, "You have already timed in.", Toast.LENGTH_SHORT).show();
+                    break;
+                default:
+                    Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();
+                    break;
+            }
+            refreshAttendanceState(db, event.getId(), studentId,
+                    tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+        });
+
+        btnTimeOut.setOnClickListener(v -> {
+            String code = etTimeOut.getText() != null ? etTimeOut.getText().toString().trim() : "";
+            if (code.isEmpty()) {
+                Toast.makeText(this, "Enter the Time-Out code shown by the officer.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int result = db.submitTimeOut(event.getId(), studentId, code);
+            switch (result) {
+                case 0:
+                    Toast.makeText(this, "Time-Out recorded!", Toast.LENGTH_SHORT).show();
+                    etTimeOut.setText("");
+                    break;
+                case 1:
+                    Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
+                    break;
+                case 2:
+                    Toast.makeText(this, "You must Time-In first.", Toast.LENGTH_SHORT).show();
+                    break;
+                case 3:
+                    Toast.makeText(this, "You have already timed out.", Toast.LENGTH_SHORT).show();
+                    break;
+                default:
+                    Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();
+                    break;
+            }
+            refreshAttendanceState(db, event.getId(), studentId,
+                    tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+        });
+    }
+
+    private void refreshAttendanceState(DatabaseHelper db, int eventId, String studentId,
+                                        TextView tvStatus,
+                                        View layoutTimeIn, View layoutTimeOut,
+                                        TextInputEditText etTimeIn, TextInputEditText etTimeOut,
+                                        Button btnTimeIn, Button btnTimeOut) {
+        String[] rec = db.getAttendanceRecord(eventId, studentId);
+        boolean hasTimeIn  = rec != null && rec[0] != null && !rec[0].isEmpty();
+        boolean hasTimeOut = rec != null && rec[1] != null && !rec[1].isEmpty();
+
+        if (hasTimeOut) {
+            tvStatus.setText("Attendance complete.\nTime In: " + rec[0] + "\nTime Out: " + rec[1]);
+            layoutTimeIn.setVisibility(View.GONE);
+            layoutTimeOut.setVisibility(View.GONE);
+        } else if (hasTimeIn) {
+            tvStatus.setText("Timed in at " + rec[0] + ". Submit Time-Out code when you leave.");
+            layoutTimeIn.setVisibility(View.GONE);
+            layoutTimeOut.setVisibility(View.VISIBLE);
+        } else {
+            tvStatus.setText("Submit the Time-In code shown by the officer to record your attendance.");
+            layoutTimeIn.setVisibility(View.VISIBLE);
+            layoutTimeOut.setVisibility(View.GONE);
         }
     }
 
@@ -121,7 +250,19 @@ public class EventDetailActivity extends AppCompatActivity {
 
     @Override
     public boolean onSupportNavigateUp() {
-        finish();
+        finishWithResult();
         return true;
+    }
+
+    @Override
+    public void onBackPressed() {
+        finishWithResult();
+    }
+
+    private void finishWithResult() {
+        Intent resultIntent = new Intent();
+        resultIntent.putExtra("registration_changed", registrationChanged);
+        setResult(RESULT_OK, resultIntent);
+        finish();
     }
 }

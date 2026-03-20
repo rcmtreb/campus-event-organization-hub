@@ -14,6 +14,9 @@ public class Event implements Serializable {
     private String imagePath;
     private String status;
     private String creatorSid; // student_id of the officer who submitted this event
+    private String venue;
+    private String timeInCode;
+    private String timeOutCode;
 
     // Full constructor (with id and time)
     public Event(int id, String title, String description, String date, String time,
@@ -73,7 +76,7 @@ public class Event implements Serializable {
         this.status = status;
     }
 
-    public int getId()          { return id; }
+    public int getId()             { return id; }
     public String getTitle()       { return title; }
     public String getDescription() { return description; }
     public String getDate()        { return date; }
@@ -83,7 +86,16 @@ public class Event implements Serializable {
     public String getCategory()    { return category; }
     public String getImagePath()   { return imagePath; }
     public String getStatus()      { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public void   setStatus(String status) { this.status = status; }
     public String getCreatorSid()  { return creatorSid != null ? creatorSid : ""; }
-    public void setCreatorSid(String creatorSid) { this.creatorSid = creatorSid; }
+    public void   setCreatorSid(String creatorSid) { this.creatorSid = creatorSid; }
+    public String getVenue()       { return venue != null ? venue : ""; }
+    public void   setVenue(String venue) { this.venue = venue; }
+    public String getTimeInCode()  { return timeInCode != null ? timeInCode : ""; }
+    public void   setTimeInCode(String code) { this.timeInCode = code; }
+    public String getTimeOutCode() { return timeOutCode != null ? timeOutCode : ""; }
+    public void   setTimeOutCode(String code) { this.timeOutCode = code; }
+
+    /** Convenience alias — some views call getEventTime() */
+    public String getEventTime()   { return getTime(); }
 }

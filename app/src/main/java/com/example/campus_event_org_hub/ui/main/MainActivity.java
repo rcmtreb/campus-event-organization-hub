@@ -1,15 +1,20 @@
 package com.example.campus_event_org_hub.ui.main;
 
-import android.os.Build;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
-import android.view.Window;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
@@ -18,8 +23,8 @@ import androidx.fragment.app.Fragment;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.SyncManager;
+import com.example.campus_event_org_hub.receiver.NetworkCallbackHandler;
 import com.example.campus_event_org_hub.ui.events.EventsFragment;
-import com.example.campus_event_org_hub.ui.main.MenuFragment;
 
 public class MainActivity extends AppCompatActivity
         implements ProfileFragment.OnProfileUpdatedListener {
@@ -39,6 +44,9 @@ public class MainActivity extends AppCompatActivity
     private TextView    textDiscover, textEvents, textVenue, textProfile;
 
     private int currentTab = 0; // 0=Discover, 1=Events, 2=Venue, 3=Profile
+
+    // ── Network connectivity ───────────────────────────────────────────────
+    private NetworkCallbackHandler networkCallbackHandler;
 
     // ── Tab titles shown in the top bar ─────────────────────────────────────
     private static final String[] TAB_TITLES = { "Discover", "Events", "Venue", "Profile" };
@@ -114,6 +122,83 @@ public class MainActivity extends AppCompatActivity
         super.onResume();
         SyncManager.sync(this, null);
         updateNotificationBadge();
+        
+        // Register network callback for connectivity changes
+        networkCallbackHandler = new NetworkCallbackHandler(this, connected -> 
+            runOnUiThread(() -> handleConnectivityChange(connected))
+        );
+        networkCallbackHandler.register();
+        
+        // Check current state
+        handleConnectivityChange(networkCallbackHandler.isConnected());
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (networkCallbackHandler != null) {
+            networkCallbackHandler.unregister();
+            networkCallbackHandler = null;
+        }
+    }
+
+    // ── Connectivity change handler ──────────────────────────────────────────
+    private final Handler connectivityHandler = new Handler(Looper.getMainLooper());
+    private Runnable connectedDismissRunnable;
+    private boolean wasOffline = false;
+
+    private void handleConnectivityChange(boolean connected) {
+        View offlineBanner = findViewById(R.id.offline_banner_container);
+        ImageView btnClose = findViewById(R.id.btn_close_offline_banner);
+        TextView tvBannerText = findViewById(R.id.tv_offline_banner_text);
+        
+        if (offlineBanner == null) return;
+        
+        if (connected) {
+            // Only show "Connected" if we were previously offline
+            if (wasOffline) {
+                // Cancel any pending dismiss
+                if (connectedDismissRunnable != null) {
+                    connectivityHandler.removeCallbacks(connectedDismissRunnable);
+                }
+                
+                // Show connected banner briefly
+                offlineBanner.setBackgroundColor(ContextCompat.getColor(this, R.color.success_green));
+                if (tvBannerText != null) {
+                    tvBannerText.setText("Connected");
+                }
+                offlineBanner.setVisibility(View.VISIBLE);
+                btnClose.setVisibility(View.GONE);
+                
+                // Dismiss after 2 seconds
+                connectedDismissRunnable = () -> {
+                    offlineBanner.setVisibility(View.GONE);
+                    // Restore offline state for next time
+                    offlineBanner.setBackgroundColor(ContextCompat.getColor(this, R.color.error_red));
+                    if (tvBannerText != null) {
+                        tvBannerText.setText("No internet connection — working offline");
+                    }
+                    btnClose.setVisibility(View.VISIBLE);
+                };
+                connectivityHandler.postDelayed(connectedDismissRunnable, 2000);
+                
+                SyncManager.sync(this, null);
+            }
+            wasOffline = false;
+        } else {
+            // Cancel pending connected dismiss
+            if (connectedDismissRunnable != null) {
+                connectivityHandler.removeCallbacks(connectedDismissRunnable);
+            }
+            offlineBanner.setBackgroundColor(ContextCompat.getColor(this, R.color.error_red));
+            if (tvBannerText != null) {
+                tvBannerText.setText("No internet connection — working offline");
+            }
+            offlineBanner.setVisibility(View.VISIBLE);
+            btnClose.setVisibility(View.VISIBLE);
+            btnClose.setOnClickListener(v -> offlineBanner.setVisibility(View.GONE));
+            wasOffline = true;
+        }
     }
 
     // ── Notification badge ───────────────────────────────────────────────────
@@ -271,5 +356,51 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onProfilePictureUpdated(String newImagePath) {
         currentProfileImagePath = newImagePath;
+    }
+
+    // ── Options Menu (Action Bar) ────────────────────────────────────────────
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_options_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        
+        if (id == R.id.action_refresh) {
+            // Refresh: sync from Firestore and reload current fragment
+            Toast.makeText(this, "Refreshing...", Toast.LENGTH_SHORT).show();
+            SyncManager.sync(this, () -> {
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Sync complete", Toast.LENGTH_SHORT).show();
+                    // Reload current tab
+                    selectTab(currentTab);
+                });
+            });
+            return true;
+            
+        } else if (id == R.id.action_settings) {
+            // Navigate to Settings
+            loadFragment(new SettingsFragment(), true, "Settings");
+            return true;
+            
+        } else if (id == R.id.action_about) {
+            // Show About dialog
+            new AlertDialog.Builder(this)
+                    .setTitle("About CEOH")
+                    .setMessage("Campus Event & Organization Hub\n\n" +
+                            "Version 1.0\n\n" +
+                            "A unified mobile platform for campus event announcements, " +
+                            "organization management, and attendance tracking.\n\n" +
+                            "Developed for University of the Cordilleras")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return true;
+        }
+        
+        return super.onOptionsItemSelected(item);
     }
 }

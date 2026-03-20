@@ -11,6 +11,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -34,6 +35,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     private String studentId;
     private String userRole;
     private DatabaseHelper dbHelper;
+    private ActivityResultLauncher<Intent> eventDetailLauncher;
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -43,6 +45,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         this.studentId     = "";
         this.userRole      = "Student";
         this.dbHelper      = null;
+        this.eventDetailLauncher = null;
     }
 
     public EventAdapter(List<Event> eventList, String studentId) {
@@ -51,6 +54,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         this.studentId     = studentId != null ? studentId : "";
         this.userRole      = "Student";
         this.dbHelper      = null;
+        this.eventDetailLauncher = null;
     }
 
     /** Full constructor used by EventsFragment — enables long-press hide for Students. */
@@ -61,6 +65,18 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         this.studentId     = studentId != null ? studentId : "";
         this.userRole      = userRole  != null ? userRole  : "Student";
         this.dbHelper      = dbHelper;
+        this.eventDetailLauncher = null;
+    }
+
+    /** Constructor with ActivityResultLauncher for returning data from EventDetailActivity. */
+    public EventAdapter(List<Event> eventList, String studentId, String userRole,
+                        DatabaseHelper dbHelper, ActivityResultLauncher<Intent> launcher) {
+        this.eventList     = eventList;
+        this.eventListFull = new ArrayList<>(eventList);
+        this.studentId     = studentId != null ? studentId : "";
+        this.userRole      = userRole  != null ? userRole  : "Student";
+        this.dbHelper      = dbHelper;
+        this.eventDetailLauncher = launcher;
     }
 
     // ── ViewHolder lifecycle ─────────────────────────────────────────────────
@@ -152,7 +168,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             Intent intent = new Intent(v.getContext(), EventDetailActivity.class);
             intent.putExtra("event", event);
             intent.putExtra("USER_STUDENT_ID", studentId);
-            v.getContext().startActivity(intent);
+            intent.putExtra("USER_ROLE", userRole);
+
+            // Use launcher if available, otherwise fall back to startActivity
+            if (eventDetailLauncher != null) {
+                eventDetailLauncher.launch(intent);
+            } else {
+                v.getContext().startActivity(intent);
+            }
         });
 
         // ── Long-press: Students can hide an event from their feed ───────────

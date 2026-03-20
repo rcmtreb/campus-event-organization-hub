@@ -78,6 +78,15 @@
             </intent-filter>
         </service>
 
+        <!-- BroadcastReceiver: listens for network connectivity changes -->
+        <receiver
+            android:name=".receiver.NetworkChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

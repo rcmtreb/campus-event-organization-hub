@@ -37,13 +37,13 @@ public class CreateEventFragment extends Fragment {
 
     // Maps chip abbreviation → full department name stored in DB
     private static final String[][] DEPT_MAP = {
-            {"CLAS", "College of Liberal Arts and Sciences (CLAS)"},
-            {"COE",  "College of Engineering (COE)"},
-            {"CAS",  "College of Arts and Sciences (CAS)"},
-            {"CBA",  "College of Business and Accountancy (CBA)"},
-            {"COED", "College of Education (COED)"},
-            {"COC",  "College of Criminology (COC)"},
-            {"CHTM", "College of Hospitality and Tourism Management (CHTM)"},
+            {"CBA",   "College of Business Accountancy (CBA)"},
+            {"CCJE",  "College of Criminal Justice Education (CCJE)"},
+            {"COED",  "College of Education (COED)"},
+            {"COE",   "College of Engineering (COE)"},
+            {"COL",   "College of Law (COL)"},
+            {"CLAS",  "College of Liberal Arts and Sciences (CLAS)"},
+            {"GS",    "Graduate School (GS)"},
     };
 
     private Uri selectedImageUri;
@@ -165,21 +165,23 @@ public class CreateEventFragment extends Fragment {
         // --- Target Audience chips — pre-check user's department ---
         preselectAudienceChip(audienceChipGroup, userDept);
 
-        // "All Departments" chip logic: checking it checks all others; unchecking it clears all
-        Chip chipAll = view.findViewById(R.id.chip_dept_all);
-        chipAll.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        // "Campus" chip logic: mutually exclusive with department chips
+        // When Campus is checked, uncheck all department chips
+        Chip chipCampus = view.findViewById(R.id.chip_dept_campus);
+        chipCampus.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
-                setAllDeptChips(audienceChipGroup, true);
+                setAllDeptChips(audienceChipGroup, false);
             }
         });
-        // If any individual chip is unchecked while "All" is checked, uncheck "All"
-        int[] deptChipIds = {R.id.chip_dept_clas, R.id.chip_dept_coe, R.id.chip_dept_cas,
-                R.id.chip_dept_cba, R.id.chip_dept_coed, R.id.chip_dept_coc, R.id.chip_dept_chtm};
+
+        // If any department chip is checked while Campus is checked, uncheck Campus
+        int[] deptChipIds = {R.id.chip_dept_cba, R.id.chip_dept_ccje, R.id.chip_dept_coed,
+                R.id.chip_dept_coe, R.id.chip_dept_col, R.id.chip_dept_clas, R.id.chip_dept_gs};
         for (int id : deptChipIds) {
             Chip c = view.findViewById(id);
             c.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (!isChecked && chipAll.isChecked()) {
-                    chipAll.setChecked(false);
+                if (isChecked && chipCampus.isChecked()) {
+                    chipCampus.setChecked(false);
                 }
             });
         }
@@ -207,9 +209,9 @@ public class CreateEventFragment extends Fragment {
                     selectedAudience.add("#" + c.getText().toString());
                 }
             }
-            if (chipAll.isChecked()) {
+            if (chipCampus.isChecked()) {
                 selectedAudience.clear();
-                selectedAudience.add("#ALL");
+                selectedAudience.add("#CAMPUS");
             }
             if (selectedAudience.isEmpty()) {
                 Toast.makeText(getContext(), "Please select at least one target audience department", Toast.LENGTH_SHORT).show();
@@ -232,6 +234,7 @@ public class CreateEventFragment extends Fragment {
             DatabaseHelper db = new DatabaseHelper(requireContext());
             Event newEvent = new Event(title, desc, date, time, tags, organizerDisplay, category, imagePath, "PENDING");
             newEvent.setCreatorSid(userStudentId);
+            newEvent.setVenue(venue);
             if (db.addEvent(newEvent) != -1) {
                 Toast.makeText(getContext(), "Event submitted for approval!", Toast.LENGTH_LONG).show();
                 requireActivity().getSupportFragmentManager().popBackStack();
@@ -251,10 +254,10 @@ public class CreateEventFragment extends Fragment {
         if (userDept == null || userDept.isEmpty()) return;
         String upper = userDept.toUpperCase(Locale.getDefault());
 
-        int[] chipIds  = {R.id.chip_dept_clas, R.id.chip_dept_coe, R.id.chip_dept_cas,
-                          R.id.chip_dept_cba, R.id.chip_dept_coed, R.id.chip_dept_coc,
-                          R.id.chip_dept_chtm};
-        String[] abbrs = {"CLAS", "COE", "CAS", "CBA", "COED", "COC", "CHTM"};
+        int[] chipIds  = {R.id.chip_dept_cba, R.id.chip_dept_ccje, R.id.chip_dept_coed,
+                          R.id.chip_dept_coe, R.id.chip_dept_col, R.id.chip_dept_clas,
+                          R.id.chip_dept_gs};
+        String[] abbrs = {"CBA", "CCJE", "COED", "COE", "COL", "CLAS", "GS"};
 
         for (int i = 0; i < abbrs.length; i++) {
             if (upper.contains(abbrs[i])) {
@@ -269,9 +272,9 @@ public class CreateEventFragment extends Fragment {
      * Sets all individual department chips to the given checked state.
      */
     private void setAllDeptChips(ChipGroup group, boolean checked) {
-        int[] chipIds = {R.id.chip_dept_clas, R.id.chip_dept_coe, R.id.chip_dept_cas,
-                         R.id.chip_dept_cba, R.id.chip_dept_coed, R.id.chip_dept_coc,
-                         R.id.chip_dept_chtm};
+        int[] chipIds = {R.id.chip_dept_cba, R.id.chip_dept_ccje, R.id.chip_dept_coed,
+                         R.id.chip_dept_coe, R.id.chip_dept_col, R.id.chip_dept_clas,
+                         R.id.chip_dept_gs};
         for (int id : chipIds) {
             Chip c = group.findViewById(id);
             if (c != null) c.setChecked(checked);

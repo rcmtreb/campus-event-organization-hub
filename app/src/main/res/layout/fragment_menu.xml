@@ -9,13 +9,14 @@
     android:background="@color/background_gray"
     tools:context=".ui.main.MenuFragment">
 
-    <!-- ── Header (matches main toolbar gradient) ───────────────────────── -->
+    <!-- ── Header (subtle surface background) ───────────────────────── -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/gradient_header"
+        android:background="@color/surface"
         android:orientation="horizontal"
-        android:padding="@dimen/space_4"
+        android:paddingHorizontal="@dimen/space_4"
+        android:paddingVertical="@dimen/space_3"
         android:gravity="center_vertical">
 
         <!-- Avatar circle -->
@@ -42,7 +43,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="UCC Student"
-                android:textColor="@color/text_on_primary"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold"/>
 
@@ -51,11 +52,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Student"
-                android:textColor="@color/primary_green_light"
+                android:textColor="@color/primary_green"
                 android:textSize="13sp"
                 android:layout_marginTop="2dp"/>
         </LinearLayout>
     </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider"/>
 
     <!-- ── Scrollable Content ─────────────────────────────────────────── -->
     <ScrollView
@@ -147,6 +153,14 @@
                     <LinearLayout android:id="@+id/menu_my_events" style="@style/MenuRow">
                         <ImageView style="@style/MenuRowIcon" android:src="@drawable/ic_bookmark" app:tint="@color/primary_green"/>
                         <TextView style="@style/MenuRowLabel" android:text="My Registered Events"/>
+                        <ImageView style="@style/MenuRowChevron"/>
+                    </LinearLayout>
+
+                    <View style="@style/MenuDivider"/>
+
+                    <LinearLayout android:id="@+id/menu_archive" style="@style/MenuRow">
+                        <ImageView style="@style/MenuRowIcon" android:src="@drawable/ic_archive" app:tint="@color/primary_green"/>
+                        <TextView style="@style/MenuRowLabel" android:text="Archived Notifications"/>
                         <ImageView style="@style/MenuRowChevron"/>
                     </LinearLayout>
                 </LinearLayout>

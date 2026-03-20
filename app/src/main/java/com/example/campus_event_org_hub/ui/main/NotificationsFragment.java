@@ -18,6 +18,8 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import androidx.core.content.ContextCompat;
+
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.NotifModel;
@@ -47,8 +49,6 @@ public class NotificationsFragment extends Fragment {
     private TextView tvUnreadCount;
     private MaterialButton btnClearAll;
     private MaterialButton btnArchiveSelected;
-    private View rowArchive;
-    private TextView tvArchiveCount;
 
     /** Whether we are currently in multi-select (archive) mode. */
     private boolean selectionMode = false;
@@ -75,16 +75,11 @@ public class NotificationsFragment extends Fragment {
         tvUnreadCount    = view.findViewById(R.id.tv_notif_unread_count);
         btnClearAll      = view.findViewById(R.id.btn_clear_all_notifications);
         btnArchiveSelected = view.findViewById(R.id.btn_archive_selected);
-        rowArchive       = view.findViewById(R.id.row_archive);
-        tvArchiveCount   = view.findViewById(R.id.tv_archive_count);
 
         updateUnreadBadge();
-        refreshArchiveCount();
 
         btnClearAll.setOnClickListener(v -> clearAllNotifications());
         btnArchiveSelected.setOnClickListener(v -> confirmArchiveSelected());
-
-        rowArchive.setOnClickListener(v -> openArchiveScreen());
 
         swipeRefresh = view.findViewById(R.id.swipe_refresh_notifications);
         swipeRefresh.setColorSchemeResources(R.color.primary_blue, R.color.primary_dark);
@@ -309,32 +304,6 @@ public class NotificationsFragment extends Fragment {
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        refreshArchiveCount();
-    }
-
-    private void refreshArchiveCount() {
-        if (db == null || tvArchiveCount == null) return;
-        int count = db.getArchivedNotificationCount(studentId);
-        if (count > 0) {
-            tvArchiveCount.setText(String.valueOf(count));
-            tvArchiveCount.setVisibility(View.VISIBLE);
-        } else {
-            tvArchiveCount.setVisibility(View.GONE);
-        }
-    }
-
-    private void openArchiveScreen() {
-        if (!(getActivity() instanceof MainActivity)) return;
-        ArchivedNotificationsFragment frag = new ArchivedNotificationsFragment();
-        Bundle args = new Bundle();
-        args.putString("USER_STUDENT_ID", studentId);
-        frag.setArguments(args);
-        ((MainActivity) getActivity()).loadFragment(frag, true);
-    }
-
     // ── Adapter ──────────────────────────────────────────────────────────────
 
     static class NotifAdapter extends RecyclerView.Adapter<NotifAdapter.VH> {
@@ -369,8 +338,8 @@ public class NotificationsFragment extends Fragment {
             // ── Card highlight when selected ──
             h.card.setCardBackgroundColor(
                     checked
-                    ? 0xFFE3F2FD   // light blue tint
-                    : 0xFFFFFFFF   // plain white
+                    ? ContextCompat.getColor(h.itemView.getContext(), R.color.notif_selection_tint)
+                    : ContextCompat.getColor(h.itemView.getContext(), R.color.surface)
             );
 
             // Title label

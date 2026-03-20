@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- ── Primary Green palette (SHADES for dark mode) ───────────────── -->
-    <color name="primary_green">#6AAF45</color>
-    <color name="primary_green_dark">#4A8E2A</color>
+    <color name="primary_green">#8BC34A</color>
+    <color name="primary_green_dark">#689F38</color>
     <color name="primary_green_light">#2A3D20</color>
 
     <!-- ── Accent Orange palette (SHADES for dark mode) ────────────────── -->
@@ -38,6 +38,10 @@
     <!-- ── Functional Colors (adjusted for dark) ──────────────────────── -->
     <color name="error_red">#EF5350</color>
     <color name="success_green">#66BB6A</color>
+    <color name="badge_notification_bg">#EF5350</color>
+
+    <!-- ── Selection Colors ─────────────────────────────────────────── -->
+    <color name="notif_selection_tint">#FF2D3A20</color>
 
     <!-- ── Basic Colors ───────────────────────────────────────────────── -->
     <color name="black">#000000</color>

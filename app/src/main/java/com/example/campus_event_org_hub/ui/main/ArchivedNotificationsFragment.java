@@ -50,10 +50,6 @@ public class ArchivedNotificationsFragment extends Fragment {
         adapter = new ArchiveAdapter(archivedList, this);
         recyclerView.setAdapter(adapter);
 
-        view.findViewById(R.id.btn_archive_back).setOnClickListener(v -> {
-            if (getActivity() != null) getActivity().getSupportFragmentManager().popBackStack();
-        });
-
         updateVisibility();
         return view;
     }

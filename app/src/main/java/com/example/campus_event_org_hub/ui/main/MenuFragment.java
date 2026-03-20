@@ -94,6 +94,15 @@ public class MenuFragment extends Fragment {
                 ((MainActivity) getActivity()).loadFragment(new RegisteredEventsFragment(), true);
             }
         });
+        view.findViewById(R.id.menu_archive).setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                ArchivedNotificationsFragment frag = new ArchivedNotificationsFragment();
+                Bundle archiveArgs = new Bundle();
+                archiveArgs.putString("USER_STUDENT_ID", studentId);
+                frag.setArguments(archiveArgs);
+                ((MainActivity) getActivity()).loadFragment(frag, true);
+            }
+        });
 
         // Settings
         view.findViewById(R.id.menu_notifications_settings).setOnClickListener(v -> {

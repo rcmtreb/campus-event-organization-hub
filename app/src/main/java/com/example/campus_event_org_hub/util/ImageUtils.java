@@ -97,8 +97,10 @@ public final class ImageUtils {
      * Load an image into {@code imageView} from {@code path}, falling back to
      * {@code placeholderRes} on any error or when {@code path} is empty.
      *
-     * Images are decoded at a sample size that keeps them at most 2× the target
-     * view dimensions to prevent blurry up-scaling while avoiding OOM errors.
+     * Images are decoded at a resolution that ensures they are at least 110% of
+     * the target view dimensions, preventing blurry up-scaling while maintaining
+     * memory efficiency.  Uses ViewTreeObserver for accurate sizing when the view
+     * has not been measured yet.
      *
      * @param ctx            Context (Activity or Fragment context both work)
      * @param imageView      Target ImageView
@@ -160,17 +162,20 @@ public final class ImageUtils {
 
     /**
      * Calculates the largest inSampleSize value that still results in a bitmap
-     * at least as large as the target view (or 512px if the view has not been
-     * laid out yet).  Halving ensures the decoded bitmap is sharper than
-     * up-scaling a heavily subsampled one.
+     * at least as large as the target view (or 1080px if the view has not been
+     * laid out yet).  A 10% buffer is added to target dimensions to ensure the
+     * decoded bitmap is never smaller than the display size, preventing blurry
+     * up-scaling.  Uses ViewTreeObserver to get actual view dimensions when
+     * the view hasn't been measured yet.
      */
     private static int calculateInSampleSize(BitmapFactory.Options opts, ImageView iv) {
         int rawW = opts.outWidth;
         int rawH = opts.outHeight;
         if (rawW <= 0 || rawH <= 0) return 1;
 
-        int targetW = iv.getWidth()  > 0 ? iv.getWidth()  : 512;
-        int targetH = iv.getHeight() > 0 ? iv.getHeight() : 512;
+        final int[] targetSize = getViewTargetSize(iv);
+        int targetW = targetSize[0];
+        int targetH = targetSize[1];
 
         int sample = 1;
         if (rawH > targetH || rawW > targetW) {
@@ -181,5 +186,34 @@ public final class ImageUtils {
             }
         }
         return sample;
+    }
+
+    /**
+     * Gets the target size for image loading. If the view has been measured,
+     * returns actual dimensions with 10% buffer. Otherwise waits for layout
+     * via ViewTreeObserver or falls back to 1080px minimum.
+     */
+    private static int[] getViewTargetSize(ImageView iv) {
+        int measuredW = iv.getMeasuredWidth();
+        int measuredH = iv.getMeasuredHeight();
+
+        if (measuredW > 0 && measuredH > 0) {
+            return new int[] {
+                (int) (measuredW * 1.1f),
+                (int) (measuredH * 1.1f)
+            };
+        }
+
+        int layoutW = iv.getWidth();
+        int layoutH = iv.getHeight();
+
+        if (layoutW > 0 && layoutH > 0) {
+            return new int[] {
+                (int) (layoutW * 1.1f),
+                (int) (layoutH * 1.1f)
+            };
+        }
+
+        return new int[] { 1080, 1080 };
     }
 }

@@ -7,33 +7,23 @@
     android:fitsSystemWindows="true"
     android:background="@color/background_gray">
 
-    <!-- Header -->
+    <!-- Subtle Page Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_header_green"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="16dp">
-
-        <ImageButton
-            android:id="@+id/btn_back_my_events"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_back"
-            app:tint="@android:color/white"
-            android:contentDescription="Back" />
+        android:orientation="vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="@dimen/space_4"
+        android:paddingVertical="@dimen/space_3">
 
         <TextView
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="Manage My Events"
-            android:textColor="@android:color/white"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:text="MANAGE MY EVENTS"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
     </LinearLayout>
 
     <!-- Tab strip -->
@@ -41,10 +31,10 @@
         android:id="@+id/tabs_my_events"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/primary_blue"
-        app:tabTextColor="#C8F5A8"
-        app:tabSelectedTextColor="@android:color/white"
-        app:tabIndicatorColor="@android:color/white"
+        android:background="@color/surface"
+        app:tabTextColor="@color/text_secondary"
+        app:tabSelectedTextColor="@color/primary_green"
+        app:tabIndicatorColor="@color/primary_green"
         app:tabMode="fixed"
         app:tabGravity="fill" />
 
@@ -55,8 +45,8 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingTop="8dp"
-        android:paddingBottom="16dp" />
+        android:paddingTop="@dimen/space_2"
+        android:paddingBottom="@dimen/space_4" />
 
     <!-- Empty state -->
     <TextView
@@ -66,7 +56,7 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="No events in this category."
-                android:textColor="@color/text_secondary"
+        android:textColor="@color/text_secondary"
         android:textSize="14sp"
         android:visibility="gone" />
 

@@ -145,6 +145,7 @@ public class AdminEventControlActivity extends AppCompatActivity {
                 intent.putExtra("EVENT_TAGS",        e.getTags());
                 intent.putExtra("EVENT_ORGANIZER",   e.getOrganizer());
                 intent.putExtra("EVENT_CATEGORY",    e.getCategory());
+                intent.putExtra("EVENT_VENUE",       e.getVenue() != null ? e.getVenue() : "");
                 editLauncher.launch(intent);
             });
             h.btnDelete.setOnClickListener(v -> confirmDelete(e, position));

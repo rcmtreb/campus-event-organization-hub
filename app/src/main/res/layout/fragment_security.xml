@@ -7,32 +7,23 @@
     android:fitsSystemWindows="true"
     android:background="@color/background_gray">
 
-    <!-- Header -->
+    <!-- Subtle Page Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_header_green"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="16dp">
-
-        <ImageButton
-            android:id="@+id/btn_back_security"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_back"
-            app:tint="@android:color/white" />
+        android:orientation="vertical"
+        android:layout_marginBottom="@dimen/space_4"
+        android:paddingHorizontal="@dimen/space_4"
+        android:paddingTop="@dimen/space_4">
 
         <TextView
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="Security"
-            android:textColor="@android:color/white"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:text="SECURITY"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
     </LinearLayout>
 
     <ScrollView

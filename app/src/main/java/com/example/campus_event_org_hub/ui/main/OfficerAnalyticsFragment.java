@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -31,13 +30,6 @@ public class OfficerAnalyticsFragment extends Fragment {
 
         Bundle args = getArguments();
         String officerName = args != null ? args.getString("USER_NAME", "") : "";
-
-        ImageButton btnBack = view.findViewById(R.id.btn_back_analytics);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> {
-                if (getActivity() != null) getActivity().onBackPressed();
-            });
-        }
 
         TextView tvTotalEvents        = view.findViewById(R.id.tv_total_events);
         TextView tvTotalRegistrations = view.findViewById(R.id.tv_total_registrations);

@@ -32,12 +32,15 @@ public class DiscoverFragment extends Fragment {
 
     private DatabaseHelper dbHelper;
     private String userDept = "";
-    private String currentTimeFilter = "year";
+    private String currentTimeFilter = "month";
     private LinearLayout deptListContainer;
     private TextView tvDeptEmpty;
     private RecyclerView rvMyDeptEvents;
     private TextView tvMyDeptEmpty;
+    private RecyclerView rvCampusEvents;
+    private TextView tvCampusEmpty;
     private EventAdapter deptEventsAdapter;
+    private EventAdapter campusEventsAdapter;
 
     @Nullable
     @Override
@@ -55,7 +58,10 @@ public class DiscoverFragment extends Fragment {
         tvDeptEmpty = view.findViewById(R.id.tv_dept_empty);
         rvMyDeptEvents = view.findViewById(R.id.rv_my_dept_events);
         tvMyDeptEmpty = view.findViewById(R.id.tv_my_dept_empty);
+        rvCampusEvents = view.findViewById(R.id.rv_campus_events);
+        tvCampusEmpty = view.findViewById(R.id.tv_campus_empty);
 
+        loadCampusEvents(view);
         loadDepartmentStats(view, currentTimeFilter);
         setupDeptFilter(view);
         loadMyDepartmentEvents(view);
@@ -63,7 +69,50 @@ public class DiscoverFragment extends Fragment {
         return view;
     }
 
+    // ── Campus Events ─────────────────────────────────────────────────────────
+
+    private void loadCampusEvents(View view) {
+        rvCampusEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvCampusEvents.setNestedScrollingEnabled(false);
+
+        try {
+            List<Event> allEvents = dbHelper.getAllEvents();
+            List<Event> campusEvents = new ArrayList<>();
+
+            if (allEvents != null) {
+                for (Event e : allEvents) {
+                    if (!"APPROVED".equals(e.getStatus())) continue;
+                    String tags = e.getTags();
+                    if (tags != null) {
+                        String upperTags = tags.toUpperCase();
+                        if (upperTags.contains("CAMPUS") || upperTags.contains("UCC") || upperTags.contains("UNIVERSITY")) {
+                            campusEvents.add(e);
+                        }
+                    }
+                }
+            }
+
+            if (campusEvents.isEmpty()) {
+                tvCampusEmpty.setVisibility(View.VISIBLE);
+                rvCampusEvents.setVisibility(View.GONE);
+            } else {
+                tvCampusEmpty.setVisibility(View.GONE);
+                rvCampusEvents.setVisibility(View.VISIBLE);
+                campusEventsAdapter = new EventAdapter(campusEvents);
+                rvCampusEvents.setAdapter(campusEventsAdapter);
+            }
+
+        } catch (Exception e) {
+            tvCampusEmpty.setVisibility(View.VISIBLE);
+            rvCampusEvents.setVisibility(View.GONE);
+        }
+    }
+
     // ── Department Statistics ─────────────────────────────────────────────
+
+    private boolean isCampusTag(String tag) {
+        return tag.equals("CAMPUS") || tag.equals("UCC") || tag.equals("UNIVERSITY");
+    }
 
     private void loadDepartmentStats(View view, String timeFilter) {
         currentTimeFilter = timeFilter;
@@ -118,8 +167,8 @@ public class DiscoverFragment extends Fragment {
                 if (tags != null && !tags.isEmpty()) {
                     String[] tagArray = tags.split("\\s+");
                     for (String tag : tagArray) {
-                        tag = tag.replace("#", "").trim();
-                        if (!tag.isEmpty()) {
+                        tag = tag.replace("#", "").trim().toUpperCase();
+                        if (!tag.isEmpty() && !isCampusTag(tag)) {
                             deptCount.put(tag, deptCount.getOrDefault(tag, 0) + 1);
                         }
                     }
@@ -189,7 +238,7 @@ public class DiscoverFragment extends Fragment {
         cg.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (checkedIds.isEmpty()) return;
             int id = checkedIds.get(0);
-            String filter = "year";
+            String filter = "month";
             if (id == R.id.chip_dept_today) filter = "today";
             else if (id == R.id.chip_dept_week) filter = "week";
             else if (id == R.id.chip_dept_month) filter = "month";

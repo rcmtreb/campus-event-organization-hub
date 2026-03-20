@@ -37,6 +37,10 @@
     <!-- ── Functional Colors ─────────────────────────────────────────── -->
     <color name="error_red">#D32F2F</color>
     <color name="success_green">#388E3C</color>
+    <color name="badge_notification_bg">#E53935</color>
+
+    <!-- ── Selection Colors ─────────────────────────────────────────── -->
+    <color name="notif_selection_tint">#FFE3F2FD</color>
 
     <!-- ── Basic Colors ───────────────────────────────────────────────── -->
     <color name="black">#000000</color>

@@ -61,7 +61,7 @@
                 android:layout_gravity="top|end"
                 android:layout_marginTop="6dp"
                 android:layout_marginEnd="6dp"
-                android:background="@drawable/badge_timeline"
+                android:background="@drawable/badge_notification"
                 android:textColor="@color/text_on_primary"
                 android:textSize="10sp"
                 android:textStyle="bold"
@@ -72,12 +72,48 @@
 
     </LinearLayout>
 
+    <!-- ── Offline Banner ────────────────────────────────────────────────── -->
+    <LinearLayout
+        android:id="@+id/offline_banner_container"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/error_red"
+        android:gravity="center_vertical"
+        android:padding="6dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@+id/top_app_bar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tv_offline_banner_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="No internet connection — working offline"
+            android:textColor="@color/text_on_primary"
+            android:gravity="center"
+            android:textSize="12sp" />
+
+        <ImageView
+            android:id="@+id/btn_close_offline_banner"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginEnd="8dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:tint="@color/text_on_primary"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Dismiss"
+            android:padding="2dp" />
+    </LinearLayout>
+
     <!-- ── Fragment container ───────────────────────────────────────────── -->
     <FrameLayout
         android:id="@+id/fragment_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintTop_toBottomOf="@+id/top_app_bar"
+        app:layout_constraintTop_toBottomOf="@+id/offline_banner_container"
         app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>

@@ -7,6 +7,25 @@
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
+    <!-- Subtle Page Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="@dimen/space_4"
+        android:paddingVertical="@dimen/space_3">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CREATE EVENT"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
+    </LinearLayout>
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -15,15 +34,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingHorizontal="@dimen/space_4"
+            android:paddingBottom="@dimen/space_4">
 
             <!-- Banner Preview -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                android:layout_marginBottom="@dimen/space_4"
+                style="@style/PremiumCard">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -41,12 +60,12 @@
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_margin="12dp"
+                        android:layout_margin="@dimen/space_3"
                         android:text="Choose Banner Image"
                         android:textAllCaps="false"
                         android:textSize="14sp"
                         android:textColor="@color/primary_green"
-                        app:cornerRadius="8dp"
+                        app:cornerRadius="@dimen/radius_medium"
                         app:strokeColor="@color/primary_green"
                         app:strokeWidth="1dp" />
                 </LinearLayout>
@@ -56,32 +75,33 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                android:layout_marginBottom="@dimen/space_4"
+                style="@style/PremiumCard">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="@dimen/space_4">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
-                        android:text="Event Information"
-                        android:textColor="@color/primary_blue"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
+                        android:layout_marginBottom="@dimen/space_3"
+                        android:text="EVENT INFORMATION"
+                        android:textColor="@color/primary_green"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.1"/>
 
                     <!-- Title -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:hint="Event Title *"
-                        app:hintTextColor="@color/primary_blue"
+                        app:hintTextColor="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_title"
@@ -96,9 +116,10 @@
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:hint="Description *"
-                        app:hintTextColor="@color/primary_blue"
+                        app:hintTextColor="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_description"
@@ -112,17 +133,18 @@
                             android:maxLines="6" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Date — tappable, opens DatePickerDialog -->
+                    <!-- Date -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/til_create_date"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:hint="Event Date *"
-                        app:hintTextColor="@color/primary_blue"
+                        app:hintTextColor="@color/primary_green"
                         app:endIconMode="custom"
                         app:endIconDrawable="@drawable/ic_calendar"
-                        app:endIconTint="@color/primary_blue"
+                        app:endIconTint="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_date"
@@ -136,17 +158,18 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Time — tappable, opens TimePickerDialog -->
+                    <!-- Time -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/til_create_time"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:hint="Event Time *"
-                        app:hintTextColor="@color/primary_blue"
+                        app:hintTextColor="@color/primary_green"
                         app:endIconMode="custom"
                         app:endIconDrawable="@drawable/ic_clock"
-                        app:endIconTint="@color/primary_blue"
+                        app:endIconTint="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_time"
@@ -160,14 +183,15 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Venue — dropdown from available venues in DB -->
+                    <!-- Venue -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/til_create_venue"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:hint="Venue *"
-                        app:hintTextColor="@color/primary_blue"
+                        app:hintTextColor="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
                         <AutoCompleteTextView
                             android:id="@+id/acv_create_venue"
@@ -181,13 +205,14 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Organizer Name — auto-filled from logged-in officer, read-only -->
+                    <!-- Organizer Name -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:hint="Organizer Name"
-                        app:hintTextColor="@color/primary_blue"
+                        app:hintTextColor="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_create_organizer"
@@ -201,14 +226,15 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Department — dropdown from departments_array -->
+                    <!-- Department -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/til_create_department"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="4dp"
+                        android:layout_marginBottom="@dimen/space_2"
                         android:hint="Department *"
-                        app:hintTextColor="@color/primary_blue"
+                        app:hintTextColor="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
                         <AutoCompleteTextView
                             android:id="@+id/acv_create_department"
@@ -229,29 +255,29 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                android:layout_marginBottom="@dimen/space_4"
+                style="@style/PremiumCard">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="@dimen/space_4">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="4dp"
-                        android:text="Target Audience *"
-                        android:textColor="@color/primary_blue"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
+                        android:layout_marginBottom="@dimen/space_1"
+                        android:text="TARGET AUDIENCE *"
+                        android:textColor="@color/primary_green"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.1" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:text="Select which departments to notify. Your department is pre-selected."
                         android:textColor="@color/text_hint"
                         android:textSize="12sp" />
@@ -263,60 +289,60 @@
                         app:singleSelection="false">
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_dept_clas"
-                            style="@style/Widget.App.Chip"
+                            android:id="@+id/chip_dept_campus"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="CLAS" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_dept_coe"
-                            style="@style/Widget.App.Chip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="COE" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_dept_cas"
-                            style="@style/Widget.App.Chip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="CAS" />
+                            android:text="Campus" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_dept_cba"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="CBA" />
 
                         <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_dept_ccje"
+                            style="@style/PremiumChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="CCJE" />
+
+                        <com.google.android.material.chip.Chip
                             android:id="@+id/chip_dept_coed"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="COED" />
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_dept_coc"
-                            style="@style/Widget.App.Chip"
+                            android:id="@+id/chip_dept_coe"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="COC" />
+                            android:text="COE" />
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_dept_chtm"
-                            style="@style/Widget.App.Chip"
+                            android:id="@+id/chip_dept_col"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="CHTM" />
+                            android:text="COL" />
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chip_dept_all"
-                            style="@style/Widget.App.Chip"
+                            android:id="@+id/chip_dept_clas"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="All Departments" />
+                            android:text="CLAS" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_dept_gs"
+                            style="@style/PremiumChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="GS" />
 
                     </com.google.android.material.chip.ChipGroup>
 
@@ -327,24 +353,24 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                android:layout_marginBottom="@dimen/space_4"
+                style="@style/PremiumCard">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="@dimen/space_4">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
-                        android:text="Category *"
-                        android:textColor="@color/primary_blue"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
+                        android:layout_marginBottom="@dimen/space_3"
+                        android:text="CATEGORY *"
+                        android:textColor="@color/primary_green"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.1" />
 
                     <com.google.android.material.chip.ChipGroup
                         android:id="@+id/chip_group_category"
@@ -355,7 +381,7 @@
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_cat_academic_professional"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Academic &amp; Professional"
@@ -363,35 +389,35 @@
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_cat_student_life_social"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Student Life &amp; Social" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_cat_athletics_wellness"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Athletics &amp; Wellness" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_cat_arts_culture"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Arts &amp; Culture" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_cat_admin_ceremonial"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Administrative &amp; Ceremonial" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_cat_competitions_interest"
-                            style="@style/Widget.App.Chip"
+                            style="@style/PremiumChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Competitions &amp; Special Interest" />
@@ -404,15 +430,15 @@
             <Button
                 android:id="@+id/btn_create_event_submit"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginBottom="24dp"
-                android:backgroundTint="@color/primary_green"
+                android:layout_height="@dimen/button_height"
+                android:layout_marginBottom="@dimen/space_4"
+                app:backgroundTint="@color/primary_green"
                 android:text="Publish Event"
                 android:textAllCaps="false"
                 android:textColor="@color/text_on_primary"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                app:cornerRadius="12dp" />
+                app:cornerRadius="@dimen/radius_full" />
 
         </LinearLayout>
     </ScrollView>
