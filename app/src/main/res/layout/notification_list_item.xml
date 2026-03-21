@@ -4,134 +4,198 @@
     android:id="@+id/notif_card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
-    app:cardCornerRadius="12dp"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="6dp"
+    app:cardCornerRadius="16dp"
     app:cardElevation="2dp"
-    app:cardBackgroundColor="@color/surface">
+    app:cardBackgroundColor="@color/surface"
+    app:rippleColor="@color/primary_light">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="14dp"
-        android:gravity="center_vertical">
+        android:orientation="vertical">
 
-        <!-- Checkbox — visible only in multi-select mode -->
-        <CheckBox
-            android:id="@+id/notif_checkbox"
-            android:layout_width="wrap_content"
+        <!-- Summary Row (always visible) -->
+        <LinearLayout
+            android:id="@+id/summary_container"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:visibility="gone"
-            android:clickable="false"
-            android:focusable="false" />
+            android:orientation="horizontal"
+            android:padding="16dp"
+            android:gravity="center_vertical"
+            android:background="?attr/selectableItemBackground">
 
-        <!-- Icon area with red alert dot badge -->
-        <FrameLayout
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginEnd="14dp">
+            <!-- Checkbox for selection mode -->
+            <CheckBox
+                android:id="@+id/notif_checkbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone"
+                android:clickable="false"
+                android:focusable="false" />
 
-            <View
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/bg_login_header"
-                android:alpha="0.15" />
+            <!-- Icon with unread indicator -->
+            <FrameLayout
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="12dp">
 
+                <View
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_login_header"
+                    android:alpha="0.12" />
+
+                <ImageView
+                    android:id="@+id/notif_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_notifications"
+                    app:tint="@color/primary_blue" />
+
+                <View
+                    android:id="@+id/notif_unread_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_gravity="top|end"
+                    android:background="@drawable/bg_unread_dot"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Title + Preview -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/notif_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/notif_message_preview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/notif_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/text_hint"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Expand indicator -->
             <ImageView
-                android:id="@+id/notif_icon"
+                android:id="@+id/expand_indicator"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_notifications"
-                app:tint="@color/primary_blue" />
+                android:layout_marginStart="8dp"
+                android:src="@drawable/ic_expand_more"
+                app:tint="@color/text_hint"
+                android:rotation="0" />
 
-            <!-- Red alert dot — shown when notification is unread -->
-            <View
-                android:id="@+id/notif_unread_dot"
-                android:layout_width="12dp"
-                android:layout_height="12dp"
-                android:layout_gravity="top|end"
-                android:background="@color/error_red"
-                android:visibility="gone" />
+        </LinearLayout>
 
-        </FrameLayout>
-
+        <!-- Expandable Details Section -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:id="@+id/details_container"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="16dp"
+            android:visibility="gone">
 
-            <TextView
-                android:id="@+id/notif_title"
+            <View
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:layout_height="1dp"
+                android:layout_marginBottom="12dp"
+                android:background="@color/divider" />
 
+            <!-- Full Message -->
             <TextView
                 android:id="@+id/notif_message"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="14sp"
+                android:lineSpacingMultiplier="1.3" />
 
-            <!-- Reason (only shown when non-empty) -->
+            <!-- Reason -->
             <TextView
                 android:id="@+id/notif_reason"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/text_hint"
-                android:textSize="12sp"
+                android:layout_marginTop="10dp"
+                android:padding="12dp"
+                android:background="@drawable/bg_detail_chip"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
                 android:visibility="gone" />
 
-            <!-- Suggested date+time (only shown for POSTPONED) -->
+            <!-- Suggested Date -->
             <TextView
                 android:id="@+id/notif_suggested_date"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="8dp"
+                android:padding="12dp"
+                android:background="@drawable/bg_detail_chip"
+                android:drawableStart="@drawable/ic_event"
+                android:drawablePadding="8dp"
                 android:textColor="@color/primary_blue"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
-            <!-- Respond button — only visible for POSTPONED notifications -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_respond_postpone"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Respond"
-                android:textSize="12sp"
-                app:cornerRadius="20dp"
-                android:visibility="gone"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-            <!-- Mark as read / unread toggle — hidden in multi-select mode -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_mark_read_toggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Mark as read"
-                android:textSize="11sp"
-                app:cornerRadius="20dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:strokeColor="@color/primary_blue"
-                android:textColor="@color/primary_blue" />
-
-            <TextView
-                android:id="@+id/notif_time"
+            <!-- Action Buttons -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="@color/text_hint"
-                android:textSize="11sp" />
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:gravity="end">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_mark_read_toggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:textSize="12sp"
+                    app:cornerRadius="20dp"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    app:strokeColor="@color/primary_blue"
+                    android:textColor="@color/primary_blue" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_respond_postpone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:text="Respond"
+                    android:textSize="12sp"
+                    app:cornerRadius="20dp"
+                    android:visibility="gone"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/primary_blue"
+                    android:textColor="@color/primary_blue" />
+            </LinearLayout>
         </LinearLayout>
 
     </LinearLayout>

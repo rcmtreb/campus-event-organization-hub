@@ -22,6 +22,7 @@
     <!-- ── Premium Surface Colors ─────────────────────────────────────── -->
     <color name="surface">#FFFFFF</color>
     <color name="surface_elevated">#FAFAFA</color>
+    <color name="surface_variant">#F5F5F5</color>
     <color name="background_gray">#F8F9FA</color>
 
     <!-- ── Premium Text Colors ────────────────────────────────────────── -->
