@@ -93,7 +93,7 @@ public class CreateEventFragment extends Fragment {
         TextInputLayout   tilEndTime    = view.findViewById(R.id.til_create_end_time);
         AutoCompleteTextView venueAcv   = view.findViewById(R.id.acv_create_venue);
         TextInputEditText organizerEt   = view.findViewById(R.id.et_create_organizer);
-        AutoCompleteTextView deptAcv    = view.findViewById(R.id.acv_create_department);
+        TextInputEditText deptEt        = view.findViewById(R.id.et_create_department);
         ChipGroup audienceChipGroup     = view.findViewById(R.id.chip_group_audience);
         ChipGroup categoryChipGroup     = view.findViewById(R.id.chip_group_category);
 
@@ -165,16 +165,9 @@ public class CreateEventFragment extends Fragment {
                 requireContext(), R.layout.spinner_item, venueNames);
         venueAcv.setAdapter(venueAdapter);
 
-        // --- Department dropdown ---
-        String[] deptFullNames = requireContext().getResources()
-                .getStringArray(R.array.departments_array);
-        ArrayAdapter<String> deptAdapter = new ArrayAdapter<>(
-                requireContext(), R.layout.spinner_item, deptFullNames);
-        deptAcv.setAdapter(deptAdapter);
-
-        // Pre-select the user's own department in the dropdown
+        // --- Department (auto-filled from officer profile, read-only) ---
         if (userDept != null && !userDept.isEmpty()) {
-            deptAcv.setText(userDept, false);
+            deptEt.setText(userDept);
         }
 
         // Auto-fill organizer with the logged-in officer's name (read-only)
@@ -215,9 +208,9 @@ public class CreateEventFragment extends Fragment {
             String endTime  = endTimeEt.getText() != null ? endTimeEt.getText().toString().trim() : "";
             String venue    = venueAcv.getText().toString().trim();
             String organizer= organizerEt.getText() != null ? organizerEt.getText().toString().trim() : "";
-            String dept     = deptAcv.getText().toString().trim();
+            String dept     = deptEt.getText() != null ? deptEt.getText().toString().trim() : userDept;
 
-            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || startTime.isEmpty() || endTime.isEmpty() || venue.isEmpty() || dept.isEmpty()) {
+            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || startTime.isEmpty() || endTime.isEmpty() || venue.isEmpty()) {
                 Toast.makeText(getContext(), "Please fill in all required fields", Toast.LENGTH_SHORT).show();
                 return;
             }

@@ -244,18 +244,18 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Department -->
+                    <!-- Department (auto-filled from officer profile, read-only) -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/til_create_department"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="@dimen/space_2"
-                        android:hint="Department *"
+                        android:hint="Department"
                         app:hintTextColor="@color/primary_green"
                         app:boxStrokeColor="@color/primary_green"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
-                        <AutoCompleteTextView
-                            android:id="@+id/acv_create_department"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_create_department"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textColor="@color/text_primary"
