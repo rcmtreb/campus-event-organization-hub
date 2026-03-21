@@ -8,6 +8,8 @@ public class Event implements Serializable {
     private String description;
     private String date;
     private String time;
+    private String startTime;
+    private String endTime;
     private String tags;
     private String organizer;
     private String category;
@@ -26,6 +28,8 @@ public class Event implements Serializable {
         this.description = description;
         this.date = date;
         this.time = time;
+        this.startTime = "";
+        this.endTime = "";
         this.tags = tags;
         this.organizer = organizer;
         this.category = category;
@@ -40,6 +44,8 @@ public class Event implements Serializable {
         this.description = description;
         this.date = date;
         this.time = "";
+        this.startTime = "";
+        this.endTime = "";
         this.tags = tags;
         this.organizer = organizer;
         this.category = category;
@@ -54,6 +60,8 @@ public class Event implements Serializable {
         this.description = description;
         this.date = date;
         this.time = time;
+        this.startTime = "";
+        this.endTime = "";
         this.tags = tags;
         this.organizer = organizer;
         this.category = category;
@@ -69,6 +77,8 @@ public class Event implements Serializable {
         this.description = description;
         this.date = date;
         this.time = "";
+        this.startTime = "";
+        this.endTime = "";
         this.tags = tags;
         this.organizer = organizer;
         this.category = category;
@@ -81,6 +91,10 @@ public class Event implements Serializable {
     public String getDescription() { return description; }
     public String getDate()        { return date; }
     public String getTime()        { return time != null ? time : ""; }
+    public String getStartTime()   { return startTime != null ? startTime : ""; }
+    public void   setStartTime(String startTime) { this.startTime = startTime; }
+    public String getEndTime()     { return endTime != null ? endTime : ""; }
+    public void   setEndTime(String endTime) { this.endTime = endTime; }
     public String getTags()        { return tags; }
     public String getOrganizer()   { return organizer; }
     public String getCategory()    { return category; }

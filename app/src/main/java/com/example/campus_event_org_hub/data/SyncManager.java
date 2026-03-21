@@ -94,6 +94,8 @@ public class SyncManager {
                 String desc       = str(d, "description");
                 String date       = str(d, "date");
                 String time       = str(d, "event_time");
+                String startTime  = str(d, "start_time");
+                String endTime    = str(d, "end_time");
                 String tags       = str(d, "tags");
                 String organizer  = str(d, "organizer");
                 String category   = str(d, "category");
@@ -102,7 +104,7 @@ public class SyncManager {
                 String creatorSid = str(d, "creator_sid");
                 if (localId <= 0 || title == null) continue;
                 db.syncUpsertEvent(localId, title, desc, date, time, tags,
-                        organizer, category, imagePath, status, creatorSid);
+                        organizer, category, imagePath, status, creatorSid, startTime, endTime);
             }
             Log.d(TAG, "Synced " + docs.size() + " events");
         } catch (Exception e) {

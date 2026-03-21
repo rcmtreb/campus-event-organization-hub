@@ -158,13 +158,13 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Time -->
+                    <!-- Start Time -->
                     <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/til_create_time"
+                        android:id="@+id/til_create_start_time"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="@dimen/space_3"
-                        android:hint="Event Time *"
+                        android:hint="Start Time *"
                         app:hintTextColor="@color/primary_green"
                         app:endIconMode="custom"
                         app:endIconDrawable="@drawable/ic_clock"
@@ -172,7 +172,32 @@
                         app:boxStrokeColor="@color/primary_green"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                         <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/et_create_time"
+                            android:id="@+id/et_create_start_time"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
+                            android:inputType="none"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:cursorVisible="false" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- End Time -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/til_create_end_time"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/space_3"
+                        android:hint="End Time *"
+                        app:hintTextColor="@color/primary_green"
+                        app:endIconMode="custom"
+                        app:endIconDrawable="@drawable/ic_clock"
+                        app:endIconTint="@color/primary_green"
+                        app:boxStrokeColor="@color/primary_green"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_create_end_time"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textColor="@color/text_primary"

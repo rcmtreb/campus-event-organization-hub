@@ -188,4 +188,34 @@
 
     </LinearLayout>
 
+    <!-- Event controls for officers -->
+    <LinearLayout
+        android:id="@+id/layout_event_controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="@dimen/space_2">
+
+        <Button
+            android:id="@+id/btn_start_event"
+            style="@style/PremiumButton.Secondary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Start Event"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btn_end_event"
+            style="@style/PremiumButton.Secondary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_2"
+            android:layout_weight="1"
+            android:text="End Event"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
 </LinearLayout>

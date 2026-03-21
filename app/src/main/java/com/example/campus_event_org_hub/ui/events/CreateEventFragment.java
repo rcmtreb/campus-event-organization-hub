@@ -87,8 +87,10 @@ public class CreateEventFragment extends Fragment {
         TextInputEditText descEt        = view.findViewById(R.id.et_create_description);
         TextInputEditText dateEt        = view.findViewById(R.id.et_create_date);
         TextInputLayout   tilDate       = view.findViewById(R.id.til_create_date);
-        TextInputEditText timeEt        = view.findViewById(R.id.et_create_time);
-        TextInputLayout   tilTime       = view.findViewById(R.id.til_create_time);
+        TextInputEditText startTimeEt   = view.findViewById(R.id.et_create_start_time);
+        TextInputLayout   tilStartTime  = view.findViewById(R.id.til_create_start_time);
+        TextInputEditText endTimeEt     = view.findViewById(R.id.et_create_end_time);
+        TextInputLayout   tilEndTime    = view.findViewById(R.id.til_create_end_time);
         AutoCompleteTextView venueAcv   = view.findViewById(R.id.acv_create_venue);
         TextInputEditText organizerEt   = view.findViewById(R.id.et_create_organizer);
         AutoCompleteTextView deptAcv    = view.findViewById(R.id.acv_create_department);
@@ -117,23 +119,41 @@ public class CreateEventFragment extends Fragment {
         dateEt.setOnClickListener(openDatePicker);
         tilDate.setEndIconOnClickListener(openDatePicker);
 
-        // --- Time picker ---
-        View.OnClickListener openTimePicker = v -> {
+        // --- Start Time picker ---
+        View.OnClickListener openStartTimePicker = v -> {
             Calendar cal = Calendar.getInstance();
             new TimePickerDialog(
                     requireContext(),
                     (tp, hourOfDay, minute) -> {
                         String formatted = String.format(Locale.getDefault(),
                                 "%02d:%02d", hourOfDay, minute);
-                        timeEt.setText(formatted);
+                        startTimeEt.setText(formatted);
                     },
                     cal.get(Calendar.HOUR_OF_DAY),
                     cal.get(Calendar.MINUTE),
                     true
             ).show();
         };
-        timeEt.setOnClickListener(openTimePicker);
-        tilTime.setEndIconOnClickListener(openTimePicker);
+        startTimeEt.setOnClickListener(openStartTimePicker);
+        tilStartTime.setEndIconOnClickListener(openStartTimePicker);
+
+        // --- End Time picker ---
+        View.OnClickListener openEndTimePicker = v -> {
+            Calendar cal = Calendar.getInstance();
+            new TimePickerDialog(
+                    requireContext(),
+                    (tp, hourOfDay, minute) -> {
+                        String formatted = String.format(Locale.getDefault(),
+                                "%02d:%02d", hourOfDay, minute);
+                        endTimeEt.setText(formatted);
+                    },
+                    cal.get(Calendar.HOUR_OF_DAY),
+                    cal.get(Calendar.MINUTE),
+                    true
+            ).show();
+        };
+        endTimeEt.setOnClickListener(openEndTimePicker);
+        tilEndTime.setEndIconOnClickListener(openEndTimePicker);
 
         // --- Venue dropdown ---
         String[] venueNames = {
@@ -191,12 +211,13 @@ public class CreateEventFragment extends Fragment {
             String title    = titleEt.getText() != null ? titleEt.getText().toString().trim() : "";
             String desc     = descEt.getText()  != null ? descEt.getText().toString().trim()  : "";
             String date     = dateEt.getText()  != null ? dateEt.getText().toString().trim()  : "";
-            String time     = timeEt.getText()  != null ? timeEt.getText().toString().trim()  : "";
+            String startTime= startTimeEt.getText() != null ? startTimeEt.getText().toString().trim() : "";
+            String endTime  = endTimeEt.getText() != null ? endTimeEt.getText().toString().trim() : "";
             String venue    = venueAcv.getText().toString().trim();
             String organizer= organizerEt.getText() != null ? organizerEt.getText().toString().trim() : "";
             String dept     = deptAcv.getText().toString().trim();
 
-            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || time.isEmpty() || venue.isEmpty() || dept.isEmpty()) {
+            if (title.isEmpty() || desc.isEmpty() || date.isEmpty() || startTime.isEmpty() || endTime.isEmpty() || venue.isEmpty() || dept.isEmpty()) {
                 Toast.makeText(getContext(), "Please fill in all required fields", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -232,9 +253,11 @@ public class CreateEventFragment extends Fragment {
 
             String imagePath = selectedImageUri != null ? selectedImageUri.toString() : "";
             DatabaseHelper db = new DatabaseHelper(requireContext());
-            Event newEvent = new Event(title, desc, date, time, tags, organizerDisplay, category, imagePath, "PENDING");
+            Event newEvent = new Event(title, desc, date, startTime + " - " + endTime, tags, organizerDisplay, category, imagePath, "PENDING");
             newEvent.setCreatorSid(userStudentId);
             newEvent.setVenue(venue);
+            newEvent.setStartTime(startTime);
+            newEvent.setEndTime(endTime);
             if (db.addEvent(newEvent) != -1) {
                 Toast.makeText(getContext(), "Event submitted for approval!", Toast.LENGTH_LONG).show();
                 requireActivity().getSupportFragmentManager().popBackStack();

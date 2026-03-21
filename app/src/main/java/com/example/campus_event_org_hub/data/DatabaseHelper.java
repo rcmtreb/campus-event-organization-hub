@@ -13,6 +13,7 @@ import com.example.campus_event_org_hub.service.FcmSender;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,6 +36,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_DESC        = "description";
     public static final String COLUMN_DATE        = "date";
     public static final String COLUMN_EVENT_TIME  = "event_time";
+    public static final String COLUMN_START_TIME  = "start_time";
+    public static final String COLUMN_END_TIME    = "end_time";
     public static final String COLUMN_TAGS        = "tags";
     public static final String COLUMN_ORGANIZER   = "organizer";
     public static final String COLUMN_CATEGORY    = "category";
@@ -53,6 +56,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_ATT_STUDENT_ID     = "att_student_id";
     public static final String COLUMN_ATT_TIME_IN_AT     = "time_in_at";
     public static final String COLUMN_ATT_TIME_OUT_AT    = "time_out_at";
+
+    // Table: Attendance Codes (per student)
+    public static final String TABLE_ATTENDANCE_CODES        = "attendance_codes";
+    public static final String COLUMN_ATT_CODE_ID           = "att_code_id";
+    public static final String COLUMN_ATT_CODE_EVENT_ID     = "att_code_event_id";
+    public static final String COLUMN_ATT_CODE_STUDENT_ID   = "att_code_student_id";
+    public static final String COLUMN_ATT_CODE             = "att_code";
+    public static final String COLUMN_ATT_CODE_TYPE        = "att_code_type";
+    public static final String COLUMN_ATT_CODE_STATUS      = "att_code_status";
+    public static final String COLUMN_ATT_CODE_CREATED_AT   = "att_code_created_at";
+    public static final String COLUMN_ATT_CODE_USED_AT      = "att_code_used_at";
 
     // Table: Users
     public static final String TABLE_USERS             = "users";
@@ -100,6 +114,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_DESC        + " TEXT, " +
             COLUMN_DATE        + " TEXT, " +
             COLUMN_EVENT_TIME  + " TEXT DEFAULT '', " +
+            COLUMN_START_TIME  + " TEXT DEFAULT '', " +
+            COLUMN_END_TIME    + " TEXT DEFAULT '', " +
             COLUMN_TAGS        + " TEXT, " +
             COLUMN_ORGANIZER   + " TEXT, " +
             COLUMN_CATEGORY    + " TEXT, " +
@@ -119,6 +135,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_ATT_TIME_IN_AT + " TEXT, " +
             COLUMN_ATT_TIME_OUT_AT + " TEXT DEFAULT '', " +
             "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))";
+
+    private static final String CREATE_TABLE_ATTENDANCE_CODES =
+            "CREATE TABLE " + TABLE_ATTENDANCE_CODES + " (" +
+            COLUMN_ATT_CODE_ID         + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            COLUMN_ATT_CODE_EVENT_ID   + " INTEGER, " +
+            COLUMN_ATT_CODE_STUDENT_ID + " TEXT, " +
+            COLUMN_ATT_CODE           + " TEXT, " +
+            COLUMN_ATT_CODE_TYPE      + " TEXT, " +
+            COLUMN_ATT_CODE_STATUS    + " TEXT, " +
+            COLUMN_ATT_CODE_CREATED_AT+ " TEXT, " +
+            COLUMN_ATT_CODE_USED_AT   + " TEXT DEFAULT '', " +
+            "UNIQUE(" + COLUMN_ATT_CODE + "))";
 
     private static final String CREATE_TABLE_USERS =
             "CREATE TABLE " + TABLE_USERS + " (" +
@@ -174,6 +202,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(CREATE_TABLE_REGISTRATIONS);
         db.execSQL(CREATE_TABLE_NOTIFICATIONS);
         db.execSQL(CREATE_TABLE_ATTENDANCE);
+        db.execSQL(CREATE_TABLE_ATTENDANCE_CODES);
         ensureUsersTableColumns(db);
     }
 
@@ -190,6 +219,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureEventTableColumns(db);
         ensureNotificationsTable(db);
         ensureAttendanceTable(db);
+        ensureAttendanceCodesTable(db);
     }
 
     @Override
@@ -200,6 +230,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureEventTableColumns(db);
         ensureNotificationsTable(db);
         ensureAttendanceTable(db);
+        ensureAttendanceCodesTable(db);
         // Remove legacy seed events that were added automatically on first launch
         removeSeedEvents(db);
         // Backfill creator_sid for events created before v11 or synced without it
@@ -342,6 +373,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             }
             if (!cols.contains(COLUMN_EVENT_TIME))
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_EVENT_TIME + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_START_TIME))
+                db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_START_TIME + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_END_TIME))
+                db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_END_TIME + " TEXT DEFAULT ''");
             if (!cols.contains(COLUMN_CREATOR_SID))
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_CREATOR_SID + " TEXT DEFAULT ''");
             if (!cols.contains(COLUMN_IS_HIDDEN))
@@ -370,6 +405,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureAttendanceTable failed", e);
+        }
+    }
+
+    private void ensureAttendanceCodesTable(SQLiteDatabase db) {
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_ATTENDANCE_CODES + " (" +
+                    COLUMN_ATT_CODE_ID         + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_ATT_CODE_EVENT_ID   + " INTEGER, " +
+                    COLUMN_ATT_CODE_STUDENT_ID + " TEXT, " +
+                    COLUMN_ATT_CODE           + " TEXT, " +
+                    COLUMN_ATT_CODE_TYPE      + " TEXT, " +
+                    COLUMN_ATT_CODE_STATUS    + " TEXT, " +
+                    COLUMN_ATT_CODE_CREATED_AT+ " TEXT, " +
+                    COLUMN_ATT_CODE_USED_AT   + " TEXT DEFAULT '', " +
+                    "UNIQUE(" + COLUMN_ATT_CODE + "))");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "ensureAttendanceCodesTable failed", e);
         }
     }
 
@@ -638,40 +690,316 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return sb.toString();
     }
 
+    public String generateUniqueAttendanceCode() {
+        int attempts = 0;
+        String code;
+        do {
+            if (attempts++ > 20) return null;
+            code = generateAttendanceCode();
+        } while (doesAttendanceCodeExist(code));
+        return code;
+    }
+
+    private boolean doesAttendanceCodeExist(String code) {
+        if (code == null || code.isEmpty()) return false;
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            c = db.rawQuery("SELECT 1 FROM " + TABLE_ATTENDANCE_CODES + " WHERE " + COLUMN_ATT_CODE + "=? LIMIT 1", new String[]{code});
+            return c != null && c.moveToFirst();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "doesAttendanceCodeExist failed", e);
+            return false;
+        } finally {
+            if (c != null) c.close();
+        }
+    }
+
+    public long requestAttendanceCode(int eventId, String studentId, String type) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty()) return -1;
+        type = (type != null ? type.trim().toUpperCase(Locale.getDefault()) : "");
+        if (!"IN".equals(type) && !"OUT".equals(type)) return -1;
+
+        // Check if event is approved
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor statusCursor = db.rawQuery("SELECT " + COLUMN_STATUS + " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+        if (statusCursor == null || !statusCursor.moveToFirst()) {
+            if (statusCursor != null) statusCursor.close();
+            return -1;
+        }
+        String status = statusCursor.getString(0);
+        statusCursor.close();
+        if (!"APPROVED".equals(status)) {
+            return -1; // event not approved
+        }
+
+        // Validate event date/time on the student's device
+        int validationResult = checkEventTimeWindow(eventId, type);
+        if (validationResult == 1) return -2; // date mismatch
+        if (validationResult == 2) return -3; // too early
+        if (validationResult == 3) return -4; // too late
+        // For OUT, check if after end
+        if ("OUT".equals(type) && validationResult == 0) {
+            // Check if now > end
+            SQLiteDatabase checkDb = this.getReadableDatabase();
+            Cursor timeCursor = checkDb.rawQuery("SELECT " + COLUMN_END_TIME + ", " + COLUMN_EVENT_TIME + " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            if (timeCursor != null && timeCursor.moveToFirst()) {
+                String endTimeStr = timeCursor.getString(0);
+                String eventTime = timeCursor.getString(1);
+                timeCursor.close();
+                int endMinutes = 24 * 60 - 1;
+                if (endTimeStr != null && !endTimeStr.isEmpty()) {
+                    endMinutes = parseTimeToMinutes(endTimeStr, 24 * 60 - 1);
+                } else if (eventTime != null && !eventTime.isEmpty()) {
+                    String[] parts = eventTime.split("-");
+                    if (parts.length == 2) {
+                        endMinutes = parseTimeToMinutes(parts[1].trim(), 24 * 60 - 1);
+                    }
+                }
+                Calendar now = Calendar.getInstance();
+                int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+                if (nowMinutes > endMinutes) {
+                    validationResult = 4; // late but allowed
+                }
+            }
+            if (timeCursor != null) timeCursor.close();
+        }
+        if (validationResult == 4) return -5; // late but allowed
+
+        String newCode = generateUniqueAttendanceCode();
+        if (newCode == null || newCode.isEmpty()) return -1;
+
+        db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            // Expire any old unused codes for this user + event + type
+            ContentValues expire = new ContentValues();
+            expire.put(COLUMN_ATT_CODE_STATUS, "EXPIRED");
+            db.update(TABLE_ATTENDANCE_CODES, expire,
+                    COLUMN_ATT_CODE_EVENT_ID + "=? AND " + COLUMN_ATT_CODE_STUDENT_ID + "=? AND " +
+                    COLUMN_ATT_CODE_TYPE + "=? AND " + COLUMN_ATT_CODE_STATUS + "='UNUSED'",
+                    new String[]{String.valueOf(eventId), studentId, type});
+
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_ATT_CODE_EVENT_ID, eventId);
+            v.put(COLUMN_ATT_CODE_STUDENT_ID, studentId);
+            v.put(COLUMN_ATT_CODE, newCode);
+            v.put(COLUMN_ATT_CODE_TYPE, type);
+            v.put(COLUMN_ATT_CODE_STATUS, "UNUSED");
+            v.put(COLUMN_ATT_CODE_CREATED_AT, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+            long id = db.insert(TABLE_ATTENDANCE_CODES, null, v);
+            if (id == -1) {
+                return -1;
+            }
+
+            // Notify student that code is ready
+            String subject = "Time-" + type + " code for event";
+            String message = "Your Time-" + type + " code for this event is: " + newCode;
+            insertNotification(studentId, eventId, "TIME_" + type + "_CODE", message,
+                    "", "", "", "Use this code now to complete attendance.");
+
+            db.setTransactionSuccessful();
+            return id;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "requestAttendanceCode failed", e);
+            return -1;
+        } finally {
+            db.endTransaction();
+            db.close();
+        }
+    }
+
+    public String getActiveAttendanceCode(int eventId, String studentId, String type) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty()) return "";
+        type = (type != null ? type.trim().toUpperCase(Locale.getDefault()) : "");
+        if (!"IN".equals(type) && !"OUT".equals(type)) return "";
+
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            c = db.rawQuery("SELECT " + COLUMN_ATT_CODE + " FROM " + TABLE_ATTENDANCE_CODES +
+                    " WHERE " + COLUMN_ATT_CODE_EVENT_ID + "=? AND " + COLUMN_ATT_CODE_STUDENT_ID + "=? AND " +
+                    COLUMN_ATT_CODE_TYPE + "=? AND " + COLUMN_ATT_CODE_STATUS + "='UNUSED' " +
+                    "ORDER BY " + COLUMN_ATT_CODE_CREATED_AT + " DESC LIMIT 1",
+                    new String[]{String.valueOf(eventId), studentId, type});
+            if (c != null && c.moveToFirst()) {
+                String code = c.getString(0);
+                c.close();
+                return code != null ? code : "";
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getActiveAttendanceCode failed", e);
+        } finally {
+            if (c != null) c.close();
+        }
+        return "";
+    }
+
+    public boolean consumeAttendanceCode(int eventId, String studentId, String type, String code) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || code == null || code.isEmpty()) return false;
+        type = (type != null ? type.trim().toUpperCase(Locale.getDefault()) : "");
+        if (!"IN".equals(type) && !"OUT".equals(type)) return false;
+
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_ATT_CODE_STATUS, "USED");
+            v.put(COLUMN_ATT_CODE_USED_AT, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+            int rows = db.update(TABLE_ATTENDANCE_CODES, v,
+                    COLUMN_ATT_CODE_EVENT_ID + "=? AND " + COLUMN_ATT_CODE_STUDENT_ID + "=? AND " +
+                    COLUMN_ATT_CODE_TYPE + "=? AND " + COLUMN_ATT_CODE + "=? AND " + COLUMN_ATT_CODE_STATUS + "='UNUSED'",
+                    new String[]{String.valueOf(eventId), studentId, type, code});
+            return rows > 0;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "consumeAttendanceCode failed", e);
+            return false;
+        } finally {
+            if (db != null) db.close();
+        }
+    }
+
+    public int checkEventTimeWindow(int eventId, String type) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery("SELECT " + COLUMN_DATE + ", " + COLUMN_START_TIME + ", " + COLUMN_END_TIME + ", " + COLUMN_EVENT_TIME + " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?",
+                    new String[]{String.valueOf(eventId)});
+            if (c == null || !c.moveToFirst()) {
+                if (c != null) c.close();
+                return -1;
+            }
+            String eventDate = c.getString(0);
+            String startTimeStr = c.getString(1);
+            String endTimeStr = c.getString(2);
+            String eventTime = c.getString(3);
+            c.close();
+            db.close();
+
+            // Current local time
+            Calendar now = Calendar.getInstance();
+            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now.getTime());
+            if (!today.equals(eventDate)) {
+                return 1; // date mismatch - but allow on event date
+            }
+
+            int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+            int startMinutes = 0;
+            int endMinutes = 24 * 60 - 1;
+
+            if (startTimeStr != null && !startTimeStr.isEmpty() && endTimeStr != null && !endTimeStr.isEmpty()) {
+                startMinutes = parseTimeToMinutes(startTimeStr, 0);
+                endMinutes = parseTimeToMinutes(endTimeStr, 24 * 60 - 1);
+            } else {
+                // Fallback to parsing eventTime for backward compatibility
+                if (eventTime != null && !eventTime.isEmpty()) {
+                    String[] parts = eventTime.split("-");
+                    if (parts.length == 2) {
+                        String s = parts[0].trim();
+                        String e = parts[1].trim();
+                        startMinutes = parseTimeToMinutes(s, 0);
+                        endMinutes = parseTimeToMinutes(e, 24 * 60 - 1);
+                    }
+                }
+            }
+
+            if ("IN".equals(type)) {
+                // Allow Time In from 10 minutes before start
+                int allowedStart = startMinutes - 10;
+                if (nowMinutes < allowedStart) {
+                    return 2; // too early
+                }
+                if (nowMinutes > endMinutes) {
+                    return 3; // too late
+                }
+            } else if ("OUT".equals(type)) {
+                // Allow Time Out up to 30 minutes after end
+                int allowedEnd = endMinutes + 30;
+                if (nowMinutes < startMinutes) {
+                    return 2; // too early
+                }
+                if (nowMinutes > allowedEnd) {
+                    return 3; // too late
+                }
+                // If after end but within 30 min, it's allowed but we'll note it
+            }
+
+            return 0;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "checkEventTimeWindow failed", e);
+            return -1;
+        }
+    }
+
+    private int parseTimeToMinutes(String time, int fallback) {
+        if (time == null || time.isEmpty()) return fallback;
+        String[] p = time.split(":");
+        if (p.length < 2) return fallback;
+        try {
+            int h = Integer.parseInt(p[0].trim());
+            int m = Integer.parseInt(p[1].trim());
+            if (h < 0 || h > 23 || m < 0 || m > 59) return fallback;
+            return h * 60 + m;
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
     /**
-     * Record a Time-In for a student: validates the submitted code against the event's
-     * current time_in_code, inserts/updates the attendance row, then rotates the code.
+     * Record a Time-In for a student: validates the submitted code against the per-student
+     * attendance code (preferred) or legacy event code, inserts/updates the attendance row,
+     * and marks the used code as consumed.
      *
      * Returns:
-     *   0  = success (time-in recorded, code rotated)
+     *   0  = success (time-in recorded)
      *   1  = wrong code
      *   2  = already timed in
+     *   3  = invalid time window (device clock or event not active)
      *   -1 = error
      */
     public int submitTimeIn(int eventId, String studentId, String submittedCode) {
         try {
-            SQLiteDatabase db = this.getWritableDatabase();
-
-            // Fetch the current time-in code for this event
-            Cursor ec = db.rawQuery(
-                    "SELECT " + COLUMN_TIME_IN_CODE + " FROM " + TABLE_EVENTS +
-                    " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
-            String currentCode = "";
-            if (ec != null && ec.moveToFirst()) { currentCode = ec.getString(0); ec.close(); }
-
-            if (currentCode == null || currentCode.isEmpty() || !currentCode.equals(submittedCode)) {
-                db.close();
-                return 1; // wrong code
+            // Check event date/time validity
+            int timeCheck = checkEventTimeWindow(eventId, "IN");
+            if (timeCheck != 0) {
+                return 3;
             }
 
-            // Check if already timed in
+            // Check attendance record
+            SQLiteDatabase db = this.getWritableDatabase();
             Cursor ac = db.rawQuery(
                     "SELECT " + COLUMN_ATT_TIME_IN_AT + " FROM " + TABLE_ATTENDANCE +
                     " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
                     new String[]{String.valueOf(eventId), studentId});
             boolean alreadyIn = ac != null && ac.moveToFirst() && ac.getString(0) != null && !ac.getString(0).isEmpty();
             if (ac != null) ac.close();
-            if (alreadyIn) { db.close(); return 2; }
+            if (alreadyIn) {
+                db.close();
+                return 2;
+            }
+
+            // Validate submitted code against per-student active code first
+            String activeCode = getActiveAttendanceCode(eventId, studentId, "IN");
+            boolean codeValid = activeCode != null && activeCode.equals(submittedCode);
+
+            // Fallback to event-level code for backward compatibility
+            if (!codeValid) {
+                Cursor ec = db.rawQuery(
+                        "SELECT " + COLUMN_TIME_IN_CODE + " FROM " + TABLE_EVENTS +
+                                " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+                String eventCode = "";
+                if (ec != null && ec.moveToFirst()) {
+                    eventCode = ec.getString(0);
+                    ec.close();
+                }
+                if (eventCode != null && !eventCode.isEmpty() && eventCode.equals(submittedCode)) {
+                    codeValid = true;
+                }
+            }
+
+            if (!codeValid) {
+                db.close();
+                return 1;
+            }
 
             // Record time-in
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
@@ -683,11 +1011,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             av.put(COLUMN_ATT_TIME_OUT_AT, "");
             db.insertWithOnConflict(TABLE_ATTENDANCE, null, av, SQLiteDatabase.CONFLICT_IGNORE);
 
-            // Rotate the time-in code
-            String newCode = generateAttendanceCode();
-            ContentValues cv = new ContentValues();
-            cv.put(COLUMN_TIME_IN_CODE, newCode);
-            db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            // Use and lock per-student code if it was the one used
+            if (activeCode != null && activeCode.equals(submittedCode)) {
+                consumeAttendanceCode(eventId, studentId, "IN", submittedCode);
+            } else {
+                // Legacy behavior: rotate global time-in code
+                String newCode = generateAttendanceCode();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_TIME_IN_CODE, newCode);
+                db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            }
+
             db.close();
             return 0;
         } catch (Exception e) {
@@ -697,31 +1031,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Record a Time-Out for a student: validates the submitted code against the event's
-     * current time_out_code, updates the attendance row, then rotates the code.
+     * Record a Time-Out for a student: validates the submitted code against the per-student
+     * attendance code (preferred) or legacy event code, updates the attendance row,
+     * and marks the used code as consumed.
      *
      * Returns:
-     *   0  = success (time-out recorded, code rotated)
+     *   0  = success (time-out recorded)
      *   1  = wrong code
      *   2  = not yet timed in
-     *   3  = already timed out
+     *   3  = already timed out or invalid time window
      *   -1 = error
      */
     public int submitTimeOut(int eventId, String studentId, String submittedCode) {
         try {
-            SQLiteDatabase db = this.getWritableDatabase();
-
-            // Fetch the current time-out code for this event
-            Cursor ec = db.rawQuery(
-                    "SELECT " + COLUMN_TIME_OUT_CODE + " FROM " + TABLE_EVENTS +
-                    " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
-            String currentCode = "";
-            if (ec != null && ec.moveToFirst()) { currentCode = ec.getString(0); ec.close(); }
-
-            if (currentCode == null || currentCode.isEmpty() || !currentCode.equals(submittedCode)) {
-                db.close();
-                return 1; // wrong code
+            // Check event date/time validity
+            int timeCheck = checkEventTimeWindow(eventId, "OUT");
+            if (timeCheck != 0) {
+                return 3;
             }
+
+            SQLiteDatabase db = this.getWritableDatabase();
 
             // Check attendance record
             Cursor ac = db.rawQuery(
@@ -739,7 +1068,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 ac.close();
             }
             if (!hasTimeIn)  { db.close(); return 2; }
-            if (alreadyOut)  { db.close(); return 3; }
+            if (alreadyOut) { db.close(); return 3; }
+
+            // Validate submitted code against per-student active code first
+            String activeCode = getActiveAttendanceCode(eventId, studentId, "OUT");
+            boolean codeValid = activeCode != null && activeCode.equals(submittedCode);
+
+            // Fallback to event-level code for backward compatibility
+            if (!codeValid) {
+                Cursor ec = db.rawQuery(
+                        "SELECT " + COLUMN_TIME_OUT_CODE + " FROM " + TABLE_EVENTS +
+                                " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+                String eventCode = "";
+                if (ec != null && ec.moveToFirst()) {
+                    eventCode = ec.getString(0);
+                    ec.close();
+                }
+                if (eventCode != null && !eventCode.isEmpty() && eventCode.equals(submittedCode)) {
+                    codeValid = true;
+                }
+            }
+
+            if (!codeValid) {
+                db.close();
+                return 1;
+            }
 
             // Record time-out
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
@@ -750,11 +1103,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
                     new String[]{String.valueOf(eventId), studentId});
 
-            // Rotate the time-out code
-            String newCode = generateAttendanceCode();
-            ContentValues cv = new ContentValues();
-            cv.put(COLUMN_TIME_OUT_CODE, newCode);
-            db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            // Use and lock per-student code if used
+            if (activeCode != null && activeCode.equals(submittedCode)) {
+                consumeAttendanceCode(eventId, studentId, "OUT", submittedCode);
+            } else {
+                // Legacy event-level code rotation
+                String newCode = generateAttendanceCode();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_TIME_OUT_CODE, newCode);
+                db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            }
+
             db.close();
             return 0;
         } catch (Exception e) {
@@ -858,7 +1217,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public void syncUpsertEvent(int localId, String title, String description,
                                  String date, String time, String tags,
                                  String organizer, String category,
-                                 String imagePath, String status, String creatorSid) {
+                                 String imagePath, String status, String creatorSid,
+                                 String startTime, String endTime) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
             ContentValues v = new ContentValues();
@@ -867,6 +1227,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_DESC,        description);
             v.put(COLUMN_DATE,        date);
             v.put(COLUMN_EVENT_TIME,  time       != null ? time       : "");
+            v.put(COLUMN_START_TIME,  startTime  != null ? startTime  : "");
+            v.put(COLUMN_END_TIME,    endTime    != null ? endTime    : "");
             v.put(COLUMN_TAGS,        tags       != null ? tags       : "");
             v.put(COLUMN_ORGANIZER,   organizer);
             v.put(COLUMN_CATEGORY,    category);
@@ -936,6 +1298,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_DESC, event.getDescription());
         v.put(COLUMN_DATE, event.getDate());
         v.put(COLUMN_EVENT_TIME, event.getTime());
+        v.put(COLUMN_START_TIME, event.getStartTime());
+        v.put(COLUMN_END_TIME, event.getEndTime());
         v.put(COLUMN_TAGS, event.getTags());
         v.put(COLUMN_ORGANIZER, event.getOrganizer());
         v.put(COLUMN_CATEGORY, event.getCategory());
@@ -950,7 +1314,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     event.getTitle(), event.getDescription(), event.getDate(),
                     event.getTime(), event.getTags(), event.getOrganizer(),
                     event.getCategory(), event.getImagePath(), event.getStatus(),
-                    event.getCreatorSid());
+                    event.getCreatorSid(), event.getStartTime(), event.getEndTime());
 
             // Notify admin that a new event is awaiting approval
             if ("PENDING".equals(event.getStatus())) {
@@ -1006,6 +1370,32 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             new FirestoreHelper().updateEventStatus(eventId, "POSTPONED");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "postponeEvent failed", e);
+        }
+    }
+
+    public void startEvent(int eventId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_STATUS, "HAPPENING");
+            db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.close();
+            new FirestoreHelper().updateEventStatus(eventId, "HAPPENING");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "startEvent failed", e);
+        }
+    }
+
+    public void endEvent(int eventId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_STATUS, "ENDED");
+            db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.close();
+            new FirestoreHelper().updateEventStatus(eventId, "ENDED");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "endEvent failed", e);
         }
     }
 
@@ -1814,6 +2204,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         int timeIdx = c.getColumnIndex(COLUMN_EVENT_TIME);
         String time = timeIdx >= 0 ? c.getString(timeIdx) : "";
         if (time == null) time = "";
+        int startTimeIdx = c.getColumnIndex(COLUMN_START_TIME);
+        String startTime = startTimeIdx >= 0 ? c.getString(startTimeIdx) : "";
+        if (startTime == null) startTime = "";
+        int endTimeIdx = c.getColumnIndex(COLUMN_END_TIME);
+        String endTime = endTimeIdx >= 0 ? c.getString(endTimeIdx) : "";
+        if (endTime == null) endTime = "";
         int creatorIdx = c.getColumnIndex(COLUMN_CREATOR_SID);
         String creatorSid = creatorIdx >= 0 ? c.getString(creatorIdx) : "";
         if (creatorSid == null) creatorSid = "";
@@ -1838,6 +2234,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 c.getString(c.getColumnIndexOrThrow(COLUMN_IMAGE_PATH)),
                 c.getString(c.getColumnIndexOrThrow(COLUMN_STATUS))
         );
+        e.setStartTime(startTime);
+        e.setEndTime(endTime);
         e.setCreatorSid(creatorSid);
         e.setVenue(venue);
         e.setTimeInCode(tiCode);
@@ -1959,11 +2357,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     // Events table
                     for (int i = 1; i < lines.length; i++) {
                         String[] cols = splitCsvLine(lines[i]);
-                        if (cols.length < 11) continue;
+                        if (cols.length < 13) continue;
                         try {
                             int localId = Integer.parseInt(cols[0].trim());
                             syncUpsertEvent(localId, cols[1], cols[2], cols[3], cols[4],
-                                    cols[5], cols[6], cols[7], cols[8], cols[9], cols[10]);
+                                    cols[7], cols[8], cols[9], cols[10], cols[11], cols[12], cols[5], cols[6]);
                             count++;
                         } catch (Exception ignored) {}
                     }

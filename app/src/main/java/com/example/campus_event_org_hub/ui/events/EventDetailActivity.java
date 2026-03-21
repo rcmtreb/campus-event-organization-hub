@@ -157,9 +157,50 @@ public class EventDetailActivity extends AppCompatActivity {
         TextInputEditText etTimeOut = card.findViewById(R.id.et_time_out_code);
         Button   btnTimeIn  = card.findViewById(R.id.btn_time_in);
         Button   btnTimeOut = card.findViewById(R.id.btn_time_out);
+        Button   btnRequestIn  = card.findViewById(R.id.btn_request_time_in);
+        Button   btnRequestOut = card.findViewById(R.id.btn_request_time_out);
 
         refreshAttendanceState(db, event.getId(), studentId,
                 tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+
+        btnRequestIn.setOnClickListener(v -> {
+            long id = db.requestAttendanceCode(event.getId(), studentId, "IN");
+            if (id == -3) {
+                Toast.makeText(this, "You can request Time In code only 10 minutes before the event starts.", Toast.LENGTH_LONG).show();
+            } else if (id == -4) {
+                Toast.makeText(this, "The event has already ended.", Toast.LENGTH_LONG).show();
+            } else if (id == -2) {
+                Toast.makeText(this, "Your device time appears incorrect. Please set the correct date and time.", Toast.LENGTH_LONG).show();
+            } else if (id > 0) {
+                String code = db.getActiveAttendanceCode(event.getId(), studentId, "IN");
+                Toast.makeText(this, "Your Time-In code: " + code + " (sent to notifications)", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Failed to request Time-In code. Please try again.", Toast.LENGTH_SHORT).show();
+            }
+            refreshAttendanceState(db, event.getId(), studentId,
+                    tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+        });
+
+        btnRequestOut.setOnClickListener(v -> {
+            long id = db.requestAttendanceCode(event.getId(), studentId, "OUT");
+            if (id == -3) {
+                Toast.makeText(this, "You can request Time Out code only after the event starts.", Toast.LENGTH_LONG).show();
+            } else if (id == -4) {
+                Toast.makeText(this, "You have exceeded the allowed time for Time Out request.", Toast.LENGTH_LONG).show();
+            } else if (id == -5) {
+                String code = db.getActiveAttendanceCode(event.getId(), studentId, "OUT");
+                Toast.makeText(this, "The event has already ended. Your Time-Out code: " + code + " (sent to notifications)", Toast.LENGTH_LONG).show();
+            } else if (id == -2) {
+                Toast.makeText(this, "Your device time appears incorrect. Please set the correct date and time.", Toast.LENGTH_LONG).show();
+            } else if (id > 0) {
+                String code = db.getActiveAttendanceCode(event.getId(), studentId, "OUT");
+                Toast.makeText(this, "Your Time-Out code: " + code + " (sent to notifications)", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Failed to request Time-Out code. Please try again.", Toast.LENGTH_SHORT).show();
+            }
+            refreshAttendanceState(db, event.getId(), studentId,
+                    tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+        });
 
         btnTimeIn.setOnClickListener(v -> {
             String code = etTimeIn.getText() != null ? etTimeIn.getText().toString().trim() : "";
@@ -226,16 +267,29 @@ public class EventDetailActivity extends AppCompatActivity {
         boolean hasTimeIn  = rec != null && rec[0] != null && !rec[0].isEmpty();
         boolean hasTimeOut = rec != null && rec[1] != null && !rec[1].isEmpty();
 
+        String activeIn  = db.getActiveAttendanceCode(eventId, studentId, "IN");
+        String activeOut = db.getActiveAttendanceCode(eventId, studentId, "OUT");
+
         if (hasTimeOut) {
             tvStatus.setText("Attendance complete.\nTime In: " + rec[0] + "\nTime Out: " + rec[1]);
             layoutTimeIn.setVisibility(View.GONE);
             layoutTimeOut.setVisibility(View.GONE);
         } else if (hasTimeIn) {
-            tvStatus.setText("Timed in at " + rec[0] + ". Submit Time-Out code when you leave.");
+            String status = "Timed in at " + rec[0] + ". Submit Time-Out code when you leave.";
+            if (!activeOut.isEmpty()) {
+                status += "\nYour pending Time-Out code: " + activeOut;
+            }
+            tvStatus.setText(status);
             layoutTimeIn.setVisibility(View.GONE);
             layoutTimeOut.setVisibility(View.VISIBLE);
         } else {
-            tvStatus.setText("Submit the Time-In code shown by the officer to record your attendance.");
+            String status = "Enter your requested code to time in.";
+            if (!activeIn.isEmpty()) {
+                status += "\nYour pending Time-In code: " + activeIn;
+            } else {
+                status += "\nTap Request Time-In Code to generate a code.";
+            }
+            tvStatus.setText(status);
             layoutTimeIn.setVisibility(View.VISIBLE);
             layoutTimeOut.setVisibility(View.GONE);
         }

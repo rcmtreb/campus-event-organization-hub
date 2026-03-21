@@ -105,13 +105,16 @@ public class FirestoreHelper {
     public void upsertEvent(int localId, String title, String description,
                             String date, String time, String tags,
                             String organizer, String category,
-                            String imagePath, String status, String creatorSid) {
+                            String imagePath, String status, String creatorSid,
+                            String startTime, String endTime) {
         Map<String, Object> data = new HashMap<>();
         data.put("local_id",    localId);
         data.put("title",       title);
         data.put("description", description);
         data.put("date",        date);
         data.put("event_time",  time    != null ? time    : "");
+        data.put("start_time",  startTime != null ? startTime : "");
+        data.put("end_time",    endTime != null ? endTime : "");
         data.put("tags",        tags    != null ? tags    : "");
         data.put("organizer",   organizer);
         data.put("category",    category);

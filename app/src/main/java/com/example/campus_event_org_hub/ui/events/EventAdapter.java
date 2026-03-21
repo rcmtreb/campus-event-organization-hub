@@ -95,6 +95,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         holder.title.setText(event.getTitle());
         holder.date.setText(event.getDate());
         holder.description.setText(event.getDescription());
+        if (holder.startTime != null) {
+            holder.startTime.setText(event.getStartTime() != null ? event.getStartTime() : "");
+        }
+        if (holder.endTime != null) {
+            holder.endTime.setText(event.getEndTime() != null ? event.getEndTime() : "");
+        }
         if (holder.category != null) {
             holder.category.setText(event.getCategory() != null ? event.getCategory() : "");
         }
@@ -263,7 +269,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     // ── ViewHolder ───────────────────────────────────────────────────────────
 
     public static class EventViewHolder extends RecyclerView.ViewHolder {
-        TextView title, date, description, category, statusBadge, timelineBadge;
+        TextView title, date, description, category, statusBadge, timelineBadge, startTime, endTime;
         ImageView image;
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -274,6 +280,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             image         = itemView.findViewById(R.id.event_image);
             statusBadge   = itemView.findViewById(R.id.tv_event_status_badge);
             timelineBadge = itemView.findViewById(R.id.tv_timeline_badge);
+            startTime     = itemView.findViewById(R.id.event_start_time);
+            endTime       = itemView.findViewById(R.id.event_end_time);
         }
     }
 }

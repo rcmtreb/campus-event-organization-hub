@@ -128,11 +128,22 @@ public class OfficerMyEventsFragment extends Fragment {
                 continue;
             }
 
-            // For APPROVED — categorise by date
-            int cmp = date.compareTo(today);
-            if (tab == TAB_UPCOMING  && cmp > 0)  filtered.add(e);
-            if (tab == TAB_HAPPENING && cmp == 0)  filtered.add(e);
-            if (tab == TAB_ENDED     && cmp < 0)   filtered.add(e);
+            // For APPROVED/HAPPENING/ENDED — categorise by status first;
+            // fallback to date for legacy APPROVED events.
+            if ("HAPPENING".equals(status)) {
+                if (tab == TAB_HAPPENING) filtered.add(e);
+                continue;
+            }
+            if ("ENDED".equals(status) || "CANCELLED".equals(status)) {
+                if (tab == TAB_ENDED) filtered.add(e);
+                continue;
+            }
+            if ("APPROVED".equals(status)) {
+                int cmp = date.compareTo(today);
+                if (tab == TAB_UPCOMING  && cmp > 0)  filtered.add(e);
+                if (tab == TAB_HAPPENING && cmp == 0)  filtered.add(e);
+                if (tab == TAB_ENDED     && cmp < 0)   filtered.add(e);
+            }
         }
 
         if (filtered.isEmpty()) {
@@ -165,6 +176,8 @@ public class OfficerMyEventsFragment extends Fragment {
         TextView tvAttendanceCount = dialogView.findViewById(R.id.tv_attendance_count);
         Button btnGenerateTimeIn = dialogView.findViewById(R.id.btn_generate_time_in);
         Button btnGenerateTimeOut = dialogView.findViewById(R.id.btn_generate_time_out);
+        Button btnStartEvent = dialogView.findViewById(R.id.btn_start_event);
+        Button btnEndEvent = dialogView.findViewById(R.id.btn_end_event);
 
         tvTitle.setText(finalEv.getTitle());
         updateCodeDisplay(tvTimeInCode, finalEv.getTimeInCode());
@@ -194,6 +207,20 @@ public class OfficerMyEventsFragment extends Fragment {
             } else {
                 Toast.makeText(requireContext(), "Failed to set code.", Toast.LENGTH_SHORT).show();
             }
+        });
+
+        btnStartEvent.setOnClickListener(v -> {
+            finalDb.startEvent(finalEv.getId());
+            finalEv.setStatus("HAPPENING");
+            Toast.makeText(requireContext(), "Event started: status set to HAPPENING.", Toast.LENGTH_SHORT).show();
+            showTab(currentTab);
+        });
+
+        btnEndEvent.setOnClickListener(v -> {
+            finalDb.endEvent(finalEv.getId());
+            finalEv.setStatus("ENDED");
+            Toast.makeText(requireContext(), "Event ended: status set to ENDED.", Toast.LENGTH_SHORT).show();
+            showTab(currentTab);
         });
 
         new AlertDialog.Builder(requireContext())
