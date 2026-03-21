@@ -50,4 +50,7 @@
     <!-- ── Basic Colors ───────────────────────────────────────────────── -->
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
+
+    <!-- ── Snackbar Colors ────────────────────────────────────────────── -->
+    <color name="dark_surface">#323232</color>
 </resources>
