@@ -290,35 +290,6 @@
                     android:textColor="@color/text_primary"
                     tools:text="Not yet timed in." />
 
-                <LinearLayout
-                    android:id="@+id/layout_request_codes"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="horizontal"
-                    android:weightSum="2">
-
-                    <Button
-                        android:id="@+id/btn_request_time_in"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Request Time-In Code"
-                        android:textAllCaps="false"
-                        android:textSize="12sp" />
-
-                    <Button
-                        android:id="@+id/btn_request_time_out"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="8dp"
-                        android:text="Request Time-Out Code"
-                        android:textAllCaps="false"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
                 <!-- Time-In section -->
                 <LinearLayout
                     android:id="@+id/layout_time_in"
