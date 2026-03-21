@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -167,23 +168,40 @@ public class ApproveEventsActivity extends AppCompatActivity {
         public void onBindViewHolder(@NonNull VH h, int pos) {
             Event e = list.get(pos);
             h.title.setText(e.getTitle());
-            h.organizer.setText(e.getOrganizer());
 
-            // Show date and category
-            if (h.date != null) {
-                String dateText = e.getDate() != null ? e.getDate() : "";
-                if (e.getTime() != null && !e.getTime().isEmpty()) dateText += "  " + e.getTime();
+            // Category badge
+            String cat = e.getCategory() != null ? e.getCategory().trim() : "";
+            h.category.setText(cat);
+            h.category.setVisibility(cat.isEmpty() ? View.GONE : View.VISIBLE);
+
+            // Date row — show only if date is non-empty
+            String dateText = e.getDate() != null ? e.getDate().trim() : "";
+            if (!dateText.isEmpty() && e.getTime() != null && !e.getTime().trim().isEmpty()) {
+                dateText += "  " + e.getTime().trim();
+            }
+            if (dateText.isEmpty()) {
+                h.dateRow.setVisibility(View.GONE);
+            } else {
                 h.date.setText(dateText);
+                h.dateRow.setVisibility(View.VISIBLE);
             }
-            if (h.category != null) {
-                h.category.setText(e.getCategory() != null ? e.getCategory() : "");
-                h.category.setVisibility(e.getCategory() != null && !e.getCategory().isEmpty()
-                        ? View.VISIBLE : View.GONE);
+
+            // Organizer row — show only if organizer is non-empty
+            String org = e.getOrganizer() != null ? e.getOrganizer().trim() : "";
+            if (org.isEmpty()) {
+                h.organizerRow.setVisibility(View.GONE);
+            } else {
+                h.organizer.setText(org);
+                h.organizerRow.setVisibility(View.VISIBLE);
             }
-            if (h.description != null) {
-                String desc = e.getDescription() != null ? e.getDescription() : "";
-                h.description.setText(desc.length() > 120 ? desc.substring(0, 120) + "..." : desc);
-                h.description.setVisibility(desc.isEmpty() ? View.GONE : View.VISIBLE);
+
+            // Description
+            String desc = e.getDescription() != null ? e.getDescription().trim() : "";
+            if (desc.isEmpty()) {
+                h.description.setVisibility(View.GONE);
+            } else {
+                h.description.setText(desc.length() > 120 ? desc.substring(0, 120) + "…" : desc);
+                h.description.setVisibility(View.VISIBLE);
             }
 
             ImageUtils.load(h.img.getContext(), h.img, e.getImagePath(),
@@ -231,18 +249,21 @@ public class ApproveEventsActivity extends AppCompatActivity {
 
         class VH extends RecyclerView.ViewHolder {
             TextView title, organizer, date, category, description;
+            LinearLayout dateRow, organizerRow;
             ImageView img;
             Button btnApprove, btnReject;
             VH(View v) {
                 super(v);
-                title       = v.findViewById(R.id.approve_event_title);
-                organizer   = v.findViewById(R.id.approve_event_organizer);
-                date        = v.findViewById(R.id.approve_event_date);
-                category    = v.findViewById(R.id.approve_event_category);
-                description = v.findViewById(R.id.approve_event_description);
-                img         = v.findViewById(R.id.approve_event_image);
-                btnApprove  = v.findViewById(R.id.btn_approve_now);
-                btnReject   = v.findViewById(R.id.btn_reject_now);
+                title         = v.findViewById(R.id.approve_event_title);
+                organizer     = v.findViewById(R.id.approve_event_organizer);
+                date          = v.findViewById(R.id.approve_event_date);
+                category      = v.findViewById(R.id.approve_event_category);
+                description   = v.findViewById(R.id.approve_event_description);
+                dateRow       = v.findViewById(R.id.approve_date_row);
+                organizerRow  = v.findViewById(R.id.approve_organizer_row);
+                img           = v.findViewById(R.id.approve_event_image);
+                btnApprove    = v.findViewById(R.id.btn_approve_now);
+                btnReject     = v.findViewById(R.id.btn_reject_now);
             }
         }
     }

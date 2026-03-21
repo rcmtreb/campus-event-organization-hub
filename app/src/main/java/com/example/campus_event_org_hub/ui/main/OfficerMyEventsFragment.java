@@ -7,8 +7,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.example.campus_event_org_hub.util.ImageUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -377,6 +380,10 @@ public class OfficerMyEventsFragment extends Fragment {
                     : e.getDate() + "  " + e.getTime());
             h.category.setText(e.getCategory());
 
+            // Load event banner image
+            int fallback = ImageUtils.getDefaultBannerForCategory(e.getCategory());
+            ImageUtils.load(h.itemView.getContext(), h.image, e.getImagePath(), fallback);
+
             // ── Timeline badge ───────────────────────────────────────────────
             String status = e.getStatus();
             if ("CANCELLED".equals(status)) {
@@ -425,6 +432,7 @@ public class OfficerMyEventsFragment extends Fragment {
 
         static class VH extends RecyclerView.ViewHolder {
             TextView title, desc, date, category, timelineBadge;
+            ImageView image;
             VH(View v) {
                 super(v);
                 title         = v.findViewById(R.id.event_title);
@@ -432,6 +440,7 @@ public class OfficerMyEventsFragment extends Fragment {
                 date          = v.findViewById(R.id.event_date);
                 category      = v.findViewById(R.id.event_category);
                 timelineBadge = v.findViewById(R.id.tv_timeline_badge);
+                image         = v.findViewById(R.id.event_image);
             }
         }
     }

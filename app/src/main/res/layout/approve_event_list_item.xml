@@ -20,7 +20,7 @@
         <ImageView
             android:id="@+id/approve_event_image"
             android:layout_width="match_parent"
-            android:layout_height="140dp"
+            android:layout_height="160dp"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_image_placeholder" />
 
@@ -28,7 +28,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="@dimen/space_3">
+            android:paddingHorizontal="@dimen/space_3"
+            android:paddingTop="@dimen/space_2"
+            android:paddingBottom="@dimen/space_3">
 
             <!-- Title -->
             <TextView
@@ -47,7 +49,7 @@
                 android:id="@+id/approve_event_category"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_1"
+                android:layout_marginTop="4dp"
                 android:paddingHorizontal="@dimen/space_2"
                 android:paddingVertical="2dp"
                 android:background="@color/primary_light"
@@ -56,13 +58,15 @@
                 android:textStyle="bold"
                 android:visibility="gone" />
 
-            <!-- Date + Organizer row -->
+            <!-- Date row -->
             <LinearLayout
+                android:id="@+id/approve_date_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="@dimen/space_2"
-                android:gravity="center_vertical">
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:visibility="gone">
 
                 <ImageView
                     android:layout_width="14dp"
@@ -72,12 +76,22 @@
 
                 <TextView
                     android:id="@+id/approve_event_date"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="@dimen/space_1"
+                    android:layout_marginStart="4dp"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Organizer row -->
+            <LinearLayout
+                android:id="@+id/approve_organizer_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:visibility="gone">
 
                 <ImageView
                     android:layout_width="14dp"
@@ -89,8 +103,7 @@
                     android:id="@+id/approve_event_organizer"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_1"
-                    android:text="Organizer"
+                    android:layout_marginStart="4dp"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:maxLines="1"
@@ -102,7 +115,7 @@
                 android:id="@+id/approve_event_description"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_2"
+                android:layout_marginTop="8dp"
                 android:textColor="@color/text_hint"
                 android:textSize="12sp"
                 android:maxLines="2"
@@ -113,7 +126,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_2"
+                android:layout_marginTop="4dp"
                 android:text="Tap to view full details"
                 android:textColor="@color/text_hint"
                 android:textSize="11sp"
