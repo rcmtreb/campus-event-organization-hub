@@ -50,21 +50,19 @@ public class EventsFragment extends Fragment {
     private DatabaseHelper dbHelper;
     private ActivityResultLauncher<Intent> eventDetailLauncher;
 
-    /** Optional dept abbreviation filter passed from DiscoverFragment quick-filter chips. */
     private String filterDept = "";
+    private int scrollPosition = 0;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Register ActivityResultLauncher before fragment view is created
         eventDetailLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                     boolean changed = result.getData().getBooleanExtra("registration_changed", false);
                     if (changed) {
-                        // Refresh the event list when registration status changes
                         reloadEvents();
                     }
                 }
@@ -86,7 +84,6 @@ public class EventsFragment extends Fragment {
         try {
             dbHelper = new DatabaseHelper(requireContext());
 
-            // Read optional dept filter from args
             if (getArguments() != null) {
                 String d = getArguments().getString("FILTER_DEPT", "");
                 filterDept = (d != null) ? d : "";
@@ -97,67 +94,11 @@ public class EventsFragment extends Fragment {
             searchView   = view.findViewById(R.id.search_view);
             chipGroup    = view.findViewById(R.id.chip_group_filter);
 
-            // Set layout manager programmatically to prevent XML inflation crashes
             recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-
-            // Brand the refresh spinner with the app's primary colour
             swipeRefresh.setColorSchemeResources(R.color.primary_green, R.color.primary_dark);
 
             loadEvents();
-
-            // ── Pull-to-refresh ──────────────────────────────────────────────
-            swipeRefresh.setOnRefreshListener(() ->
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    reloadEvents();
-                    swipeRefresh.setRefreshing(false);
-                }, 600)
-            );
-
-            // ── FAB (Officers only) ──────────────────────────────────────────
-            FloatingActionButton fab = view.findViewById(R.id.fab_create_event);
-            String role = getArguments() != null
-                    ? getArguments().getString("USER_ROLE", "Student") : "Student";
-            fab.setVisibility("Student".equalsIgnoreCase(role) ? View.GONE : View.VISIBLE);
-            fab.setOnClickListener(v -> {
-                if (getActivity() instanceof com.example.campus_event_org_hub.ui.main.MainActivity) {
-                    ((com.example.campus_event_org_hub.ui.main.MainActivity) getActivity())
-                            .loadFragment(new CreateEventFragment(), true);
-                } else {
-                    requireActivity().getSupportFragmentManager()
-                            .beginTransaction()
-                            .replace(R.id.fragment_container, new CreateEventFragment())
-                            .addToBackStack(null)
-                            .commit();
-                }
-            });
-
-            // ── Search ───────────────────────────────────────────────────────
-            if (searchView != null) {
-                searchView.addTextChangedListener(new TextWatcher() {
-                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                    @Override public void afterTextChanged(Editable s) {
-                        if (adapter != null) adapter.getFilter().filter(s.toString());
-                    }
-                });
-                searchView.setOnEditorActionListener((v, actionId, event) -> {
-                    if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                        if (adapter != null) adapter.getFilter().filter(searchView.getText().toString());
-                        return true;
-                    }
-                    return false;
-                });
-            }
-
-            // ── Category chips ───────────────────────────────────────────────
-            if (chipGroup != null) {
-                chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
-                    if (!checkedIds.isEmpty() && adapter != null) {
-                        Chip chip = group.findViewById(checkedIds.get(0));
-                        if (chip != null) adapter.filterByCategory(chip.getText().toString());
-                    }
-                });
-            }
+            setupListeners(view);
 
         } catch (Exception e) {
             Log.e(TAG, "CRITICAL CRASH in EventsFragment", e);
@@ -168,9 +109,75 @@ public class EventsFragment extends Fragment {
         return view;
     }
 
-    // ── Data loading ─────────────────────────────────────────────────────────
+    private void setupListeners(View view) {
+        swipeRefresh.setOnRefreshListener(() ->
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                reloadEvents();
+                swipeRefresh.setRefreshing(false);
+            }, 600)
+        );
 
-    /** Load events from DB, optionally filtered by department abbreviation. */
+        FloatingActionButton fab = view.findViewById(R.id.fab_create_event);
+        String role = getArguments() != null
+                ? getArguments().getString("USER_ROLE", "Student") : "Student";
+        fab.setVisibility("Student".equalsIgnoreCase(role) ? View.GONE : View.VISIBLE);
+        fab.setOnClickListener(v -> {
+            saveScrollPosition();
+            if (getActivity() instanceof com.example.campus_event_org_hub.ui.main.MainActivity) {
+                ((com.example.campus_event_org_hub.ui.main.MainActivity) getActivity())
+                        .loadFragment(new CreateEventFragment(), true);
+            } else {
+                requireActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new CreateEventFragment())
+                        .addToBackStack(null)
+                        .commit();
+            }
+        });
+
+        if (searchView != null) {
+            searchView.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    if (adapter != null) adapter.getFilter().filter(s.toString());
+                }
+            });
+            searchView.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    if (adapter != null) adapter.getFilter().filter(searchView.getText().toString());
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        if (chipGroup != null) {
+            chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
+                if (!checkedIds.isEmpty() && adapter != null) {
+                    Chip chip = group.findViewById(checkedIds.get(0));
+                    if (chip != null) adapter.filterByCategory(chip.getText().toString());
+                }
+            });
+        }
+    }
+
+    private void saveScrollPosition() {
+        LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+        if (layoutManager != null) {
+            scrollPosition = layoutManager.findFirstVisibleItemPosition();
+        }
+    }
+
+    private void restoreScrollPosition() {
+        recyclerView.post(() -> {
+            LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+            if (layoutManager != null && scrollPosition > 0) {
+                layoutManager.scrollToPositionWithOffset(scrollPosition, 0);
+            }
+        });
+    }
+
     private void loadEvents() {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -193,6 +200,8 @@ public class EventsFragment extends Fragment {
                     ? getArguments().getString("USER_ROLE", "Student") : "Student";
             adapter = new EventAdapter(eventList, sid, role, dbHelper, eventDetailLauncher);
             recyclerView.setAdapter(adapter);
+
+            restoreScrollPosition();
         } catch (Exception e) {
             Log.e(TAG, "Error in loadEvents", e);
             eventList = new ArrayList<>();
@@ -201,10 +210,6 @@ public class EventsFragment extends Fragment {
         }
     }
 
-    /**
-     * Refresh pass — re-queries the DB, updates the adapter in place, then
-     * scrolls smoothly back to the top so the user can see the updated list.
-     */
     private void reloadEvents() {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -230,6 +235,6 @@ public class EventsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        if (adapter != null) reloadEvents();
+        restoreScrollPosition();
     }
 }

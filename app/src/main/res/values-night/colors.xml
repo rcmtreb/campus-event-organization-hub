@@ -22,6 +22,7 @@
     <!-- ── Premium Dark Surface Colors (White shades) ─────────────────── -->
     <color name="surface">#1E1E1E</color>
     <color name="surface_elevated">#2A2A2A</color>
+    <color name="surface_variant">#333333</color>
     <color name="background_gray">#121212</color>
     <color name="card_bg">#2D2D2D</color>
 

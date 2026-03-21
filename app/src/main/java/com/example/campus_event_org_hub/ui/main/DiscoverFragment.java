@@ -9,6 +9,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.widget.NestedScrollView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -33,14 +34,21 @@ public class DiscoverFragment extends Fragment {
     private DatabaseHelper dbHelper;
     private String userDept = "";
     private String currentTimeFilter = "month";
+
+    private LinearLayout tabContainer;
+    private TextView tabToday, tabCampus, tabMyDept, tabExplore;
+    private LinearLayout contentToday, contentCampus, contentMyDept, contentExplore;
+    private NestedScrollView nestedScrollView;
+    private RecyclerView rvTodayEvents, rvCampusEvents, rvMyDeptEvents;
+    private TextView tvTodayEmpty, tvCampusEmpty, tvMyDeptEmpty;
     private LinearLayout deptListContainer;
     private TextView tvDeptEmpty;
-    private RecyclerView rvMyDeptEvents;
-    private TextView tvMyDeptEmpty;
-    private RecyclerView rvCampusEvents;
-    private TextView tvCampusEmpty;
-    private EventAdapter deptEventsAdapter;
-    private EventAdapter campusEventsAdapter;
+    private ChipGroup chipGroupDeptFilter;
+
+    private EventAdapter todayAdapter, campusAdapter, deptAdapter;
+
+    private int currentTab = 0;
+    private int scrollPositionToday = 0, scrollPositionCampus = 0, scrollPositionMyDept = 0, scrollPositionExplore = 0;
 
     @Nullable
     @Override
@@ -54,27 +62,182 @@ public class DiscoverFragment extends Fragment {
         Bundle args = getArguments();
         userDept = args != null ? args.getString("USER_DEPT", "") : "";
 
-        deptListContainer = view.findViewById(R.id.dept_list_container);
-        tvDeptEmpty = view.findViewById(R.id.tv_dept_empty);
-        rvMyDeptEvents = view.findViewById(R.id.rv_my_dept_events);
-        tvMyDeptEmpty = view.findViewById(R.id.tv_my_dept_empty);
-        rvCampusEvents = view.findViewById(R.id.rv_campus_events);
-        tvCampusEmpty = view.findViewById(R.id.tv_campus_empty);
-
-        loadCampusEvents(view);
-        loadDepartmentStats(view, currentTimeFilter);
-        setupDeptFilter(view);
-        loadMyDepartmentEvents(view);
+        initViews(view);
+        setupTabSwitching();
+        loadAllContent();
 
         return view;
     }
 
-    // ── Campus Events ─────────────────────────────────────────────────────────
+    private void initViews(View view) {
+        tabContainer = view.findViewById(R.id.tab_container);
+        tabToday = view.findViewById(R.id.tab_today);
+        tabCampus = view.findViewById(R.id.tab_campus);
+        tabMyDept = view.findViewById(R.id.tab_my_dept);
+        tabExplore = view.findViewById(R.id.tab_explore);
 
-    private void loadCampusEvents(View view) {
-        rvCampusEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
-        rvCampusEvents.setNestedScrollingEnabled(false);
+        contentToday = view.findViewById(R.id.content_today);
+        contentCampus = view.findViewById(R.id.content_campus);
+        contentMyDept = view.findViewById(R.id.content_my_dept);
+        contentExplore = view.findViewById(R.id.content_explore);
 
+        nestedScrollView = view.findViewById(R.id.nested_scroll_view);
+
+        rvTodayEvents = view.findViewById(R.id.rv_today_events);
+        rvCampusEvents = view.findViewById(R.id.rv_campus_events);
+        rvMyDeptEvents = view.findViewById(R.id.rv_my_dept_events);
+
+        tvTodayEmpty = view.findViewById(R.id.tv_today_empty);
+        tvCampusEmpty = view.findViewById(R.id.tv_campus_empty);
+        tvMyDeptEmpty = view.findViewById(R.id.tv_my_dept_empty);
+
+        deptListContainer = view.findViewById(R.id.dept_list_container);
+        tvDeptEmpty = view.findViewById(R.id.tv_dept_empty);
+        chipGroupDeptFilter = view.findViewById(R.id.chip_group_dept_filter);
+
+        if (rvTodayEvents != null) {
+            rvTodayEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
+            rvTodayEvents.setNestedScrollingEnabled(false);
+        }
+        if (rvCampusEvents != null) {
+            rvCampusEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
+            rvCampusEvents.setNestedScrollingEnabled(false);
+        }
+        if (rvMyDeptEvents != null) {
+            rvMyDeptEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
+            rvMyDeptEvents.setNestedScrollingEnabled(false);
+        }
+
+        if (tabToday != null) {
+            tabToday.setSelected(true);
+        }
+    }
+
+    private void setupTabSwitching() {
+        if (tabToday != null) tabToday.setOnClickListener(v -> switchTab(0));
+        if (tabCampus != null) tabCampus.setOnClickListener(v -> switchTab(1));
+        if (tabMyDept != null) tabMyDept.setOnClickListener(v -> switchTab(2));
+        if (tabExplore != null) tabExplore.setOnClickListener(v -> switchTab(3));
+
+        if (chipGroupDeptFilter != null) {
+            chipGroupDeptFilter.setOnCheckedStateChangeListener((group, checkedIds) -> {
+                if (checkedIds.isEmpty()) return;
+                int id = checkedIds.get(0);
+                String filter = "month";
+                if (id == R.id.chip_dept_today) filter = "today";
+                else if (id == R.id.chip_dept_week) filter = "week";
+                else if (id == R.id.chip_dept_month) filter = "month";
+                else if (id == R.id.chip_dept_year) filter = "year";
+                loadDepartmentStats(filter);
+            });
+        }
+    }
+
+    private void switchTab(int tab) {
+        if (contentToday == null || contentCampus == null || 
+            contentMyDept == null || contentExplore == null) {
+            return;
+        }
+
+        saveScrollPosition(currentTab);
+
+        if (tabToday != null) tabToday.setSelected(tab == 0);
+        if (tabCampus != null) tabCampus.setSelected(tab == 1);
+        if (tabMyDept != null) tabMyDept.setSelected(tab == 2);
+        if (tabExplore != null) tabExplore.setSelected(tab == 3);
+
+        currentTab = tab;
+        showContent(tab);
+        restoreScrollPosition(tab);
+    }
+
+    private void showContent(int tab) {
+        if (contentToday != null) contentToday.setVisibility(tab == 0 ? View.VISIBLE : View.GONE);
+        if (contentCampus != null) contentCampus.setVisibility(tab == 1 ? View.VISIBLE : View.GONE);
+        if (contentMyDept != null) contentMyDept.setVisibility(tab == 2 ? View.VISIBLE : View.GONE);
+        if (contentExplore != null) contentExplore.setVisibility(tab == 3 ? View.VISIBLE : View.GONE);
+    }
+
+    private void saveScrollPosition(int tab) {
+        if (nestedScrollView == null) return;
+        
+        switch (tab) {
+            case 0: scrollPositionToday = nestedScrollView.getScrollY(); break;
+            case 1: scrollPositionCampus = nestedScrollView.getScrollY(); break;
+            case 2: scrollPositionMyDept = nestedScrollView.getScrollY(); break;
+            case 3: scrollPositionExplore = nestedScrollView.getScrollY(); break;
+        }
+    }
+
+    private void restoreScrollPosition(int tab) {
+        if (nestedScrollView == null) return;
+        
+        int position;
+        switch (tab) {
+            case 0: position = scrollPositionToday; break;
+            case 1: position = scrollPositionCampus; break;
+            case 2: position = scrollPositionMyDept; break;
+            case 3: position = scrollPositionExplore; break;
+            default: position = 0;
+        }
+        nestedScrollView.post(() -> nestedScrollView.scrollTo(0, position));
+    }
+
+    private void loadAllContent() {
+        loadTodayEvents();
+        loadCampusEvents();
+        loadMyDepartmentEvents();
+        loadDepartmentStats(currentTimeFilter);
+    }
+
+    private boolean isCampusTag(String tag) {
+        return tag.equals("CAMPUS") || tag.equals("UCC") || tag.equals("UNIVERSITY");
+    }
+
+    // ── Today Events ─────────────────────────────────────────────────────────
+
+    private void loadTodayEvents() {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String today = sdf.format(new Date());
+
+            List<Event> allEvents = dbHelper.getAllEvents();
+            List<Event> todayEvents = new ArrayList<>();
+
+            if (allEvents != null) {
+                for (Event e : allEvents) {
+                    if (!"APPROVED".equals(e.getStatus())) continue;
+                    String eventDate = e.getDate();
+                    if (eventDate == null || !eventDate.equals(today)) continue;
+                    String tags = e.getTags();
+                    if (tags != null) {
+                        String upperTags = tags.toUpperCase();
+                        if (upperTags.contains("CAMPUS") || upperTags.contains("UCC") || upperTags.contains("UNIVERSITY")) {
+                            continue;
+                        }
+                    }
+                    todayEvents.add(e);
+                }
+            }
+
+            if (todayEvents.isEmpty()) {
+                tvTodayEmpty.setVisibility(View.VISIBLE);
+                rvTodayEvents.setVisibility(View.GONE);
+            } else {
+                tvTodayEmpty.setVisibility(View.GONE);
+                rvTodayEvents.setVisibility(View.VISIBLE);
+                todayAdapter = new EventAdapter(todayEvents);
+                rvTodayEvents.setAdapter(todayAdapter);
+            }
+        } catch (Exception e) {
+            tvTodayEmpty.setVisibility(View.VISIBLE);
+            rvTodayEvents.setVisibility(View.GONE);
+        }
+    }
+
+    // ── Campus Events ────────────────────────────────────────────────────────
+
+    private void loadCampusEvents() {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
             String today = sdf.format(new Date());
@@ -103,23 +266,55 @@ public class DiscoverFragment extends Fragment {
             } else {
                 tvCampusEmpty.setVisibility(View.GONE);
                 rvCampusEvents.setVisibility(View.VISIBLE);
-                campusEventsAdapter = new EventAdapter(campusEvents);
-                rvCampusEvents.setAdapter(campusEventsAdapter);
+                campusAdapter = new EventAdapter(campusEvents);
+                rvCampusEvents.setAdapter(campusAdapter);
             }
-
         } catch (Exception e) {
             tvCampusEmpty.setVisibility(View.VISIBLE);
             rvCampusEvents.setVisibility(View.GONE);
         }
     }
 
-    // ── Department Statistics ─────────────────────────────────────────────
+    // ── My Department Events ────────────────────────────────────────────────
 
-    private boolean isCampusTag(String tag) {
-        return tag.equals("CAMPUS") || tag.equals("UCC") || tag.equals("UNIVERSITY");
+    private void loadMyDepartmentEvents() {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String today = sdf.format(new Date());
+
+            List<Event> allEvents = dbHelper.getAllEvents();
+            List<Event> myDeptEvents = new ArrayList<>();
+
+            if (allEvents != null && userDept != null && !userDept.isEmpty()) {
+                for (Event e : allEvents) {
+                    if (!"APPROVED".equals(e.getStatus())) continue;
+                    String eventDate = e.getDate();
+                    if (eventDate == null || eventDate.compareTo(today) < 0) continue;
+                    String tags = e.getTags();
+                    if (tags != null && tags.toUpperCase().contains(userDept.toUpperCase())) {
+                        myDeptEvents.add(e);
+                    }
+                }
+            }
+
+            if (myDeptEvents.isEmpty()) {
+                tvMyDeptEmpty.setVisibility(View.VISIBLE);
+                rvMyDeptEvents.setVisibility(View.GONE);
+            } else {
+                tvMyDeptEmpty.setVisibility(View.GONE);
+                rvMyDeptEvents.setVisibility(View.VISIBLE);
+                deptAdapter = new EventAdapter(myDeptEvents);
+                rvMyDeptEvents.setAdapter(deptAdapter);
+            }
+        } catch (Exception e) {
+            tvMyDeptEmpty.setVisibility(View.VISIBLE);
+            rvMyDeptEvents.setVisibility(View.GONE);
+        }
     }
 
-    private void loadDepartmentStats(View view, String timeFilter) {
+    // ── Department Statistics ───────────────────────────────────────────────
+
+    private void loadDepartmentStats(String timeFilter) {
         currentTimeFilter = timeFilter;
         deptListContainer.removeAllViews();
 
@@ -194,7 +389,7 @@ public class DiscoverFragment extends Fragment {
 
                 for (int i = 0; i < maxDisplay; i++) {
                     Map.Entry<String, Integer> entry = sortedDepts.get(i);
-                    addDepartmentRow(deptListContainer, entry.getKey(), entry.getValue(), maxCount, i + 1);
+                    addDepartmentRow(entry.getKey(), entry.getValue(), maxCount, i + 1);
                 }
             }
 
@@ -204,9 +399,9 @@ public class DiscoverFragment extends Fragment {
         }
     }
 
-    private void addDepartmentRow(LinearLayout container, String deptName, int count, int maxCount, int rank) {
+    private void addDepartmentRow(String deptName, int count, int maxCount, int rank) {
         View row = LayoutInflater.from(requireContext())
-                .inflate(R.layout.item_department_stat, container, false);
+                .inflate(R.layout.item_department_stat, deptListContainer, false);
 
         TextView tvRank = row.findViewById(R.id.tv_dept_rank);
         TextView tvName = row.findViewById(R.id.tv_dept_name);
@@ -215,7 +410,7 @@ public class DiscoverFragment extends Fragment {
 
         tvRank.setText(String.valueOf(rank));
         tvName.setText(deptName);
-        tvCount.setText(count + " event" + (count != 1 ? "s" : ""));
+        tvCount.setText(String.valueOf(count));
 
         int rankColor;
         switch (rank) {
@@ -233,63 +428,8 @@ public class DiscoverFragment extends Fragment {
         progressBar.setLayoutParams(params);
         progressBar.setBackgroundColor(0xFF5A9E3A);
 
-        container.addView(row);
-    }
+        row.setOnClickListener(v -> switchTab(2));
 
-    // ── Department Time Filter ────────────────────────────────────────────
-
-    private void setupDeptFilter(View view) {
-        ChipGroup cg = view.findViewById(R.id.chip_group_dept_filter);
-        cg.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            if (checkedIds.isEmpty()) return;
-            int id = checkedIds.get(0);
-            String filter = "month";
-            if (id == R.id.chip_dept_today) filter = "today";
-            else if (id == R.id.chip_dept_week) filter = "week";
-            else if (id == R.id.chip_dept_month) filter = "month";
-            else if (id == R.id.chip_dept_year) filter = "year";
-            loadDepartmentStats(view, filter);
-        });
-    }
-
-    // ── My Department Events ──────────────────────────────────────────────
-
-    private void loadMyDepartmentEvents(View view) {
-        rvMyDeptEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
-        rvMyDeptEvents.setNestedScrollingEnabled(false);
-
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            String today = sdf.format(new Date());
-
-            List<Event> allEvents = dbHelper.getAllEvents();
-            List<Event> myDeptEvents = new ArrayList<>();
-
-            if (allEvents != null && userDept != null && !userDept.isEmpty()) {
-                for (Event e : allEvents) {
-                    if (!"APPROVED".equals(e.getStatus())) continue;
-                    String eventDate = e.getDate();
-                    if (eventDate == null || eventDate.compareTo(today) < 0) continue;
-                    String tags = e.getTags();
-                    if (tags != null && tags.toUpperCase().contains(userDept.toUpperCase())) {
-                        myDeptEvents.add(e);
-                    }
-                }
-            }
-
-            if (myDeptEvents.isEmpty()) {
-                tvMyDeptEmpty.setVisibility(View.VISIBLE);
-                rvMyDeptEvents.setVisibility(View.GONE);
-            } else {
-                tvMyDeptEmpty.setVisibility(View.GONE);
-                rvMyDeptEvents.setVisibility(View.VISIBLE);
-                deptEventsAdapter = new EventAdapter(myDeptEvents);
-                rvMyDeptEvents.setAdapter(deptEventsAdapter);
-            }
-
-        } catch (Exception e) {
-            tvMyDeptEmpty.setVisibility(View.VISIBLE);
-            rvMyDeptEvents.setVisibility(View.GONE);
-        }
+        deptListContainer.addView(row);
     }
 }

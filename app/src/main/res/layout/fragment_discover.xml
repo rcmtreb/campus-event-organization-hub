@@ -1,171 +1,270 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:fitsSystemWindows="true"
     android:background="@color/background_gray">
 
-    <LinearLayout
+    <!-- Segmented Tabs -->
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="@dimen/space_4">
+        android:layout_margin="@dimen/space_3"
+        app:cardCornerRadius="@dimen/radius_large"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="@color/surface">
 
-        <!-- ── Section Header: Campus Events ─────────────────── -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Campus Events"
-            android:textColor="@color/text_primary"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:layout_marginBottom="@dimen/space_2" />
+        <LinearLayout
+            android:id="@+id/tab_container"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:orientation="horizontal"
+            android:gravity="center">
 
-        <!-- Campus Events List -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_campus_events"
+            <TextView
+                android:id="@+id/tab_today"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Today"
+                android:textColor="@color/tab_text_selector"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:background="@drawable/tab_bg_selector"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/tab_campus"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Campus"
+                android:textColor="@color/tab_text_selector"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:background="@drawable/tab_bg_selector"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/tab_my_dept"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="My Dept"
+                android:textColor="@color/tab_text_selector"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:background="@drawable/tab_bg_selector"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/tab_explore"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Explore"
+                android:textColor="@color/tab_text_selector"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:background="@drawable/tab_bg_selector"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Scrollable Content Area -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/nested_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false"
-            android:layout_marginBottom="@dimen/space_4"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/space_3"
+            android:paddingBottom="@dimen/space_4">
 
-        <TextView
-            android:id="@+id/tv_campus_empty"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:padding="@dimen/space_6"
-            android:text="No campus events"
-            android:textColor="@color/text_hint"
-            android:textSize="14sp"
-            android:visibility="gone"
-            android:layout_marginBottom="@dimen/space_4" />
-
-        <!-- ── Section Header: Departments with Most Events ─────────────────── -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Departments with Most Events"
-            android:textColor="@color/text_primary"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:layout_marginBottom="@dimen/space_2" />
-
-        <!-- Time Filter Chips -->
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:scrollbars="none"
-            android:layout_marginBottom="@dimen/space_3">
-
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/chip_group_dept_filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:singleSelection="true"
-                app:selectionRequired="true"
-                app:chipSpacingHorizontal="@dimen/space_2">
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip_dept_today"
-                    style="@style/PremiumChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Today" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip_dept_week"
-                    style="@style/PremiumChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="This Week" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip_dept_month"
-                    style="@style/PremiumChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="This Month"
-                    android:checked="true" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chip_dept_year"
-                    style="@style/PremiumChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="This Year" />
-
-            </com.google.android.material.chip.ChipGroup>
-        </HorizontalScrollView>
-
-        <!-- Departments List -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/space_4"
-            style="@style/PremiumCard">
-
+            <!-- TODAY Tab Content -->
             <LinearLayout
+                android:id="@+id/content_today"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="@dimen/space_3">
+                android:visibility="visible">
 
-                <LinearLayout
-                    android:id="@+id/dept_list_container"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_today_events"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical" />
+                    android:nestedScrollingEnabled="false"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
                 <TextView
-                    android:id="@+id/tv_dept_empty"
+                    android:id="@+id/tv_today_empty"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:padding="@dimen/space_6"
-                    android:text="No events found"
+                    android:padding="@dimen/space_8"
+                    android:text="No events happening right now"
                     android:textColor="@color/text_hint"
                     android:textSize="14sp"
                     android:visibility="gone" />
-
             </LinearLayout>
 
-        </com.google.android.material.card.MaterialCardView>
+            <!-- CAMPUS Tab Content -->
+            <LinearLayout
+                android:id="@+id/content_campus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
 
-        <!-- ── Section Header: Events in Your Department ─────────────────── -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Events in Your Department"
-            android:textColor="@color/text_primary"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:layout_marginBottom="@dimen/space_3" />
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_campus_events"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-        <!-- User Department Events List -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_my_dept_events"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+                <TextView
+                    android:id="@+id/tv_campus_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:padding="@dimen/space_8"
+                    android:text="No campus events"
+                    android:textColor="@color/text_hint"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </LinearLayout>
 
-        <TextView
-            android:id="@+id/tv_my_dept_empty"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:padding="@dimen/space_6"
-            android:text="No events in your department"
-            android:textColor="@color/text_hint"
-            android:textSize="14sp"
-            android:visibility="gone" />
+            <!-- MY DEPT Tab Content -->
+            <LinearLayout
+                android:id="@+id/content_my_dept"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
 
-    </LinearLayout>
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_my_dept_events"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-</androidx.core.widget.NestedScrollView>
+                <TextView
+                    android:id="@+id/tv_my_dept_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:padding="@dimen/space_8"
+                    android:text="No events in your department"
+                    android:textColor="@color/text_hint"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- EXPLORE Tab Content -->
+            <LinearLayout
+                android:id="@+id/content_explore"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- Time Filter Chips -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none"
+                    android:layout_marginBottom="@dimen/space_3">
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chip_group_dept_filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:singleSelection="true"
+                        app:selectionRequired="true"
+                        app:chipSpacingHorizontal="@dimen/space_2">
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_dept_today"
+                            style="@style/PremiumChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Today" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_dept_week"
+                            style="@style/PremiumChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="This Week" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_dept_month"
+                            style="@style/PremiumChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="This Month"
+                            android:checked="true" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_dept_year"
+                            style="@style/PremiumChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="This Year" />
+
+                    </com.google.android.material.chip.ChipGroup>
+                </HorizontalScrollView>
+
+                <!-- Departments List Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/PremiumCard">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="@dimen/space_3">
+
+                        <LinearLayout
+                            android:id="@+id/dept_list_container"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+
+                        <TextView
+                            android:id="@+id/tv_dept_empty"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:padding="@dimen/space_6"
+                            android:text="No events found"
+                            android:textColor="@color/text_hint"
+                            android:textSize="14sp"
+                            android:visibility="gone" />
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

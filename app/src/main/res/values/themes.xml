@@ -81,7 +81,18 @@
         <item name="chipStrokeWidth">0dp</item>
     </style>
 
-    <!-- ── Premium Button Styles ────────────────────────────────────────── -->
+    <style name="DiscoverTabChip" parent="Widget.MaterialComponents.Chip.Choice">
+        <item name="chipCornerRadius">18dp</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="chipStrokeWidth">0dp</item>
+        <item name="chipStartPadding">8dp</item>
+        <item name="chipEndPadding">8dp</item>
+        <item name="android:textSize">13sp</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="chipBackgroundColor">@color/discover_tab_bg</item>
+        <item name="android:textColor">@color/discover_tab_text</item>
+    </style>
+
     <style name="PremiumButton" parent="Widget.MaterialComponents.Button">
         <item name="cornerRadius">@dimen/radius_full</item>
         <item name="android:minHeight">@dimen/button_height</item>
