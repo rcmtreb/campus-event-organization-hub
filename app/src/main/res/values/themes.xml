@@ -9,7 +9,7 @@
 
         <!-- Window -->
         <item name="android:windowBackground">@color/background_gray</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
 
         <!-- Surface -->
         <item name="colorSurface">@color/surface</item>
