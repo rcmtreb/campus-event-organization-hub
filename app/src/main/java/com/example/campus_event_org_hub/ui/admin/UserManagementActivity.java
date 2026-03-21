@@ -92,7 +92,7 @@ public class UserManagementActivity extends AppCompatActivity {
         public void onBindViewHolder(@NonNull VH h, int pos) {
             User u = list.get(pos);
             h.name.setText(u.name);
-            h.details.setText(u.id + " | " + u.dept);
+            h.details.setText(u.id + "-S | " + u.dept);
             h.role.setText(u.role);
 
             if (h.avatar != null) {
@@ -120,10 +120,10 @@ public class UserManagementActivity extends AppCompatActivity {
             // Delete button
             if (h.btnDelete != null) {
                 h.btnDelete.setOnClickListener(v -> {
-                    new AlertDialog.Builder(UserManagementActivity.this)
-                            .setTitle("Delete Account")
-                            .setMessage("Permanently delete " + u.name + " (" + u.id + ")?\n\n"
-                                    + "This will also remove their registrations and notifications.")
+                            new AlertDialog.Builder(UserManagementActivity.this)
+                                    .setTitle("Delete Account")
+                                    .setMessage("Permanently delete " + u.name + " (" + u.id + "-S)?\n\n"
+                                            + "This will also remove their registrations and notifications.")
                             .setPositiveButton("Delete", (dialog, which) -> {
                                 db.deleteUserAccount(u.id);
                                 int idx = list.indexOf(u);

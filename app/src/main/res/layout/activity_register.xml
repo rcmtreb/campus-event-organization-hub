@@ -63,6 +63,7 @@
                         android:textColor="@color/text_primary"
                         android:textColorHint="@color/text_hint"
                         android:inputType="textPersonName"
+                        android:maxLength="20"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -78,10 +79,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_edit_text_rounded"
-                        android:hint="Student ID"
+                        android:hint="Student ID (8 digits)"
                         android:textColor="@color/text_primary"
                         android:textColorHint="@color/text_hint"
                         android:inputType="number"
+                        android:maxLength="8"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -101,6 +103,7 @@
                         android:textColor="@color/text_primary"
                         android:textColorHint="@color/text_hint"
                         android:inputType="textEmailAddress"
+                        android:maxLength="100"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -121,8 +124,34 @@
                         android:textColor="@color/text_primary"
                         android:textColorHint="@color/text_hint"
                         android:inputType="textPassword"
+                        android:maxLength="20"
                         android:padding="16dp" />
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Password Strength Indicator -->
+                <LinearLayout
+                    android:id="@+id/layout_password_strength"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+                    <ProgressBar
+                        android:id="@+id/progress_password_strength"
+                        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                        android:layout_width="0dp"
+                        android:layout_height="6dp"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:progress="0" />
+                    <TextView
+                        android:id="@+id/tv_password_strength"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <!-- Confirm Password -->
                 <com.google.android.material.textfield.TextInputLayout

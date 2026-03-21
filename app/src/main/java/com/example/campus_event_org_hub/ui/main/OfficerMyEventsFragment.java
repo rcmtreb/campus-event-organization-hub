@@ -36,7 +36,7 @@ public class OfficerMyEventsFragment extends Fragment {
     private static final int TAB_POSTPONED = 3;
 
     private RecyclerView rv;
-    private TextView tvEmpty;
+    private View tvEmpty;
     private String officerName;
     private String officerSid;
     private List<Event> allOfficerEvents = new ArrayList<>();

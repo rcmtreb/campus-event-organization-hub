@@ -14,7 +14,6 @@ import androidx.fragment.app.Fragment;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
-import com.google.android.material.card.MaterialCardView;
 
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,7 @@ public class OfficerAnalyticsFragment extends Fragment {
         TextView tvTotalEvents        = view.findViewById(R.id.tv_total_events);
         TextView tvTotalRegistrations = view.findViewById(R.id.tv_total_registrations);
         LinearLayout breakdownContainer = view.findViewById(R.id.container_event_breakdown);
-        TextView tvNoEvents           = view.findViewById(R.id.tv_no_events);
+        View tvNoEvents              = view.findViewById(R.id.tv_no_events);
 
         DatabaseHelper db = new DatabaseHelper(requireContext());
 
@@ -59,70 +58,39 @@ public class OfficerAnalyticsFragment extends Fragment {
     }
 
     /**
-     * Wraps each event's analytics in its own MaterialCardView.
+     * Wraps each event's analytics in its own MaterialCardView using the new layout.
      */
     private void addEventSectionProgrammatically(LinearLayout parent, Event e,
                                                   DatabaseHelper db) {
-        // Outer card
-        MaterialCardView card = new MaterialCardView(requireContext());
-        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        cardLp.setMargins(0, 0, 0, 16);
-        card.setLayoutParams(cardLp);
-        card.setRadius(24f);
-        card.setCardElevation(4f);
-        card.setStrokeColor(0xFFE0E0E0);
-        card.setStrokeWidth(1);
+        View cardView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.item_event_breakdown, parent, false);
 
-        // Inner linear layout
-        LinearLayout inner = new LinearLayout(requireContext());
-        inner.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (14 * getResources().getDisplayMetrics().density);
-        inner.setPadding(pad, pad, pad, pad);
+        TextView tvTitle = cardView.findViewById(R.id.tv_breakdown_title);
+        TextView tvDateStatus = cardView.findViewById(R.id.tv_breakdown_date_status);
+        TextView tvTotal = cardView.findViewById(R.id.tv_breakdown_total);
+        LinearLayout containerDepts = cardView.findViewById(R.id.container_breakdown_depts);
 
-        // Title row
-        TextView tvTitle = new TextView(requireContext());
         tvTitle.setText(e.getTitle());
-        tvTitle.setTextColor(getResources().getColor(R.color.black, null));
-        tvTitle.setTextSize(15);
-        tvTitle.setPadding(0, 0, 0, 4);
-        android.graphics.Typeface bold = android.graphics.Typeface.DEFAULT_BOLD;
-        tvTitle.setTypeface(bold);
-        inner.addView(tvTitle);
 
-        // Date + status
-        TextView tvDate = new TextView(requireContext());
         String dateTime = e.getTime().isEmpty() ? e.getDate() : e.getDate() + "  " + e.getTime();
-        tvDate.setText(dateTime + "  |  " + e.getStatus());
-        tvDate.setTextColor(0xFF666666);
-        tvDate.setTextSize(12);
-        tvDate.setPadding(0, 0, 0, 8);
-        inner.addView(tvDate);
+        tvDateStatus.setText(dateTime + "  |  " + e.getStatus());
 
-        // Registrations stats
         Map<String, Integer> stats = db.getEventRegistrationStats(e.getId());
         int eventTotal = 0;
         for (int cnt : stats.values()) eventTotal += cnt;
 
-        TextView tvTotal = new TextView(requireContext());
-        tvTotal.setText("Registrations: " + eventTotal);
-        tvTotal.setTextColor(getResources().getColor(R.color.primary_blue, null));
-        tvTotal.setTextSize(13);
-        tvTotal.setPadding(0, 0, 0, 4);
-        inner.addView(tvTotal);
+        tvTotal.setText("Total Registrations: " + eventTotal);
 
         if (!stats.isEmpty()) {
             for (Map.Entry<String, Integer> entry : stats.entrySet()) {
                 TextView tvDept = new TextView(requireContext());
                 tvDept.setText("  " + entry.getKey() + ": " + entry.getValue());
-                tvDept.setTextColor(0xFF444444);
+                tvDept.setTextColor(getResources().getColor(R.color.text_secondary, null));
                 tvDept.setTextSize(12);
-                inner.addView(tvDept);
+                containerDepts.addView(tvDept);
             }
         }
 
-        card.addView(inner);
-        parent.addView(card);
+        parent.addView(cardView);
     }
 }

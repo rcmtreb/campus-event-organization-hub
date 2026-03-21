@@ -82,7 +82,7 @@ public class ProfileFragment extends Fragment {
 
         tvName.setText(name);
         tvRoleBadge.setText(role);
-        tvSid.setText(studentId.isEmpty() ? "\u2014" : studentId);
+        tvSid.setText(studentId.isEmpty() ? "\u2014" : studentId + "-S");
         tvEmail.setText(email.isEmpty() ? "\u2014" : email);
         tvDept.setText(dept.isEmpty() ? "\u2014" : dept);
 

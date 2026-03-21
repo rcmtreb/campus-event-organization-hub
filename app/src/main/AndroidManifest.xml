@@ -34,6 +34,14 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.auth.ForgotPasswordActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.auth.EmailVerificationPendingActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.admin.AdminActivity"
             android:exported="false" />
 

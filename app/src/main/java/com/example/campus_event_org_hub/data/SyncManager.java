@@ -72,9 +72,10 @@ public class SyncManager {
                 String profileImg  = str(d, "profile_image");
                 String notifPref   = str(d, "notif_pref");
                 String password    = str(d, "password");
+                boolean emailVerified = intVal(d, "email_verified") == 1;
                 if (sid == null || sid.isEmpty()) continue;
                 db.syncUpsertUser(sid, name, email, role, dept,
-                        gender, mobile, profileImg, notifPref, password);
+                        gender, mobile, profileImg, notifPref, password, emailVerified);
             }
             Log.d(TAG, "Synced " + docs.size() + " users");
         } catch (Exception e) {

@@ -53,4 +53,10 @@
 
     <!-- ── Snackbar Colors ────────────────────────────────────────────── -->
     <color name="dark_surface">#323232</color>
+
+    <!-- ── Password Strength Colors ──────────────────────────────────── -->
+    <color name="password_weak">#D32F2F</color>
+    <color name="password_fair">#F57C00</color>
+    <color name="password_good">#1976D2</color>
+    <color name="password_strong">#388E3C</color>
 </resources>

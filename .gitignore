@@ -57,3 +57,6 @@ gradle/wrapper/gradle-wrapper.jar
 
 # IntelliJ/Android Studio configuration files
 .idea/*.xml
+
+# Gradle properties — contains machine-specific paths
+gradle.properties

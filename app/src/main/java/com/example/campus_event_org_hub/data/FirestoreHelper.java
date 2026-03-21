@@ -58,6 +58,28 @@ public class FirestoreHelper {
                 .addOnFailureListener(e -> Log.e(TAG, "upsertUser failed: " + studentId, e));
     }
 
+    public void upsertUserWithVerification(String studentId, String name, String email,
+                                           String role, String department,
+                                           String gender, String mobile, String profileImage,
+                                           String notifPref, boolean emailVerified,
+                                           String verificationToken) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("student_id",              studentId);
+        data.put("name",                    name);
+        data.put("email",                   email);
+        data.put("role",                    role);
+        data.put("department",              department);
+        data.put("gender",        gender   != null ? gender      : "");
+        data.put("mobile",        mobile   != null ? mobile      : "");
+        data.put("profile_image", profileImage != null ? profileImage : "");
+        data.put("notif_pref",    notifPref != null ? notifPref   : "All Events");
+        data.put("email_verified", emailVerified ? 1 : 0);
+        data.put("verification_token", verificationToken != null ? verificationToken : "");
+        db.collection(COL_USERS).document(studentId)
+                .set(data, SetOptions.merge())
+                .addOnFailureListener(e -> Log.e(TAG, "upsertUserWithVerification failed: " + studentId, e));
+    }
+
     public void updateUserField(String studentId, String field, Object value) {
         db.collection(COL_USERS).document(studentId)
                 .update(field, value)

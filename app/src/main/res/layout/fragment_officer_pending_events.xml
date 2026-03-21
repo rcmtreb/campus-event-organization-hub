@@ -6,45 +6,70 @@
     android:fitsSystemWindows="false"
     android:background="@color/background_gray">
 
-    <!-- Subtle Page Header -->
+    <!-- Page Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@color/surface"
         android:paddingHorizontal="@dimen/space_4"
-        android:paddingVertical="@dimen/space_3">
+        android:paddingTop="@dimen/space_3"
+        android:paddingBottom="@dimen/space_2">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="PENDING EVENTS"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/text_secondary"
             android:textSize="11sp"
             android:textStyle="bold"
             android:letterSpacing="0.15"/>
     </LinearLayout>
 
-    <!-- List -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_pending_events"
+    <!-- Content wrapper -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingHorizontal="@dimen/space_2"
-        android:paddingVertical="@dimen/space_2"
-        android:clipToPadding="false" />
+        android:background="@color/background_gray">
 
-    <!-- Empty state -->
-    <TextView
-        android:id="@+id/tv_pending_events_empty"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="No pending events awaiting approval."
-        android:textColor="@color/text_hint"
-        android:textSize="14sp"
-        android:visibility="gone" />
+        <!-- List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_pending_events"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingHorizontal="@dimen/space_4"
+            android:paddingTop="@dimen/space_3"
+            android:paddingBottom="@dimen/space_3"
+            android:clipToPadding="false" />
+
+        <!-- Empty state -->
+        <LinearLayout
+            android:id="@+id/tv_pending_events_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone"
+            android:paddingHorizontal="@dimen/space_4">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/ic_events"
+                android:tint="@color/text_hint"
+                android:alpha="0.5"
+                android:layout_marginBottom="@dimen/space_3" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No pending events awaiting approval"
+                android:textColor="@color/text_hint"
+                android:textSize="14sp"
+                android:gravity="center" />
+        </LinearLayout>
+
+    </FrameLayout>
 
 </LinearLayout>

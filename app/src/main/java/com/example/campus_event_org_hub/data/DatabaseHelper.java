@@ -11,6 +11,8 @@ import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.model.NotifModel;
 import com.example.campus_event_org_hub.service.FcmSender;
 
+import org.mindrot.jbcrypt.BCrypt;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -25,7 +27,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "ceoh.db";
-    private static final int DATABASE_VERSION = 14; // v14: added venue, time_in_code, time_out_code to events; added attendance table
+    private static final int DATABASE_VERSION = 15; // v15: added email_verified, verification_token, login_attempts, locked_until columns
 
     private final Context mContext;
 
@@ -81,6 +83,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_USER_MOBILE      = "mobile";
     public static final String COLUMN_USER_PROFILE_IMG = "profile_image";
     public static final String COLUMN_USER_NOTIF_PREF  = "notif_pref";
+    public static final String COLUMN_USER_EMAIL_VERIFIED = "email_verified";
+    public static final String COLUMN_USER_VERIFICATION_TOKEN = "verification_token";
+    public static final String COLUMN_USER_LOGIN_ATTEMPTS = "login_attempts";
+    public static final String COLUMN_USER_LOCKED_UNTIL = "locked_until";
+
+    // Table: Login Rate Limiting
+    public static final String TABLE_LOGIN_RATE_LIMIT = "login_rate_limit";
+    public static final String COLUMN_LR_ID = "lr_id";
+    public static final String COLUMN_LR_STUDENT_ID = "student_id";
+    public static final String COLUMN_LR_ATTEMPTS = "attempts";
+    public static final String COLUMN_LR_LOCKED_UNTIL = "locked_until";
 
     // Table: Registrations
     public static final String TABLE_REGISTRATIONS   = "registrations";
@@ -104,6 +117,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_NOTIF_CREATED_AT     = "created_at";
     public static final String COLUMN_NOTIF_IS_ARCHIVED    = "is_archived";
     public static final String COLUMN_NOTIF_ARCHIVED_AT    = "archived_at";
+
+    // Table: Attendance Rate Limiting
+    public static final String TABLE_ATTENDANCE_RATE_LIMIT = "attendance_rate_limit";
+    public static final String COLUMN_RL_STUDENT_ID        = "student_id";
+    public static final String COLUMN_RL_EVENT_ID         = "event_id";
+    public static final String COLUMN_RL_TYPE            = "type";
+    public static final String COLUMN_RL_ATTEMPTS         = "attempts";
+    public static final String COLUMN_RL_LOCKED_UNTIL     = "locked_until";
+
+    // Table: Attendance Audit Log
+    public static final String TABLE_ATTENDANCE_AUDIT     = "attendance_audit";
+    public static final String COLUMN_AUDIT_ID            = "audit_id";
+    public static final String COLUMN_AUDIT_EVENT_ID      = "event_id";
+    public static final String COLUMN_AUDIT_STUDENT_ID   = "student_id";
+    public static final String COLUMN_AUDIT_TYPE         = "type";
+    public static final String COLUMN_AUDIT_ACTION       = "action";
+    public static final String COLUMN_AUDIT_RESULT_CODE   = "result_code";
+    public static final String COLUMN_AUDIT_TIMESTAMP    = "timestamp";
+    public static final String COLUMN_AUDIT_DEVICE_INFO  = "device_info";
+    public static final String COLUMN_AUDIT_IP_ADDRESS   = "ip_address";
 
     // ── CREATE statements ────────────────────────────────────────────────────
 
@@ -160,7 +193,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_USER_GENDER      + " TEXT DEFAULT '', " +
             COLUMN_USER_MOBILE      + " TEXT DEFAULT '', " +
             COLUMN_USER_PROFILE_IMG + " TEXT DEFAULT '', " +
-            COLUMN_USER_NOTIF_PREF  + " TEXT DEFAULT 'All Events')";
+            COLUMN_USER_NOTIF_PREF  + " TEXT DEFAULT 'All Events', " +
+            COLUMN_USER_EMAIL_VERIFIED + " INTEGER DEFAULT 1, " +
+            COLUMN_USER_VERIFICATION_TOKEN + " TEXT DEFAULT '', " +
+            COLUMN_USER_LOGIN_ATTEMPTS + " INTEGER DEFAULT 0, " +
+            COLUMN_USER_LOCKED_UNTIL + " TEXT DEFAULT '')";
 
     private static final String CREATE_TABLE_REGISTRATIONS =
             "CREATE TABLE " + TABLE_REGISTRATIONS + " (" +
@@ -186,6 +223,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_NOTIF_IS_ARCHIVED    + " INTEGER DEFAULT 0, " +
             COLUMN_NOTIF_ARCHIVED_AT    + " TEXT DEFAULT '')";
 
+    private static final String CREATE_TABLE_ATTENDANCE_RATE_LIMIT =
+            "CREATE TABLE " + TABLE_ATTENDANCE_RATE_LIMIT + " (" +
+            COLUMN_RL_STUDENT_ID   + " TEXT, " +
+            COLUMN_RL_EVENT_ID     + " INTEGER, " +
+            COLUMN_RL_TYPE         + " TEXT, " +
+            COLUMN_RL_ATTEMPTS     + " INTEGER DEFAULT 0, " +
+            COLUMN_RL_LOCKED_UNTIL + " TEXT, " +
+            "PRIMARY KEY (" + COLUMN_RL_STUDENT_ID + ", " + COLUMN_RL_EVENT_ID + ", " + COLUMN_RL_TYPE + "))";
+
+    private static final String CREATE_TABLE_ATTENDANCE_AUDIT =
+            "CREATE TABLE " + TABLE_ATTENDANCE_AUDIT + " (" +
+            COLUMN_AUDIT_ID          + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            COLUMN_AUDIT_EVENT_ID    + " INTEGER, " +
+            COLUMN_AUDIT_STUDENT_ID  + " TEXT, " +
+            COLUMN_AUDIT_TYPE       + " TEXT, " +
+            COLUMN_AUDIT_ACTION     + " TEXT, " +
+            COLUMN_AUDIT_RESULT_CODE + " INTEGER, " +
+            COLUMN_AUDIT_TIMESTAMP  + " TEXT, " +
+            COLUMN_AUDIT_DEVICE_INFO + " TEXT, " +
+            COLUMN_AUDIT_IP_ADDRESS + " TEXT)";
+
     // ── Constructor ──────────────────────────────────────────────────────────
 
     public DatabaseHelper(Context context) {
@@ -203,6 +261,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(CREATE_TABLE_NOTIFICATIONS);
         db.execSQL(CREATE_TABLE_ATTENDANCE);
         db.execSQL(CREATE_TABLE_ATTENDANCE_CODES);
+        db.execSQL(CREATE_TABLE_ATTENDANCE_RATE_LIMIT);
+        db.execSQL(CREATE_TABLE_ATTENDANCE_AUDIT);
+        ensureLoginRateLimitTable(db);
         ensureUsersTableColumns(db);
     }
 
@@ -220,6 +281,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureNotificationsTable(db);
         ensureAttendanceTable(db);
         ensureAttendanceCodesTable(db);
+        ensureAttendanceRateLimitTable(db);
+        ensureAttendanceAuditTable(db);
+        ensureLoginRateLimitTable(db);
     }
 
     @Override
@@ -231,6 +295,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureNotificationsTable(db);
         ensureAttendanceTable(db);
         ensureAttendanceCodesTable(db);
+        ensureAttendanceRateLimitTable(db);
+        ensureAttendanceAuditTable(db);
+        ensureLoginRateLimitTable(db);
         // Remove legacy seed events that were added automatically on first launch
         removeSeedEvents(db);
         // Backfill creator_sid for events created before v11 or synced without it
@@ -353,6 +420,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_PROFILE_IMG + " TEXT DEFAULT ''");
             if (!cols.contains(COLUMN_USER_NOTIF_PREF))
                 db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_NOTIF_PREF + " TEXT DEFAULT 'All Events'");
+            if (!cols.contains(COLUMN_USER_EMAIL_VERIFIED))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_EMAIL_VERIFIED + " INTEGER DEFAULT 1");
+            if (!cols.contains(COLUMN_USER_VERIFICATION_TOKEN))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_VERIFICATION_TOKEN + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_USER_LOGIN_ATTEMPTS))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_LOGIN_ATTEMPTS + " INTEGER DEFAULT 0");
+            if (!cols.contains(COLUMN_USER_LOCKED_UNTIL))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_LOCKED_UNTIL + " TEXT DEFAULT ''");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureUsersTableColumns failed", e);
         } finally {
@@ -425,6 +500,50 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    private void ensureAttendanceRateLimitTable(SQLiteDatabase db) {
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_ATTENDANCE_RATE_LIMIT + " (" +
+                    COLUMN_RL_STUDENT_ID   + " TEXT, " +
+                    COLUMN_RL_EVENT_ID     + " INTEGER, " +
+                    COLUMN_RL_TYPE         + " TEXT, " +
+                    COLUMN_RL_ATTEMPTS     + " INTEGER DEFAULT 0, " +
+                    COLUMN_RL_LOCKED_UNTIL + " TEXT, " +
+                    "PRIMARY KEY (" + COLUMN_RL_STUDENT_ID + ", " + COLUMN_RL_EVENT_ID + ", " + COLUMN_RL_TYPE + "))");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "ensureAttendanceRateLimitTable failed", e);
+        }
+    }
+
+    private void ensureAttendanceAuditTable(SQLiteDatabase db) {
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_ATTENDANCE_AUDIT + " (" +
+                    COLUMN_AUDIT_ID          + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_AUDIT_EVENT_ID    + " INTEGER, " +
+                    COLUMN_AUDIT_STUDENT_ID  + " TEXT, " +
+                    COLUMN_AUDIT_TYPE       + " TEXT, " +
+                    COLUMN_AUDIT_ACTION     + " TEXT, " +
+                    COLUMN_AUDIT_RESULT_CODE + " INTEGER, " +
+                    COLUMN_AUDIT_TIMESTAMP  + " TEXT, " +
+                    COLUMN_AUDIT_DEVICE_INFO + " TEXT, " +
+                    COLUMN_AUDIT_IP_ADDRESS + " TEXT)");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "ensureAttendanceAuditTable failed", e);
+        }
+    }
+
+    private void ensureLoginRateLimitTable(SQLiteDatabase db) {
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_LOGIN_RATE_LIMIT + " (" +
+                    COLUMN_LR_ID          + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_LR_STUDENT_ID  + " TEXT, " +
+                    COLUMN_LR_ATTEMPTS    + " INTEGER DEFAULT 0, " +
+                    COLUMN_LR_LOCKED_UNTIL + " TEXT DEFAULT '', " +
+                    "UNIQUE(" + COLUMN_LR_STUDENT_ID + "))");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "ensureLoginRateLimitTable failed", e);
+        }
+    }
+
     private void ensureNotificationsTable(SQLiteDatabase db) {
         try {
             db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_NOTIFICATIONS + " (" +
@@ -455,19 +574,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public long registerUser(String name, String studentId, String email,
                              String password, String role, String department) {
         SQLiteDatabase db = this.getWritableDatabase();
+        String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+        String verificationToken = java.util.UUID.randomUUID().toString();
         ContentValues v = new ContentValues();
         v.put(COLUMN_USER_NAME, name);
         v.put(COLUMN_USER_STUDENT_ID, studentId);
         v.put(COLUMN_USER_EMAIL, email);
-        v.put(COLUMN_USER_PASSWORD, password);
+        v.put(COLUMN_USER_PASSWORD, hashedPassword);
         v.put(COLUMN_USER_ROLE, role);
         v.put(COLUMN_USER_DEPARTMENT, department);
+        v.put(COLUMN_USER_EMAIL_VERIFIED, 0);
+        v.put(COLUMN_USER_VERIFICATION_TOKEN, verificationToken);
         long id = db.insert(TABLE_USERS, null, v);
         db.close();
         if (id != -1) {
-            // Mirror to Firestore (password NOT synced)
-            new FirestoreHelper().upsertUser(studentId, name, email, role, department,
-                    "", "", "", "All Events");
+            // Mirror to Firestore with verification token
+            new FirestoreHelper().upsertUserWithVerification(studentId, name, email, role, department,
+                    "", "", "", "All Events", false, verificationToken);
         }
         return id;
     }
@@ -475,15 +598,69 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public Cursor checkUser(String loginInput, String password) {
         try {
             SQLiteDatabase db = this.getReadableDatabase();
-            return db.rawQuery(
+            Cursor cursor = db.rawQuery(
                     "SELECT * FROM " + TABLE_USERS + " WHERE (" +
-                    COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?) AND " +
-                    COLUMN_USER_PASSWORD + "=?",
-                    new String[]{loginInput, loginInput, password});
+                    COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?)",
+                    new String[]{loginInput, loginInput});
+
+            if (cursor != null && cursor.moveToFirst()) {
+                String storedPassword = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_USER_PASSWORD));
+                String studentId = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_USER_STUDENT_ID));
+                boolean isLegacyPassword = !storedPassword.startsWith("$2");
+
+                boolean passwordMatches;
+                if (isLegacyPassword) {
+                    passwordMatches = password.equals(storedPassword);
+                } else {
+                    passwordMatches = BCrypt.checkpw(password, storedPassword);
+                }
+
+                if (passwordMatches) {
+                    if (isLegacyPassword) {
+                        upgradePasswordToBCrypt(studentId, password);
+                    }
+                    return cursor;
+                }
+                cursor.close();
+                return null;
+            }
+            if (cursor != null) cursor.close();
+            return null;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "checkUser failed", e);
             return null;
         }
+    }
+
+    public boolean wasPasswordUpgradedFromLegacy(String loginInput, String password) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor cursor = db.rawQuery(
+                    "SELECT " + COLUMN_USER_PASSWORD + " FROM " + TABLE_USERS + " WHERE (" +
+                    COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?)",
+                    new String[]{loginInput, loginInput});
+
+            if (cursor != null && cursor.moveToFirst()) {
+                String storedPassword = cursor.getString(0);
+                cursor.close();
+                return !storedPassword.startsWith("$2") && password.equals(storedPassword);
+            }
+            if (cursor != null) cursor.close();
+            return false;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "wasPasswordUpgradedFromLegacy failed", e);
+            return false;
+        }
+    }
+
+    private void upgradePasswordToBCrypt(String studentId, String plainPassword) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        String hashedPassword = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
+        ContentValues v = new ContentValues();
+        v.put(COLUMN_USER_PASSWORD, hashedPassword);
+        db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+        db.close();
+        Log.d("DatabaseHelper", "Password upgraded to BCrypt for: " + studentId);
     }
 
     public Cursor getUserByStudentId(String studentId) {
@@ -552,11 +729,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             if (c == null || !c.moveToFirst()) { if (c != null) c.close(); db.close(); return false; }
             String stored = c.getString(0);
             c.close();
-            if (!oldPassword.equals(stored)) { db.close(); return false; }
+            if (!BCrypt.checkpw(oldPassword, stored)) { db.close(); return false; }
+            String hashedNew = BCrypt.hashpw(newPassword, BCrypt.gensalt());
             ContentValues v = new ContentValues();
-            v.put(COLUMN_USER_PASSWORD, newPassword);
+            v.put(COLUMN_USER_PASSWORD, hashedNew);
             db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
             db.close();
+            new FirestoreHelper().updatePassword(studentId, hashedNew);
             return true;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "changePassword failed", e);
@@ -575,6 +754,139 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             Log.e("DatabaseHelper", "updateNotifPref failed", e);
         }
+    }
+
+    // ── Email Verification Operations ─────────────────────────────────────────
+
+    public boolean isEmailVerified(String studentId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c = db.rawQuery(
+                "SELECT " + COLUMN_USER_EMAIL_VERIFIED + " FROM " + TABLE_USERS +
+                " WHERE " + COLUMN_USER_STUDENT_ID + "=?",
+                new String[]{studentId});
+        if (c != null && c.moveToFirst()) {
+            int verified = c.getInt(0);
+            c.close();
+            return verified == 1;
+        }
+        if (c != null) c.close();
+        return false;
+    }
+
+    public void setEmailVerified(String studentId, boolean verified) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues v = new ContentValues();
+        v.put(COLUMN_USER_EMAIL_VERIFIED, verified ? 1 : 0);
+        v.put(COLUMN_USER_VERIFICATION_TOKEN, "");
+        db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+        db.close();
+        new FirestoreHelper().updateUserField(studentId, "email_verified", verified ? 1 : 0);
+    }
+
+    public String getVerificationToken(String studentId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c = db.rawQuery(
+                "SELECT " + COLUMN_USER_VERIFICATION_TOKEN + " FROM " + TABLE_USERS +
+                " WHERE " + COLUMN_USER_STUDENT_ID + "=?",
+                new String[]{studentId});
+        if (c != null && c.moveToFirst()) {
+            String token = c.getString(0);
+            c.close();
+            return token;
+        }
+        if (c != null) c.close();
+        return null;
+    }
+
+    // ── Login Rate Limiting ───────────────────────────────────────────────────
+
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final long LOGIN_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+    public boolean isLoginLocked(String loginInput) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c = db.rawQuery(
+                "SELECT " + COLUMN_LR_LOCKED_UNTIL + " FROM " + TABLE_LOGIN_RATE_LIMIT +
+                " WHERE " + COLUMN_LR_STUDENT_ID + "=?",
+                new String[]{loginInput});
+        if (c != null && c.moveToFirst()) {
+            String lockedUntilStr = c.getString(0);
+            c.close();
+            if (lockedUntilStr != null && !lockedUntilStr.isEmpty()) {
+                try {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                    Date lockedUntil = sdf.parse(lockedUntilStr);
+                    if (lockedUntil != null && lockedUntil.getTime() > System.currentTimeMillis()) {
+                        return true;
+                    }
+                } catch (Exception e) {
+                    Log.e("DatabaseHelper", "isLoginLocked parse error", e);
+                }
+            }
+        }
+        if (c != null) c.close();
+        return false;
+    }
+
+    public long getLoginLockoutRemainingMs(String loginInput) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c = db.rawQuery(
+                "SELECT " + COLUMN_LR_LOCKED_UNTIL + " FROM " + TABLE_LOGIN_RATE_LIMIT +
+                " WHERE " + COLUMN_LR_STUDENT_ID + "=?",
+                new String[]{loginInput});
+        if (c != null && c.moveToFirst()) {
+            String lockedUntilStr = c.getString(0);
+            c.close();
+            if (lockedUntilStr != null && !lockedUntilStr.isEmpty()) {
+                try {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                    Date lockedUntil = sdf.parse(lockedUntilStr);
+                    if (lockedUntil != null) {
+                        long remaining = lockedUntil.getTime() - System.currentTimeMillis();
+                        return remaining > 0 ? remaining : 0;
+                    }
+                } catch (Exception e) {
+                    Log.e("DatabaseHelper", "getLoginLockoutRemainingMs parse error", e);
+                }
+            }
+        }
+        if (c != null) c.close();
+        return 0;
+    }
+
+    public void incrementLoginAttempts(String loginInput) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery(
+                "SELECT " + COLUMN_LR_ATTEMPTS + " FROM " + TABLE_LOGIN_RATE_LIMIT +
+                " WHERE " + COLUMN_LR_STUDENT_ID + "=?",
+                new String[]{loginInput});
+        int attempts = 0;
+        if (c != null && c.moveToFirst()) {
+            attempts = c.getInt(0);
+            c.close();
+        }
+        if (c != null) c.close();
+        
+        attempts++;
+        String lockedUntil = "";
+        if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            long lockTime = System.currentTimeMillis() + LOGIN_LOCKOUT_DURATION_MS;
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            lockedUntil = sdf.format(new Date(lockTime));
+        }
+        
+        ContentValues v = new ContentValues();
+        v.put(COLUMN_LR_STUDENT_ID, loginInput);
+        v.put(COLUMN_LR_ATTEMPTS, attempts);
+        v.put(COLUMN_LR_LOCKED_UNTIL, lockedUntil);
+        db.insertWithOnConflict(TABLE_LOGIN_RATE_LIMIT, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+        db.close();
+    }
+
+    public void resetLoginAttempts(String loginInput) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.delete(TABLE_LOGIN_RATE_LIMIT, COLUMN_LR_STUDENT_ID + "=?", new String[]{loginInput});
+        db.close();
     }
 
     // ── Registration Operations ───────────────────────────────────────────────
@@ -720,8 +1032,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         type = (type != null ? type.trim().toUpperCase(Locale.getDefault()) : "");
         if (!"IN".equals(type) && !"OUT".equals(type)) return -1;
 
-        // Check if event is approved
         SQLiteDatabase db = this.getReadableDatabase();
+
         Cursor statusCursor = db.rawQuery("SELECT " + COLUMN_STATUS + " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
         if (statusCursor == null || !statusCursor.moveToFirst()) {
             if (statusCursor != null) statusCursor.close();
@@ -730,19 +1042,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String status = statusCursor.getString(0);
         statusCursor.close();
         if (!"APPROVED".equals(status)) {
+            Log.w("DatabaseHelper", "Code request rejected: event not approved, eventId=" + eventId);
             return -1; // event not approved
         }
 
-        // Validate event date/time on the student's device
+        Cursor regCursor = db.rawQuery(
+                "SELECT 1 FROM " + TABLE_REGISTRATIONS + 
+                " WHERE " + COLUMN_REG_STUDENT_ID + "=? AND " + COLUMN_REG_EVENT_ID + "=? LIMIT 1",
+                new String[]{studentId, String.valueOf(eventId)});
+        boolean isRegistered = regCursor != null && regCursor.moveToFirst();
+        if (regCursor != null) regCursor.close();
+        if (!isRegistered) {
+            Log.w("DatabaseHelper", "Code request rejected: student not registered, studentId=" + studentId + ", eventId=" + eventId);
+            return -6; // student not registered for event
+        }
+
         int validationResult = checkEventTimeWindow(eventId, type);
         if (validationResult == 1) return -2; // date mismatch
         if (validationResult == 2) return -3; // too early
         if (validationResult == 3) return -4; // too late
-        // For OUT, check if after end
         if ("OUT".equals(type) && validationResult == 0) {
-            // Check if now > end
-            SQLiteDatabase checkDb = this.getReadableDatabase();
-            Cursor timeCursor = checkDb.rawQuery("SELECT " + COLUMN_END_TIME + ", " + COLUMN_EVENT_TIME + " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            Cursor timeCursor = db.rawQuery("SELECT " + COLUMN_END_TIME + ", " + COLUMN_EVENT_TIME + " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
             if (timeCursor != null && timeCursor.moveToFirst()) {
                 String endTimeStr = timeCursor.getString(0);
                 String eventTime = timeCursor.getString(1);
@@ -759,10 +1079,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 Calendar now = Calendar.getInstance();
                 int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
                 if (nowMinutes > endMinutes) {
-                    validationResult = 4; // late but allowed
+                    validationResult = 4;
                 }
             }
-            if (timeCursor != null) timeCursor.close();
         }
         if (validationResult == 4) return -5; // late but allowed
 
@@ -772,7 +1091,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db = this.getWritableDatabase();
         db.beginTransaction();
         try {
-            // Expire any old unused codes for this user + event + type
             ContentValues expire = new ContentValues();
             expire.put(COLUMN_ATT_CODE_STATUS, "EXPIRED");
             db.update(TABLE_ATTENDANCE_CODES, expire,
@@ -792,7 +1110,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 return -1;
             }
 
-            // Notify student that code is ready
             String subject = "Time-" + type + " code for event";
             String message = "Your Time-" + type + " code for this event is: " + newCode;
             insertNotification(studentId, eventId, "TIME_" + type + "_CODE", message,
@@ -846,14 +1163,158 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             ContentValues v = new ContentValues();
             v.put(COLUMN_ATT_CODE_STATUS, "USED");
             v.put(COLUMN_ATT_CODE_USED_AT, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
-            int rows = db.update(TABLE_ATTENDANCE_CODES, v,
-                    COLUMN_ATT_CODE_EVENT_ID + "=? AND " + COLUMN_ATT_CODE_STUDENT_ID + "=? AND " +
-                    COLUMN_ATT_CODE_TYPE + "=? AND " + COLUMN_ATT_CODE + "=? AND " + COLUMN_ATT_CODE_STATUS + "='UNUSED'",
-                    new String[]{String.valueOf(eventId), studentId, type, code});
-            return rows > 0;
+            db.beginTransactionNonExclusive();
+            try {
+                int rows = db.update(TABLE_ATTENDANCE_CODES, v,
+                        COLUMN_ATT_CODE_EVENT_ID + "=? AND " + COLUMN_ATT_CODE_STUDENT_ID + "=? AND " +
+                        COLUMN_ATT_CODE_TYPE + "=? AND " + COLUMN_ATT_CODE + "=? AND " + COLUMN_ATT_CODE_STATUS + "='UNUSED'",
+                        new String[]{String.valueOf(eventId), studentId, type, code});
+                if (rows > 0) {
+                    db.setTransactionSuccessful();
+                    return true;
+                }
+                return false;
+            } catch (Exception e) {
+                Log.e("DatabaseHelper", "consumeAttendanceCode failed", e);
+                return false;
+            } finally {
+                db.endTransaction();
+            }
         } catch (Exception e) {
             Log.e("DatabaseHelper", "consumeAttendanceCode failed", e);
             return false;
+        } finally {
+            if (db != null) db.close();
+        }
+    }
+
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final long LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+    public boolean isRateLimited(int eventId, String studentId, String type) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || type == null) return false;
+        type = type.trim().toUpperCase(Locale.getDefault());
+        if (!"IN".equals(type) && !"OUT".equals(type)) return false;
+
+        SQLiteDatabase db = null;
+        Cursor c = null;
+        try {
+            db = this.getReadableDatabase();
+            c = db.rawQuery(
+                    "SELECT " + COLUMN_RL_ATTEMPTS + ", " + COLUMN_RL_LOCKED_UNTIL +
+                    " FROM " + TABLE_ATTENDANCE_RATE_LIMIT +
+                    " WHERE " + COLUMN_RL_EVENT_ID + "=? AND " + COLUMN_RL_STUDENT_ID + "=? AND " + COLUMN_RL_TYPE + "=?",
+                    new String[]{String.valueOf(eventId), studentId, type});
+            if (c != null && c.moveToFirst()) {
+                int attempts = c.getInt(0);
+                String lockedUntilStr = c.getString(1);
+                c.close();
+                if (attempts >= MAX_FAILED_ATTEMPTS) {
+                    if (lockedUntilStr != null && !lockedUntilStr.isEmpty()) {
+                        try {
+                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                            Date lockedUntil = sdf.parse(lockedUntilStr);
+                            if (lockedUntil != null && lockedUntil.getTime() > System.currentTimeMillis()) {
+                                Log.w("DatabaseHelper", "Rate limited: student=" + studentId + ", event=" + eventId + ", type=" + type);
+                                return true;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (c != null) c.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "isRateLimited failed", e);
+        } finally {
+            if (c != null) c.close();
+            if (db != null) db.close();
+        }
+        return false;
+    }
+
+    public void incrementFailedAttempt(int eventId, String studentId, String type) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || type == null) return;
+        type = type.trim().toUpperCase(Locale.getDefault());
+        if (!"IN".equals(type) && !"OUT".equals(type)) return;
+
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            db.beginTransactionNonExclusive();
+            try {
+                Cursor c = db.rawQuery(
+                        "SELECT " + COLUMN_RL_ATTEMPTS +
+                        " FROM " + TABLE_ATTENDANCE_RATE_LIMIT +
+                        " WHERE " + COLUMN_RL_EVENT_ID + "=? AND " + COLUMN_RL_STUDENT_ID + "=? AND " + COLUMN_RL_TYPE + "=?",
+                        new String[]{String.valueOf(eventId), studentId, type});
+                int currentAttempts = 0;
+                if (c != null && c.moveToFirst()) {
+                    currentAttempts = c.getInt(0);
+                    c.close();
+                }
+                int newAttempts = currentAttempts + 1;
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_RL_ATTEMPTS, newAttempts);
+                if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+                    long lockedUntilMs = System.currentTimeMillis() + LOCKOUT_DURATION_MS;
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                    v.put(COLUMN_RL_LOCKED_UNTIL, sdf.format(new Date(lockedUntilMs)));
+                    Log.w("DatabaseHelper", "Locked out: student=" + studentId + ", event=" + eventId + ", type=" + type + ", attempts=" + newAttempts);
+                }
+                db.insertWithOnConflict(TABLE_ATTENDANCE_RATE_LIMIT, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+                db.setTransactionSuccessful();
+            } finally {
+                db.endTransaction();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "incrementFailedAttempt failed", e);
+        } finally {
+            if (db != null) db.close();
+        }
+    }
+
+    public void resetFailedAttempts(int eventId, String studentId, String type) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || type == null) return;
+        type = type.trim().toUpperCase(Locale.getDefault());
+        if (!"IN".equals(type) && !"OUT".equals(type)) return;
+
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            db.delete(TABLE_ATTENDANCE_RATE_LIMIT,
+                    COLUMN_RL_EVENT_ID + "=? AND " + COLUMN_RL_STUDENT_ID + "=? AND " + COLUMN_RL_TYPE + "=?",
+                    new String[]{String.valueOf(eventId), studentId, type});
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "resetFailedAttempts failed", e);
+        } finally {
+            if (db != null) db.close();
+        }
+    }
+
+    public void logAttendanceAttempt(int eventId, String studentId, String type, String action, int resultCode) {
+        logAttendanceAttempt(eventId, studentId, type, action, resultCode, "", "");
+    }
+
+    public void logAttendanceAttempt(int eventId, String studentId, String type, String action, int resultCode, String deviceInfo, String ipAddress) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || type == null || action == null) return;
+        type = type.trim().toUpperCase(Locale.getDefault());
+        action = action.trim().toUpperCase(Locale.getDefault());
+
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_AUDIT_EVENT_ID, eventId);
+            v.put(COLUMN_AUDIT_STUDENT_ID, studentId);
+            v.put(COLUMN_AUDIT_TYPE, type);
+            v.put(COLUMN_AUDIT_ACTION, action);
+            v.put(COLUMN_AUDIT_RESULT_CODE, resultCode);
+            v.put(COLUMN_AUDIT_TIMESTAMP, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+            v.put(COLUMN_AUDIT_DEVICE_INFO, deviceInfo != null ? deviceInfo : "");
+            v.put(COLUMN_AUDIT_IP_ADDRESS, ipAddress != null ? ipAddress : "");
+            db.insert(TABLE_ATTENDANCE_AUDIT, null, v);
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "logAttendanceAttempt failed", e);
         } finally {
             if (db != null) db.close();
         }
@@ -957,14 +1418,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      *   -1 = error
      */
     public int submitTimeIn(int eventId, String studentId, String submittedCode) {
+        return submitTimeIn(eventId, studentId, submittedCode, "", "");
+    }
+
+    public int submitTimeIn(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || submittedCode == null || submittedCode.isEmpty()) {
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", -1, deviceInfo, ipAddress);
+            return -1;
+        }
+
+        if (isRateLimited(eventId, studentId, "IN")) {
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", -4, deviceInfo, ipAddress);
+            Log.w("DatabaseHelper", "Time-in blocked due to rate limit: student=" + studentId + ", event=" + eventId);
+            return -4;
+        }
+
         try {
-            // Check event date/time validity
             int timeCheck = checkEventTimeWindow(eventId, "IN");
             if (timeCheck != 0) {
+                logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 3, deviceInfo, ipAddress);
                 return 3;
             }
 
-            // Check attendance record
             SQLiteDatabase db = this.getWritableDatabase();
             Cursor ac = db.rawQuery(
                     "SELECT " + COLUMN_ATT_TIME_IN_AT + " FROM " + TABLE_ATTENDANCE +
@@ -973,15 +1448,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             boolean alreadyIn = ac != null && ac.moveToFirst() && ac.getString(0) != null && !ac.getString(0).isEmpty();
             if (ac != null) ac.close();
             if (alreadyIn) {
+                logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 2, deviceInfo, ipAddress);
                 db.close();
                 return 2;
             }
 
-            // Validate submitted code against per-student active code first
             String activeCode = getActiveAttendanceCode(eventId, studentId, "IN");
             boolean codeValid = activeCode != null && activeCode.equals(submittedCode);
 
-            // Fallback to event-level code for backward compatibility
             if (!codeValid) {
                 Cursor ec = db.rawQuery(
                         "SELECT " + COLUMN_TIME_IN_CODE + " FROM " + TABLE_EVENTS +
@@ -997,11 +1471,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             }
 
             if (!codeValid) {
+                logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 1, deviceInfo, ipAddress);
+                incrementFailedAttempt(eventId, studentId, "IN");
                 db.close();
                 return 1;
             }
 
-            // Record time-in
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                     .format(new Date());
             ContentValues av = new ContentValues();
@@ -1011,21 +1486,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             av.put(COLUMN_ATT_TIME_OUT_AT, "");
             db.insertWithOnConflict(TABLE_ATTENDANCE, null, av, SQLiteDatabase.CONFLICT_IGNORE);
 
-            // Use and lock per-student code if it was the one used
             if (activeCode != null && activeCode.equals(submittedCode)) {
                 consumeAttendanceCode(eventId, studentId, "IN", submittedCode);
             } else {
-                // Legacy behavior: rotate global time-in code
                 String newCode = generateAttendanceCode();
                 ContentValues cv = new ContentValues();
                 cv.put(COLUMN_TIME_IN_CODE, newCode);
                 db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
             }
 
+            resetFailedAttempts(eventId, studentId, "IN");
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 0, deviceInfo, ipAddress);
             db.close();
             return 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "submitTimeIn failed", e);
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", -1, deviceInfo, ipAddress);
             return -1;
         }
     }
@@ -1041,18 +1517,33 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      *   2  = not yet timed in
      *   3  = already timed out or invalid time window
      *   -1 = error
+     *   -4 = rate limited
      */
     public int submitTimeOut(int eventId, String studentId, String submittedCode) {
+        return submitTimeOut(eventId, studentId, submittedCode, "", "");
+    }
+
+    public int submitTimeOut(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress) {
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || submittedCode == null || submittedCode.isEmpty()) {
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -1, deviceInfo, ipAddress);
+            return -1;
+        }
+
+        if (isRateLimited(eventId, studentId, "OUT")) {
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -4, deviceInfo, ipAddress);
+            Log.w("DatabaseHelper", "Time-out blocked due to rate limit: student=" + studentId + ", event=" + eventId);
+            return -4;
+        }
+
         try {
-            // Check event date/time validity
             int timeCheck = checkEventTimeWindow(eventId, "OUT");
             if (timeCheck != 0) {
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 3, deviceInfo, ipAddress);
                 return 3;
             }
 
             SQLiteDatabase db = this.getWritableDatabase();
 
-            // Check attendance record
             Cursor ac = db.rawQuery(
                     "SELECT " + COLUMN_ATT_TIME_IN_AT + ", " + COLUMN_ATT_TIME_OUT_AT +
                     " FROM " + TABLE_ATTENDANCE +
@@ -1067,14 +1558,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 alreadyOut = to != null && !to.isEmpty();
                 ac.close();
             }
-            if (!hasTimeIn)  { db.close(); return 2; }
-            if (alreadyOut) { db.close(); return 3; }
+            if (!hasTimeIn)  {
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 2, deviceInfo, ipAddress);
+                db.close(); return 2;
+            }
+            if (alreadyOut) {
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 3, deviceInfo, ipAddress);
+                db.close(); return 3;
+            }
 
-            // Validate submitted code against per-student active code first
             String activeCode = getActiveAttendanceCode(eventId, studentId, "OUT");
             boolean codeValid = activeCode != null && activeCode.equals(submittedCode);
 
-            // Fallback to event-level code for backward compatibility
             if (!codeValid) {
                 Cursor ec = db.rawQuery(
                         "SELECT " + COLUMN_TIME_OUT_CODE + " FROM " + TABLE_EVENTS +
@@ -1090,11 +1585,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             }
 
             if (!codeValid) {
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 1, deviceInfo, ipAddress);
+                incrementFailedAttempt(eventId, studentId, "OUT");
                 db.close();
                 return 1;
             }
 
-            // Record time-out
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                     .format(new Date());
             ContentValues av = new ContentValues();
@@ -1103,21 +1599,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
                     new String[]{String.valueOf(eventId), studentId});
 
-            // Use and lock per-student code if used
             if (activeCode != null && activeCode.equals(submittedCode)) {
                 consumeAttendanceCode(eventId, studentId, "OUT", submittedCode);
             } else {
-                // Legacy event-level code rotation
                 String newCode = generateAttendanceCode();
                 ContentValues cv = new ContentValues();
                 cv.put(COLUMN_TIME_OUT_CODE, newCode);
                 db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
             }
 
+            resetFailedAttempts(eventId, studentId, "OUT");
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 0, deviceInfo, ipAddress);
             db.close();
             return 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "submitTimeOut failed", e);
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -1, deviceInfo, ipAddress);
             return -1;
         }
     }
@@ -1179,16 +1676,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                 String role, String department,
                                 String gender, String mobile,
                                 String profileImage, String notifPref,
-                                String firestorePassword) {
+                                String firestorePassword, boolean emailVerified) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
-            // Preserve local password if it exists; fall back to Firestore password for fresh installs
             String localPassword = "";
-            Cursor c = db.rawQuery("SELECT " + COLUMN_USER_PASSWORD + " FROM " + TABLE_USERS +
+            boolean localEmailVerified = true;
+            Cursor c = db.rawQuery("SELECT " + COLUMN_USER_PASSWORD + ", " + COLUMN_USER_EMAIL_VERIFIED + " FROM " + TABLE_USERS +
                     " WHERE " + COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
-            if (c != null && c.moveToFirst()) { localPassword = c.getString(0); c.close(); }
+            if (c != null && c.moveToFirst()) { 
+                localPassword = c.getString(0); 
+                localEmailVerified = c.getInt(1) == 1;
+                c.close(); 
+            }
 
-            // Use local password if available, otherwise use the one from Firestore
             String passwordToStore = (localPassword != null && !localPassword.isEmpty())
                     ? localPassword
                     : (firestorePassword != null ? firestorePassword : "");
@@ -1204,6 +1704,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_USER_MOBILE,      mobile        != null ? mobile        : "");
             v.put(COLUMN_USER_PROFILE_IMG, profileImage  != null ? profileImage  : "");
             v.put(COLUMN_USER_NOTIF_PREF,  notifPref     != null ? notifPref     : "All Events");
+            v.put(COLUMN_USER_EMAIL_VERIFIED, localEmailVerified ? 1 : 0);
             db.insertWithOnConflict(TABLE_USERS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
             db.close();
         } catch (Exception e) {
@@ -2371,12 +2872,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         String[] cols = splitCsvLine(lines[i]);
                         if (cols.length < 9) continue;
                         try {
-                            // cols: user_pk, name, student_id, email, password(skip), role, dept, gender, mobile, profile_image, notif_pref
                             syncUpsertUser(cols[2], cols[1], cols[3], cols[5], cols[6],
                                     cols[7], cols[8],
                                     cols.length > 9 ? cols[9] : "",
                                     cols.length > 10 ? cols[10] : "All Events",
-                                    "" /* password not imported from CSV */);
+                                    "", true);
                             count++;
                         } catch (Exception ignored) {}
                     }

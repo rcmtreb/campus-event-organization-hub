@@ -38,15 +38,13 @@
             android:paddingBottom="@dimen/space_4">
 
             <!-- Banner Preview -->
-            <com.google.android.material.card.MaterialCardView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/space_4"
-                style="@style/PremiumCard">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                android:orientation="vertical"
+                android:background="@color/surface"
+                android:padding="@dimen/space_4"
+                android:layout_marginBottom="@dimen/space_3">
 
                     <ImageView
                         android:id="@+id/create_event_banner_preview"
@@ -60,7 +58,7 @@
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_margin="@dimen/space_3"
+                        android:layout_marginTop="@dimen/space_3"
                         android:text="Choose Banner Image"
                         android:textAllCaps="false"
                         android:textSize="14sp"
@@ -69,30 +67,25 @@
                         app:strokeColor="@color/primary_green"
                         app:strokeWidth="1dp" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-            <!-- Event Details Card -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- Event Details -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/space_4"
-                style="@style/PremiumCard">
+                android:orientation="vertical"
+                android:background="@color/surface"
+                android:padding="@dimen/space_4"
+                android:layout_marginBottom="@dimen/space_3">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_4">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="@dimen/space_3"
-                        android:text="EVENT INFORMATION"
-                        android:textColor="@color/primary_green"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.1"/>
+                    android:layout_marginBottom="@dimen/space_3"
+                    android:text="EVENT INFORMATION"
+                    android:textColor="@color/primary_green"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1"/>
 
                     <!-- Title -->
                     <com.google.android.material.textfield.TextInputLayout
@@ -273,21 +266,16 @@
                             android:cursorVisible="false" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
 
-            <!-- Target Audience Card -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- Target Audience -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/space_4"
-                style="@style/PremiumCard">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_4">
+                android:orientation="vertical"
+                android:background="@color/surface"
+                android:padding="@dimen/space_4"
+                android:layout_marginBottom="@dimen/space_3">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -371,21 +359,16 @@
 
                     </com.google.android.material.chip.ChipGroup>
 
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
 
-            <!-- Category Card -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- Category -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/space_4"
-                style="@style/PremiumCard">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_4">
+                android:orientation="vertical"
+                android:background="@color/surface"
+                android:padding="@dimen/space_4"
+                android:layout_marginBottom="@dimen/space_3">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -448,8 +431,7 @@
                             android:text="Competitions &amp; Special Interest" />
 
                     </com.google.android.material.chip.ChipGroup>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
 
             <!-- Submit Button -->
             <Button
