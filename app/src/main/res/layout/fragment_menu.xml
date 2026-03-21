@@ -22,7 +22,6 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@color/surface"
                 android:orientation="vertical"
                 android:paddingBottom="@dimen/space_3">
 
@@ -101,8 +100,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:background="@color/surface">
+                    android:orientation="vertical">
 
                     <LinearLayout android:id="@+id/menu_officer_my_events" style="@style/MenuRow">
                         <ImageView style="@style/MenuRowIcon" android:src="@drawable/ic_events" app:tint="@color/primary_green"/>
@@ -144,8 +142,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@color/surface">
+                android:orientation="vertical">
 
                 <LinearLayout android:id="@+id/menu_profile" style="@style/MenuRow">
                     <ImageView style="@style/MenuRowIcon" android:src="@drawable/ic_person" app:tint="@color/primary_green"/>
@@ -186,8 +183,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@color/surface">
+                android:orientation="vertical">
 
                 <LinearLayout android:id="@+id/menu_notifications_settings" style="@style/MenuRow">
                     <ImageView style="@style/MenuRowIcon" android:src="@drawable/ic_notifications" app:tint="@color/primary_green"/>
@@ -236,8 +232,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@color/surface">
+                android:orientation="vertical">
 
                 <LinearLayout android:id="@+id/menu_help" style="@style/MenuRow">
                     <ImageView style="@style/MenuRowIcon" android:src="@drawable/ic_help" app:tint="@color/primary_green"/>
@@ -263,8 +258,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@color/surface">
+                android:orientation="vertical">
 
                 <LinearLayout
                     android:id="@+id/menu_logout"
