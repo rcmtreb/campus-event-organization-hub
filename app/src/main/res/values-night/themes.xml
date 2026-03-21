@@ -4,7 +4,8 @@
         <!-- Brand Colors (Green shades) -->
         <item name="colorPrimary">@color/primary_green</item>
         <item name="colorSecondary">@color/primary_orange</item>
-        <item name="android:statusBarColor">@color/background_gray</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/surface</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
 
         <!-- Window -->

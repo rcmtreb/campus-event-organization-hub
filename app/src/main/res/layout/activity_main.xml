@@ -5,9 +5,18 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
     android:background="@color/background_gray"
     tools:context=".ui.main.MainActivity">
+
+    <!-- ── Status Bar Background ───────────────────────────────────────── -->
+    <View
+        android:id="@+id/status_bar_background"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/status_bar_height"
+        android:background="@drawable/status_bar_gradient"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
     <!-- ── Top App Bar ──────────────────────────────────────────────────── -->
     <LinearLayout
@@ -16,11 +25,11 @@
         android:layout_height="@dimen/top_bar_height"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/gradient_header"
+        android:background="@drawable/bg_header"
         android:elevation="0dp"
         android:paddingStart="@dimen/space_4"
         android:paddingEnd="@dimen/space_3"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/status_bar_background"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -31,7 +40,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Discover"
-            android:textColor="@color/text_on_primary"
+            android:textColor="@color/header_text"
             android:textSize="20sp"
             android:textStyle="bold"
             android:fontFamily="sans-serif-medium"/>
@@ -47,7 +56,7 @@
                 android:layout_height="26dp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_notifications"
-                android:tint="@color/text_on_primary"
+                android:tint="@color/header_text"
                 android:contentDescription="Notifications"
                 android:clickable="true"
                 android:focusable="true"
@@ -62,7 +71,7 @@
                 android:layout_marginTop="6dp"
                 android:layout_marginEnd="6dp"
                 android:background="@drawable/badge_notification"
-                android:textColor="@color/text_on_primary"
+                android:textColor="@color/badge_text"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:gravity="center"

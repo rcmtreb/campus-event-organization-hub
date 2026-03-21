@@ -8,13 +8,15 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.campus_event_org_hub.ui.base.BaseActivity;
+
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.ui.auth.LoginActivity;
 import com.example.campus_event_org_hub.util.SessionManager;
 
-public class AdminActivity extends AppCompatActivity {
+public class AdminActivity extends BaseActivity {
 
     private DatabaseHelper db;
 

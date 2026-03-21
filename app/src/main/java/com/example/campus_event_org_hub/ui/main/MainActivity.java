@@ -17,7 +17,12 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+
+import com.example.campus_event_org_hub.ui.base.BaseActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.campus_event_org_hub.R;
@@ -26,10 +31,11 @@ import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.receiver.NetworkCallbackHandler;
 import com.example.campus_event_org_hub.ui.events.EventsFragment;
 
-public class MainActivity extends AppCompatActivity
+public class MainActivity extends BaseActivity
         implements ProfileFragment.OnProfileUpdatedListener {
 
     private static final String TAG = "CEOH_MAIN";
+    private static final String KEY_CURRENT_TAB = "current_tab";
     private String userName, userRole, userDept, userEmail, userStudentId;
     private String currentProfileImagePath = null;
 
@@ -55,11 +61,21 @@ public class MainActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Ensure content doesn't draw behind system bars
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+        // Enable edge-to-edge display
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         try {
             setContentView(R.layout.activity_main);
+
+            // Apply window insets for status bar
+            View statusBarBg = findViewById(R.id.status_bar_background);
+            if (statusBarBg != null) {
+                ViewCompat.setOnApplyWindowInsetsListener(statusBarBg, (v, insets) -> {
+                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    v.setPadding(0, systemBars.top, 0, 0);
+                    return insets;
+                });
+            }
 
             // Read user info from login intent
             if (getIntent() != null) {
@@ -109,6 +125,10 @@ public class MainActivity extends AppCompatActivity
 
             if (savedInstanceState == null) {
                 selectTab(0);
+            } else {
+                currentTab = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
+                // Just restore tab indicators without clearing backstack
+                restoreTabIndicators(currentTab);
             }
 
         } catch (Exception e) {
@@ -140,6 +160,12 @@ public class MainActivity extends AppCompatActivity
             networkCallbackHandler.unregister();
             networkCallbackHandler = null;
         }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(KEY_CURRENT_TAB, currentTab);
     }
 
     // ── Connectivity change handler ──────────────────────────────────────────
@@ -294,6 +320,39 @@ public class MainActivity extends AppCompatActivity
                 : ContextCompat.getColor(this, R.color.text_hint);
         icon.setColorFilter(color);
         label.setTextColor(color);
+    }
+
+    private void restoreTabIndicators(int index) {
+        // Reset all tabs
+        setTabActive(iconDiscover, textDiscover, false);
+        setTabActive(iconEvents,   textEvents,   false);
+        setTabActive(iconVenue,    textVenue,    false);
+        setTabActive(iconProfile,  textProfile,  false);
+
+        // Highlight active tab
+        switch (index) {
+            case 1:
+                setTabActive(iconEvents, textEvents, true);
+                break;
+            case 2:
+                setTabActive(iconVenue, textVenue, true);
+                break;
+            case 3:
+                setTabActive(iconProfile, textProfile, true);
+                break;
+            case 0:
+            default:
+                setTabActive(iconDiscover, textDiscover, true);
+                break;
+        }
+
+        // Update top-bar title if needed (don't change if Settings is showing)
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (currentFragment != null && !(currentFragment instanceof SettingsFragment)) {
+            if (tvPageTitle != null && index >= 0 && index < TAB_TITLES.length) {
+                tvPageTitle.setText(TAB_TITLES[index]);
+            }
+        }
     }
 
     // ── Toolbar title ──────────────────────────────────────────────────────

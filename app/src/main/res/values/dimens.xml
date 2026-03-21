@@ -55,6 +55,9 @@
     <dimen name="bottom_nav_height">60dp</dimen>
     <dimen name="top_bar_height">56dp</dimen>
 
+    <!-- System bars -->
+    <dimen name="status_bar_height">24dp</dimen>
+
     <!-- Chip -->
     <dimen name="chip_height">36dp</dimen>
     <dimen name="chip_corner_radius">18dp</dimen>

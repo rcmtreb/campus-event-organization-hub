@@ -57,6 +57,10 @@ public class SettingsFragment extends Fragment {
                 theme = THEME_SYSTEM;
             }
             saveTheme(theme);
+            // Recreate activity to apply theme while staying on Settings
+            if (getActivity() != null) {
+                getActivity().recreate();
+            }
         });
 
         return view;

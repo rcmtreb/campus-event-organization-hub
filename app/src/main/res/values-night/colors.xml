@@ -44,6 +44,10 @@
     <!-- ── Selection Colors ─────────────────────────────────────────── -->
     <color name="notif_selection_tint">#FF2D3A20</color>
 
+    <!-- ── Header Colors ───────────────────────────────────────────────── -->
+    <color name="header_text">@color/primary_green</color>
+    <color name="badge_text">@color/text_on_primary</color>
+
     <!-- ── Basic Colors ───────────────────────────────────────────────── -->
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
