@@ -138,31 +138,39 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 holder.timelineBadge.setBackgroundColor(0xFF7B1FA2);
                 holder.timelineBadge.setVisibility(View.VISIBLE);
             } else if ("APPROVED".equals(status)) {
-                Calendar todayCal = Calendar.getInstance();
-                todayCal.set(Calendar.HOUR_OF_DAY, 0);
-                todayCal.set(Calendar.MINUTE, 0);
-                todayCal.set(Calendar.SECOND, 0);
-                todayCal.set(Calendar.MILLISECOND, 0);
-                try {
-                    Date eventDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                            .parse(event.getDate());
-                    if (eventDate == null) {
-                        holder.timelineBadge.setVisibility(View.GONE);
-                    } else if (eventDate.before(todayCal.getTime())) {
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                String today = dateFormat.format(new Date());
+                String eventDateStr = event.getDate();
+                
+                if (eventDateStr == null || eventDateStr.isEmpty()) {
+                    holder.timelineBadge.setVisibility(View.GONE);
+                } else if (eventDateStr.compareTo(today) == 0) {
+                    String endTime = event.getEndTime();
+                    boolean hasEnded = false;
+                    if (endTime != null && !endTime.isEmpty()) {
+                        try {
+                            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                            Calendar now = Calendar.getInstance();
+                            String currentTimeStr = timeFormat.format(now.getTime());
+                            Date currentTime = timeFormat.parse(currentTimeStr);
+                            Date endTimeDate = timeFormat.parse(endTime);
+                            if (currentTime != null && endTimeDate != null && endTimeDate.before(currentTime)) {
+                                hasEnded = true;
+                            }
+                        } catch (ParseException ignored) { }
+                    }
+                    if (hasEnded) {
                         holder.timelineBadge.setText("ENDED");
                         holder.timelineBadge.setBackgroundColor(0xFF757575);
-                        holder.timelineBadge.setVisibility(View.VISIBLE);
-                    } else if (eventDate.equals(todayCal.getTime())) {
+                    } else {
                         holder.timelineBadge.setText("HAPPENING");
                         holder.timelineBadge.setBackgroundColor(0xFF0288D1);
-                        holder.timelineBadge.setVisibility(View.VISIBLE);
-                    } else {
-                        holder.timelineBadge.setText("UPCOMING");
-                        holder.timelineBadge.setBackgroundColor(0xFF388E3C);
-                        holder.timelineBadge.setVisibility(View.VISIBLE);
                     }
-                } catch (ParseException ex) {
-                    holder.timelineBadge.setVisibility(View.GONE);
+                    holder.timelineBadge.setVisibility(View.VISIBLE);
+                } else {
+                    holder.timelineBadge.setText("UPCOMING");
+                    holder.timelineBadge.setBackgroundColor(0xFF388E3C);
+                    holder.timelineBadge.setVisibility(View.VISIBLE);
                 }
             } else {
                 holder.timelineBadge.setVisibility(View.GONE);

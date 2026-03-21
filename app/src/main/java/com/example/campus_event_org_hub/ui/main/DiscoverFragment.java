@@ -76,12 +76,17 @@ public class DiscoverFragment extends Fragment {
         rvCampusEvents.setNestedScrollingEnabled(false);
 
         try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String today = sdf.format(new Date());
+
             List<Event> allEvents = dbHelper.getAllEvents();
             List<Event> campusEvents = new ArrayList<>();
 
             if (allEvents != null) {
                 for (Event e : allEvents) {
                     if (!"APPROVED".equals(e.getStatus())) continue;
+                    String eventDate = e.getDate();
+                    if (eventDate == null || eventDate.compareTo(today) < 0) continue;
                     String tags = e.getTags();
                     if (tags != null) {
                         String upperTags = tags.toUpperCase();
@@ -254,12 +259,17 @@ public class DiscoverFragment extends Fragment {
         rvMyDeptEvents.setNestedScrollingEnabled(false);
 
         try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String today = sdf.format(new Date());
+
             List<Event> allEvents = dbHelper.getAllEvents();
             List<Event> myDeptEvents = new ArrayList<>();
 
             if (allEvents != null && userDept != null && !userDept.isEmpty()) {
                 for (Event e : allEvents) {
                     if (!"APPROVED".equals(e.getStatus())) continue;
+                    String eventDate = e.getDate();
+                    if (eventDate == null || eventDate.compareTo(today) < 0) continue;
                     String tags = e.getTags();
                     if (tags != null && tags.toUpperCase().contains(userDept.toUpperCase())) {
                         myDeptEvents.add(e);

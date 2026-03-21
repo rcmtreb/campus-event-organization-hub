@@ -31,8 +31,11 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class EventsFragment extends Fragment {
 
@@ -170,8 +173,19 @@ public class EventsFragment extends Fragment {
     /** Load events from DB, optionally filtered by department abbreviation. */
     private void loadEvents() {
         try {
-            eventList = dbHelper.getAllEvents(filterDept);
-            if (eventList == null) eventList = new ArrayList<>();
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String today = sdf.format(new Date());
+
+            List<Event> allEvents = dbHelper.getAllEvents(filterDept);
+            if (allEvents == null) allEvents = new ArrayList<>();
+
+            eventList = new ArrayList<>();
+            for (Event e : allEvents) {
+                String eventDate = e.getDate();
+                if (eventDate != null && eventDate.compareTo(today) >= 0) {
+                    eventList.add(e);
+                }
+            }
 
             String sid = getArguments() != null
                     ? getArguments().getString("USER_STUDENT_ID", "") : "";
@@ -193,10 +207,19 @@ public class EventsFragment extends Fragment {
      */
     private void reloadEvents() {
         try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String today = sdf.format(new Date());
+
             List<Event> fresh = dbHelper.getAllEvents(filterDept);
             if (fresh == null) fresh = new ArrayList<>();
+
             eventList.clear();
-            eventList.addAll(fresh);
+            for (Event e : fresh) {
+                String eventDate = e.getDate();
+                if (eventDate != null && eventDate.compareTo(today) >= 0) {
+                    eventList.add(e);
+                }
+            }
             adapter.notifyDataSetChanged();
             recyclerView.smoothScrollToPosition(0);
         } catch (Exception e) {
