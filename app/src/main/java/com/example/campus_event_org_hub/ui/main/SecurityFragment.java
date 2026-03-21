@@ -53,7 +53,7 @@ public class SecurityFragment extends Fragment {
                 return;
             }
 
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             boolean ok = db.changePassword(sid, currentPw, newPw);
             if (ok) {
                 // Sync new password to Firestore so other devices pick it up on next login

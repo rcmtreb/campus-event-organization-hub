@@ -67,7 +67,7 @@ public class FirestoreHelper {
                                            String role, String department,
                                            String gender, String mobile, String profileImage,
                                            String notifPref, boolean emailVerified,
-                                           String verificationToken) {
+                                           String verificationToken, String hashedPassword) {
         Map<String, Object> data = new HashMap<>();
         data.put("student_id",              studentId);
         data.put("name",                    name);
@@ -80,6 +80,9 @@ public class FirestoreHelper {
         data.put("notif_pref",    notifPref != null ? notifPref   : "All Events");
         data.put("email_verified", emailVerified ? 1 : 0);
         data.put("verification_token", verificationToken != null ? verificationToken : "");
+        if (hashedPassword != null && !hashedPassword.isEmpty()) {
+            data.put("password", hashedPassword);
+        }
         db.collection(COL_USERS).document(studentId)
                 .set(data, SetOptions.merge())
                 .addOnFailureListener(e -> Log.e(TAG, "upsertUserWithVerification failed: " + studentId, e));

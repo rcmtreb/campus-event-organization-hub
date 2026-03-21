@@ -43,7 +43,7 @@ public class ExportImportActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_export_import);
 
-        db = new DatabaseHelper(this);
+        db = DatabaseHelper.getInstance(this);
 
         findViewById(R.id.btn_back_export).setOnClickListener(v -> finish());
 

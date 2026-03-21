@@ -100,7 +100,7 @@ public class AdminEditEventActivity extends AppCompatActivity {
             return;
         }
 
-        DatabaseHelper db = new DatabaseHelper(this);
+        DatabaseHelper db = DatabaseHelper.getInstance(this);
         boolean ok = db.updateEvent(eventId, title, desc, date, time, tags, organizer, category, originalVenue);
         if (ok) {
             Toast.makeText(this, "Event updated successfully.", Toast.LENGTH_SHORT).show();

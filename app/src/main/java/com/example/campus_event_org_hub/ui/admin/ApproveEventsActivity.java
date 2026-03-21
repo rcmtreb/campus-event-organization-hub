@@ -1,10 +1,12 @@
 package com.example.campus_event_org_hub.ui.admin;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -17,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
+import com.example.campus_event_org_hub.ui.events.EventDetailActivity;
 import com.example.campus_event_org_hub.util.ImageUtils;
 
 import java.util.List;
@@ -25,6 +28,7 @@ public class ApproveEventsActivity extends AppCompatActivity {
 
     private DatabaseHelper db;
     private RecyclerView rv;
+    private TextView tvEmpty;
     private ApproveAdapter adapter;
 
     @Override
@@ -32,9 +36,13 @@ public class ApproveEventsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_approve_events);
 
-        db = new DatabaseHelper(this);
+        db = DatabaseHelper.getInstance(this);
         rv = findViewById(R.id.rv_approve_events);
+        tvEmpty = findViewById(R.id.tv_approve_empty);
         rv.setLayoutManager(new LinearLayoutManager(this));
+
+        ImageButton btnBack = findViewById(R.id.btn_back_approve);
+        if (btnBack != null) btnBack.setOnClickListener(v -> finish());
 
         loadPendingEvents();
     }
@@ -43,6 +51,14 @@ public class ApproveEventsActivity extends AppCompatActivity {
         List<Event> pendingList = db.getEventsByStatus("PENDING");
         adapter = new ApproveAdapter(pendingList);
         rv.setAdapter(adapter);
+        updateEmptyState();
+    }
+
+    private void updateEmptyState() {
+        if (tvEmpty == null) return;
+        boolean empty = adapter == null || adapter.getItemCount() == 0;
+        tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        rv.setVisibility(empty ? View.GONE : View.VISIBLE);
     }
 
     // ── Notification helpers ─────────────────────────────────────────────────
@@ -152,33 +168,60 @@ public class ApproveEventsActivity extends AppCompatActivity {
             Event e = list.get(pos);
             h.title.setText(e.getTitle());
             h.organizer.setText(e.getOrganizer());
+
+            // Show date and category
+            if (h.date != null) {
+                String dateText = e.getDate() != null ? e.getDate() : "";
+                if (e.getTime() != null && !e.getTime().isEmpty()) dateText += "  " + e.getTime();
+                h.date.setText(dateText);
+            }
+            if (h.category != null) {
+                h.category.setText(e.getCategory() != null ? e.getCategory() : "");
+                h.category.setVisibility(e.getCategory() != null && !e.getCategory().isEmpty()
+                        ? View.VISIBLE : View.GONE);
+            }
+            if (h.description != null) {
+                String desc = e.getDescription() != null ? e.getDescription() : "";
+                h.description.setText(desc.length() > 120 ? desc.substring(0, 120) + "..." : desc);
+                h.description.setVisibility(desc.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+
             ImageUtils.load(h.img.getContext(), h.img, e.getImagePath(),
                     R.drawable.ic_image_placeholder);
 
+            // Tap card to view full event details
+            h.itemView.setOnClickListener(v -> {
+                Intent intent = new Intent(ApproveEventsActivity.this, EventDetailActivity.class);
+                intent.putExtra("event", e);
+                intent.putExtra("USER_STUDENT_ID", "admin");
+                intent.putExtra("USER_ROLE", "Admin");
+                startActivity(intent);
+            });
+
             h.btnApprove.setOnClickListener(v -> {
                 int adapterPos = h.getAdapterPosition();
-                if (adapterPos == RecyclerView.NO_ID) return;
-                // Disable both buttons immediately to prevent double-tap double-send
+                if (adapterPos == RecyclerView.NO_POSITION) return;
                 h.btnApprove.setEnabled(false);
                 h.btnReject.setEnabled(false);
                 db.approveEvent(e.getId());
-                notifyOfficerOfDecision(e, true);   // tell the officer it was approved
-                notifyTargetedStudents(e);           // tell relevant students a new event is live
+                notifyOfficerOfDecision(e, true);
+                notifyTargetedStudents(e);
                 list.remove(adapterPos);
                 notifyItemRemoved(adapterPos);
+                updateEmptyState();
                 Toast.makeText(ApproveEventsActivity.this, "Event Approved!", Toast.LENGTH_SHORT).show();
             });
 
             h.btnReject.setOnClickListener(v -> {
                 int adapterPos = h.getAdapterPosition();
-                if (adapterPos == RecyclerView.NO_ID) return;
-                // Disable both buttons immediately to prevent double-tap double-send
+                if (adapterPos == RecyclerView.NO_POSITION) return;
                 h.btnApprove.setEnabled(false);
                 h.btnReject.setEnabled(false);
-                notifyOfficerOfDecision(e, false);  // tell the officer it was rejected
+                notifyOfficerOfDecision(e, false);
                 db.deleteEvent(e.getId());
                 list.remove(adapterPos);
                 notifyItemRemoved(adapterPos);
+                updateEmptyState();
                 Toast.makeText(ApproveEventsActivity.this, "Event Rejected", Toast.LENGTH_SHORT).show();
             });
         }
@@ -187,16 +230,19 @@ public class ApproveEventsActivity extends AppCompatActivity {
         public int getItemCount() { return list.size(); }
 
         class VH extends RecyclerView.ViewHolder {
-            TextView title, organizer;
+            TextView title, organizer, date, category, description;
             ImageView img;
             Button btnApprove, btnReject;
             VH(View v) {
                 super(v);
-                title      = v.findViewById(R.id.approve_event_title);
-                organizer  = v.findViewById(R.id.approve_event_organizer);
-                img        = v.findViewById(R.id.approve_event_image);
-                btnApprove = v.findViewById(R.id.btn_approve_now);
-                btnReject  = v.findViewById(R.id.btn_reject_now);
+                title       = v.findViewById(R.id.approve_event_title);
+                organizer   = v.findViewById(R.id.approve_event_organizer);
+                date        = v.findViewById(R.id.approve_event_date);
+                category    = v.findViewById(R.id.approve_event_category);
+                description = v.findViewById(R.id.approve_event_description);
+                img         = v.findViewById(R.id.approve_event_image);
+                btnApprove  = v.findViewById(R.id.btn_approve_now);
+                btnReject   = v.findViewById(R.id.btn_reject_now);
             }
         }
     }

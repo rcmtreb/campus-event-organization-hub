@@ -31,6 +31,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "ceoh.db";
     private static final int DATABASE_VERSION = 15; // v15: added email_verified, verification_token, login_attempts, locked_until columns
 
+    // ── Singleton ─────────────────────────────────────────────────────────────
+    private static volatile DatabaseHelper instance;
+
+    /**
+     * Returns the application-wide singleton instance.
+     * Always pass {@code context.getApplicationContext()} (or any Context — it
+     * is converted to the application context internally to avoid leaks).
+     */
+    public static synchronized DatabaseHelper getInstance(Context ctx) {
+        if (instance == null) {
+            instance = new DatabaseHelper(ctx.getApplicationContext());
+        }
+        return instance;
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     private final Context mContext;
 
     // Table: Events
@@ -590,9 +606,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         long id = db.insert(TABLE_USERS, null, v);
         db.close();
         if (id != -1) {
-            // Mirror to Firestore with verification token
+            // Mirror to Firestore — include the BCrypt hash so sync can restore it on other devices
             new FirestoreHelper().upsertUserWithVerification(studentId, name, email, role, department,
-                    "", "", "", "All Events", false, verificationToken);
+                    "", "", "", "All Events", false, verificationToken, hashedPassword);
         }
         return id;
     }
@@ -610,6 +626,76 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             Log.e("DatabaseHelper", "isEmailInLocalDb failed", e);
             return false;
+        }
+    }
+
+    /** Returns the email address for a given loginInput (email or student_id). */
+    public String getEmailForLoginInput(String loginInput) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT " + COLUMN_USER_EMAIL + " FROM " + TABLE_USERS +
+                    " WHERE (" + COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?) LIMIT 1",
+                    new String[]{loginInput, loginInput});
+            if (c != null && c.moveToFirst()) {
+                String email = c.getString(0);
+                c.close();
+                return email;
+            }
+            if (c != null) c.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getEmailForLoginInput failed", e);
+        }
+        return null;
+    }
+
+    /** Returns true if a user row exists for this loginInput but their stored password is empty or null. */
+    public boolean userExistsWithEmptyPassword(String loginInput) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT " + COLUMN_USER_PASSWORD + " FROM " + TABLE_USERS +
+                    " WHERE (" + COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?) LIMIT 1",
+                    new String[]{loginInput, loginInput});
+            if (c != null && c.moveToFirst()) {
+                String pw = c.getString(0);
+                c.close();
+                return pw == null || pw.isEmpty();
+            }
+            if (c != null) c.close();
+            return false;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "userExistsWithEmptyPassword failed", e);
+            return false;
+        }
+    }
+
+    /** Restores a BCrypt hash for an existing user whose password was wiped by a sync bug. */
+    public void restorePassword(String loginInput, String plainPassword) {
+        try {
+            String hash = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_USER_PASSWORD, hash);
+            db.update(TABLE_USERS, v,
+                    COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?",
+                    new String[]{loginInput, loginInput});
+            db.close();
+            Log.d("DatabaseHelper", "Password restored for: " + loginInput);
+            // Also push the hash back to Firestore so future syncs carry it
+            Cursor c = this.getReadableDatabase().rawQuery(
+                    "SELECT " + COLUMN_USER_STUDENT_ID + " FROM " + TABLE_USERS +
+                    " WHERE (" + COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?) LIMIT 1",
+                    new String[]{loginInput, loginInput});
+            if (c != null && c.moveToFirst()) {
+                String sid = c.getString(0);
+                c.close();
+                if (sid != null && !sid.isEmpty()) {
+                    new FirestoreHelper().updateUserField(sid, "password", hash);
+                }
+            } else if (c != null) c.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "restorePassword failed", e);
         }
     }
 
@@ -1685,10 +1771,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // ── Sync helpers (called by SyncManager to import Firestore data) ─────────
 
     /**
-     * Upsert a user row from Firestore. Uses INSERT OR REPLACE so existing rows
-     * are overwritten with the latest cloud data.
-     * Password priority: local password wins if it exists; otherwise use the Firestore password
-     * (handles fresh-install case where user has changed their password on another device).
+     * Upsert a user row from Firestore.
+     *
+     * Strategy:
+     *   - If the user already exists locally → UPDATE only non-sensitive profile fields
+     *     (name, email, role, department, gender, mobile, profileImage, notifPref).
+     *     The local password and email_verified flag are NEVER overwritten by sync.
+     *   - If the user does not exist locally (fresh install / new device) → INSERT the
+     *     full row using the Firestore password so the user can log in immediately.
+     *
+     * This prevents sync from ever wiping a locally-stored BCrypt password, which was
+     * the root cause of "invalid credentials" after a Firestore sync.
      */
     public void syncUpsertUser(String studentId, String name, String email,
                                 String role, String department,
@@ -1697,33 +1790,57 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                 String firestorePassword, boolean emailVerified) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
-            String localPassword = "";
-            boolean localEmailVerified = true;
-            Cursor c = db.rawQuery("SELECT " + COLUMN_USER_PASSWORD + ", " + COLUMN_USER_EMAIL_VERIFIED + " FROM " + TABLE_USERS +
-                    " WHERE " + COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
-            if (c != null && c.moveToFirst()) { 
-                localPassword = c.getString(0); 
-                localEmailVerified = c.getInt(1) == 1;
-                c.close(); 
+
+            // Check whether this user already exists locally
+            Cursor c = db.rawQuery("SELECT " + COLUMN_USER_PASSWORD + ", " + COLUMN_USER_EMAIL_VERIFIED +
+                    " FROM " + TABLE_USERS + " WHERE " + COLUMN_USER_STUDENT_ID + "=?",
+                    new String[]{studentId});
+            boolean userExists = (c != null && c.moveToFirst());
+            String localPassword = userExists ? c.getString(0) : null;
+            boolean localEmailVerified = userExists ? (c.getInt(1) == 1) : emailVerified;
+            if (c != null) c.close();
+
+            if (userExists) {
+                // UPDATE: never touch password or email_verified.
+                // Also never overwrite a locally-stored profile_image with an empty Firestore value —
+                // profile images are absolute device file paths that only exist on this device.
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_USER_NAME,       name);
+                v.put(COLUMN_USER_EMAIL,      email);
+                v.put(COLUMN_USER_ROLE,       role);
+                v.put(COLUMN_USER_DEPARTMENT, department);
+                v.put(COLUMN_USER_GENDER,     gender    != null ? gender    : "");
+                v.put(COLUMN_USER_MOBILE,     mobile    != null ? mobile    : "");
+                v.put(COLUMN_USER_NOTIF_PREF, notifPref != null ? notifPref : "All Events");
+                // Only update profile_image from Firestore when Firestore has a real value
+                // AND the file actually exists on this device.  Stale local paths
+                // (e.g. from before a deletion or from another device) are ignored.
+                if (profileImage != null && !profileImage.isEmpty()) {
+                    if (profileImage.startsWith("/") && !new java.io.File(profileImage).exists()) {
+                        // Stale local path — file was deleted; skip
+                    } else {
+                        v.put(COLUMN_USER_PROFILE_IMG, profileImage);
+                    }
+                }
+                db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+            } else {
+                // INSERT: new user on this device — use Firestore password as seed
+                String passwordToStore = (firestorePassword != null && !firestorePassword.isEmpty())
+                        ? firestorePassword : "";
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_USER_STUDENT_ID,     studentId);
+                v.put(COLUMN_USER_NAME,           name);
+                v.put(COLUMN_USER_EMAIL,          email);
+                v.put(COLUMN_USER_PASSWORD,       passwordToStore);
+                v.put(COLUMN_USER_ROLE,           role);
+                v.put(COLUMN_USER_DEPARTMENT,     department);
+                v.put(COLUMN_USER_GENDER,         gender       != null ? gender       : "");
+                v.put(COLUMN_USER_MOBILE,         mobile       != null ? mobile       : "");
+                v.put(COLUMN_USER_PROFILE_IMG,    profileImage != null ? profileImage : "");
+                v.put(COLUMN_USER_NOTIF_PREF,     notifPref    != null ? notifPref    : "All Events");
+                v.put(COLUMN_USER_EMAIL_VERIFIED, localEmailVerified ? 1 : 0);
+                db.insertWithOnConflict(TABLE_USERS, null, v, SQLiteDatabase.CONFLICT_IGNORE);
             }
-
-            String passwordToStore = (localPassword != null && !localPassword.isEmpty())
-                    ? localPassword
-                    : (firestorePassword != null ? firestorePassword : "");
-
-            ContentValues v = new ContentValues();
-            v.put(COLUMN_USER_STUDENT_ID,  studentId);
-            v.put(COLUMN_USER_NAME,        name);
-            v.put(COLUMN_USER_EMAIL,       email);
-            v.put(COLUMN_USER_PASSWORD,    passwordToStore);
-            v.put(COLUMN_USER_ROLE,        role);
-            v.put(COLUMN_USER_DEPARTMENT,  department);
-            v.put(COLUMN_USER_GENDER,      gender        != null ? gender        : "");
-            v.put(COLUMN_USER_MOBILE,      mobile        != null ? mobile        : "");
-            v.put(COLUMN_USER_PROFILE_IMG, profileImage  != null ? profileImage  : "");
-            v.put(COLUMN_USER_NOTIF_PREF,  notifPref     != null ? notifPref     : "All Events");
-            v.put(COLUMN_USER_EMAIL_VERIFIED, localEmailVerified ? 1 : 0);
-            db.insertWithOnConflict(TABLE_USERS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
             db.close();
         } catch (Exception e) {
             Log.e("DatabaseHelper", "syncUpsertUser failed", e);
@@ -1732,6 +1849,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Upsert an event row from Firestore. localId is the Firestore doc id (= original SQLite id).
+     * For new rows: full INSERT (venue/is_hidden/time_in_code/time_out_code get defaults).
+     * For existing rows: UPDATE only the Firestore-owned columns;
+     *   venue, is_hidden, time_in_code, time_out_code are local-only and are never touched.
      */
     public void syncUpsertEvent(int localId, String title, String description,
                                  String date, String time, String tags,
@@ -1740,22 +1860,55 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                  String startTime, String endTime) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
-            ContentValues v = new ContentValues();
-            v.put(COLUMN_ID,          localId);
-            v.put(COLUMN_TITLE,       title);
-            v.put(COLUMN_DESC,        description);
-            v.put(COLUMN_DATE,        date);
-            v.put(COLUMN_EVENT_TIME,  time       != null ? time       : "");
-            v.put(COLUMN_START_TIME,  startTime  != null ? startTime  : "");
-            v.put(COLUMN_END_TIME,    endTime    != null ? endTime    : "");
-            v.put(COLUMN_TAGS,        tags       != null ? tags       : "");
-            v.put(COLUMN_ORGANIZER,   organizer);
-            v.put(COLUMN_CATEGORY,    category);
-            v.put(COLUMN_IMAGE_PATH,  imagePath  != null ? imagePath  : "");
-            v.put(COLUMN_STATUS,      status);
-            v.put(COLUMN_CREATOR_SID, creatorSid != null ? creatorSid : "");
-            // venue not synced from legacy Firestore docs — leave existing value
-            db.insertWithOnConflict(TABLE_EVENTS, null, v, SQLiteDatabase.CONFLICT_IGNORE);
+
+            // Check whether this event already exists locally.
+            boolean exists = false;
+            Cursor chk = db.rawQuery(
+                    "SELECT 1 FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?",
+                    new String[]{String.valueOf(localId)});
+            if (chk != null) {
+                exists = chk.moveToFirst();
+                chk.close();
+            }
+
+            if (!exists) {
+                // New event: insert with defaults for local-only columns.
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_ID,          localId);
+                v.put(COLUMN_TITLE,       title);
+                v.put(COLUMN_DESC,        description);
+                v.put(COLUMN_DATE,        date);
+                v.put(COLUMN_EVENT_TIME,  time       != null ? time       : "");
+                v.put(COLUMN_START_TIME,  startTime  != null ? startTime  : "");
+                v.put(COLUMN_END_TIME,    endTime    != null ? endTime    : "");
+                v.put(COLUMN_TAGS,        tags       != null ? tags       : "");
+                v.put(COLUMN_ORGANIZER,   organizer);
+                v.put(COLUMN_CATEGORY,    category);
+                v.put(COLUMN_IMAGE_PATH,  imagePath  != null ? imagePath  : "");
+                v.put(COLUMN_STATUS,      status);
+                v.put(COLUMN_CREATOR_SID, creatorSid != null ? creatorSid : "");
+                // venue, is_hidden, time_in_code, time_out_code use column DEFAULT values
+                db.insertWithOnConflict(TABLE_EVENTS, null, v, SQLiteDatabase.CONFLICT_IGNORE);
+            } else {
+                // Existing event: update Firestore-owned columns only.
+                // Do NOT touch: venue, is_hidden, time_in_code, time_out_code.
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_TITLE,       title);
+                v.put(COLUMN_DESC,        description);
+                v.put(COLUMN_DATE,        date);
+                v.put(COLUMN_EVENT_TIME,  time       != null ? time       : "");
+                v.put(COLUMN_START_TIME,  startTime  != null ? startTime  : "");
+                v.put(COLUMN_END_TIME,    endTime    != null ? endTime    : "");
+                v.put(COLUMN_TAGS,        tags       != null ? tags       : "");
+                v.put(COLUMN_ORGANIZER,   organizer);
+                v.put(COLUMN_CATEGORY,    category);
+                v.put(COLUMN_IMAGE_PATH,  imagePath  != null ? imagePath  : "");
+                v.put(COLUMN_STATUS,      status);
+                v.put(COLUMN_CREATOR_SID, creatorSid != null ? creatorSid : "");
+                db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
+                        new String[]{String.valueOf(localId)});
+            }
+
             db.close();
         } catch (Exception e) {
             Log.e("DatabaseHelper", "syncUpsertEvent failed", e);
@@ -1781,6 +1934,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Upsert a notification row from Firestore.
+     * For new rows: full INSERT (is_read/is_archived/archived_at get defaults of 0/"").
+     * For existing rows: UPDATE only Firestore-owned columns;
+     *   is_read, is_archived, archived_at are local-only and are never touched.
+     * NOTE: the {@code isRead} parameter is kept for API compatibility but is only used
+     * when inserting a brand-new row — existing rows keep their local read state.
      */
     public void syncUpsertNotification(int localNotifId, String recipientSid, int eventId,
                                         String type, String message, String reason,
@@ -1789,19 +1947,48 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                         int isRead, String createdAt) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
-            ContentValues v = new ContentValues();
-            v.put(COLUMN_NOTIF_ID,             localNotifId);
-            v.put(COLUMN_NOTIF_RECIPIENT_SID,  recipientSid);
-            v.put(COLUMN_NOTIF_EVENT_ID,       eventId);
-            v.put(COLUMN_NOTIF_TYPE,           type);
-            v.put(COLUMN_NOTIF_MESSAGE,        message);
-            v.put(COLUMN_NOTIF_REASON,         reason        != null ? reason        : "");
-            v.put(COLUMN_NOTIF_SUGGESTED_DATE, suggestedDate != null ? suggestedDate : "");
-            v.put(COLUMN_NOTIF_SUGGESTED_TIME, suggestedTime != null ? suggestedTime : "");
-            v.put(COLUMN_NOTIF_INSTRUCTIONS,   instructions  != null ? instructions  : "");
-            v.put(COLUMN_NOTIF_IS_READ,        isRead);
-            v.put(COLUMN_NOTIF_CREATED_AT,     createdAt     != null ? createdAt     : "");
-            db.insertWithOnConflict(TABLE_NOTIFICATIONS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+
+            // Check whether this notification already exists locally.
+            boolean exists = false;
+            Cursor chk = db.rawQuery(
+                    "SELECT 1 FROM " + TABLE_NOTIFICATIONS + " WHERE " + COLUMN_NOTIF_ID + "=?",
+                    new String[]{String.valueOf(localNotifId)});
+            if (chk != null) {
+                exists = chk.moveToFirst();
+                chk.close();
+            }
+
+            if (!exists) {
+                // New notification: insert; is_read comes from Firestore, is_archived defaults to 0.
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_NOTIF_ID,             localNotifId);
+                v.put(COLUMN_NOTIF_RECIPIENT_SID,  recipientSid);
+                v.put(COLUMN_NOTIF_EVENT_ID,       eventId);
+                v.put(COLUMN_NOTIF_TYPE,           type);
+                v.put(COLUMN_NOTIF_MESSAGE,        message);
+                v.put(COLUMN_NOTIF_REASON,         reason        != null ? reason        : "");
+                v.put(COLUMN_NOTIF_SUGGESTED_DATE, suggestedDate != null ? suggestedDate : "");
+                v.put(COLUMN_NOTIF_SUGGESTED_TIME, suggestedTime != null ? suggestedTime : "");
+                v.put(COLUMN_NOTIF_INSTRUCTIONS,   instructions  != null ? instructions  : "");
+                v.put(COLUMN_NOTIF_IS_READ,        isRead);
+                v.put(COLUMN_NOTIF_CREATED_AT,     createdAt     != null ? createdAt     : "");
+                // is_archived and archived_at use column DEFAULT values (0 / "")
+                db.insertWithOnConflict(TABLE_NOTIFICATIONS, null, v, SQLiteDatabase.CONFLICT_IGNORE);
+            } else {
+                // Existing notification: update Firestore-owned columns only.
+                // Do NOT touch: is_read, is_archived, archived_at.
+                ContentValues v = new ContentValues();
+                v.put(COLUMN_NOTIF_TYPE,           type);
+                v.put(COLUMN_NOTIF_MESSAGE,        message);
+                v.put(COLUMN_NOTIF_REASON,         reason        != null ? reason        : "");
+                v.put(COLUMN_NOTIF_SUGGESTED_DATE, suggestedDate != null ? suggestedDate : "");
+                v.put(COLUMN_NOTIF_SUGGESTED_TIME, suggestedTime != null ? suggestedTime : "");
+                v.put(COLUMN_NOTIF_INSTRUCTIONS,   instructions  != null ? instructions  : "");
+                v.put(COLUMN_NOTIF_CREATED_AT,     createdAt     != null ? createdAt     : "");
+                db.update(TABLE_NOTIFICATIONS, v, COLUMN_NOTIF_ID + "=?",
+                        new String[]{String.valueOf(localNotifId)});
+            }
+
             db.close();
         } catch (Exception e) {
             Log.e("DatabaseHelper", "syncUpsertNotification failed", e);
@@ -2297,6 +2484,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             new FirestoreHelper().markNotificationRead(notifId);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "markNotificationRead failed", e);
+        }
+    }
+
+    public void markAllNotificationsRead(String studentId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_NOTIF_IS_READ, 1);
+            db.update(TABLE_NOTIFICATIONS, v,
+                    COLUMN_NOTIF_RECIPIENT_SID + "=? AND (" + COLUMN_NOTIF_IS_ARCHIVED + "=0 OR " + COLUMN_NOTIF_IS_ARCHIVED + " IS NULL)",
+                    new String[]{studentId});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "markAllNotificationsRead failed", e);
         }
     }
 

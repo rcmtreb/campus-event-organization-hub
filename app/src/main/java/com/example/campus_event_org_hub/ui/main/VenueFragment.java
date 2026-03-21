@@ -48,7 +48,7 @@ public class VenueFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_venue, container, false);
 
-        dbHelper = new DatabaseHelper(requireContext());
+        dbHelper = DatabaseHelper.getInstance(requireContext());
 
         // Show today's date in header
         TextView tvDate = view.findViewById(R.id.tv_venue_date);

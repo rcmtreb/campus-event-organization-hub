@@ -5,6 +5,8 @@ import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +22,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.concurrent.Executors;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
@@ -54,7 +58,7 @@ public class AdminEventControlActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin_event_control);
 
-        db = new DatabaseHelper(this);
+        db = DatabaseHelper.getInstance(this);
 
         ImageButton btnBack = findViewById(R.id.btn_back_event_control);
         btnBack.setOnClickListener(v -> finish());
@@ -135,22 +139,37 @@ public class AdminEventControlActivity extends AppCompatActivity {
             }
 
             h.btnEdit.setOnClickListener(v -> {
+                int pos = h.getAdapterPosition();
+                if (pos == RecyclerView.NO_ID) return;
+                Event ev = events.get(pos);
                 Intent intent = new Intent(AdminEventControlActivity.this,
                         AdminEditEventActivity.class);
-                intent.putExtra("EVENT_ID",          e.getId());
-                intent.putExtra("EVENT_TITLE",       e.getTitle());
-                intent.putExtra("EVENT_DESC",        e.getDescription());
-                intent.putExtra("EVENT_DATE",        e.getDate());
-                intent.putExtra("EVENT_TIME",        e.getTime());
-                intent.putExtra("EVENT_TAGS",        e.getTags());
-                intent.putExtra("EVENT_ORGANIZER",   e.getOrganizer());
-                intent.putExtra("EVENT_CATEGORY",    e.getCategory());
-                intent.putExtra("EVENT_VENUE",       e.getVenue() != null ? e.getVenue() : "");
+                intent.putExtra("EVENT_ID",          ev.getId());
+                intent.putExtra("EVENT_TITLE",       ev.getTitle());
+                intent.putExtra("EVENT_DESC",        ev.getDescription());
+                intent.putExtra("EVENT_DATE",        ev.getDate());
+                intent.putExtra("EVENT_TIME",        ev.getTime());
+                intent.putExtra("EVENT_TAGS",        ev.getTags());
+                intent.putExtra("EVENT_ORGANIZER",   ev.getOrganizer());
+                intent.putExtra("EVENT_CATEGORY",    ev.getCategory());
+                intent.putExtra("EVENT_VENUE",       ev.getVenue() != null ? ev.getVenue() : "");
                 editLauncher.launch(intent);
             });
-            h.btnDelete.setOnClickListener(v -> confirmDelete(e, position));
-            h.btnCancel.setOnClickListener(v -> showCancelDialog(e, position));
-            h.btnPostpone.setOnClickListener(v -> showPostponeDialog(e, position));
+            h.btnDelete.setOnClickListener(v -> {
+                int pos = h.getAdapterPosition();
+                if (pos == RecyclerView.NO_ID) return;
+                confirmDelete(events.get(pos), pos);
+            });
+            h.btnCancel.setOnClickListener(v -> {
+                int pos = h.getAdapterPosition();
+                if (pos == RecyclerView.NO_ID) return;
+                showCancelDialog(events.get(pos), pos);
+            });
+            h.btnPostpone.setOnClickListener(v -> {
+                int pos = h.getAdapterPosition();
+                if (pos == RecyclerView.NO_ID) return;
+                showPostponeDialog(events.get(pos), pos);
+            });
         }
 
         @Override public int getItemCount() { return events.size(); }
@@ -179,10 +198,13 @@ public class AdminEventControlActivity extends AppCompatActivity {
                 .setTitle("Delete Event")
                 .setMessage("Permanently delete \"" + e.getTitle() + "\"?")
                 .setPositiveButton("Delete", (d, w) -> {
-                    db.deleteEvent(e.getId());
+                    // Remove from list and animate immediately — feels instant
                     events.remove(pos);
                     adapter.notifyItemRemoved(pos);
                     Toast.makeText(this, "Event deleted.", Toast.LENGTH_SHORT).show();
+                    // DB + Firestore delete runs off the main thread — no UI jank
+                    Executors.newSingleThreadExecutor().execute(() ->
+                            db.deleteEvent(e.getId()));
                 })
                 .setNegativeButton("Cancel", null)
                 .show();

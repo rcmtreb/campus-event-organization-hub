@@ -40,7 +40,7 @@ public class ArchivedNotificationsFragment extends Fragment {
         Bundle args = getArguments();
         studentId = args != null ? args.getString("USER_STUDENT_ID", "") : "";
 
-        db = new DatabaseHelper(requireContext());
+        db = DatabaseHelper.getInstance(requireContext());
         archivedList = db.getArchivedNotificationsForUser(studentId);
 
         recyclerView  = view.findViewById(R.id.archive_recycler);

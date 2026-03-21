@@ -58,7 +58,7 @@ public class EmailVerificationPendingActivity extends AppCompatActivity {
         tvEmail.setText(email != null ? email : "");
 
         // Check if already verified in local DB
-        DatabaseHelper db = new DatabaseHelper(this);
+        DatabaseHelper db = DatabaseHelper.getInstance(this);
         if (studentId != null && db.isEmailVerified(studentId)) {
             onVerificationConfirmed();
             return;
@@ -159,7 +159,7 @@ public class EmailVerificationPendingActivity extends AppCompatActivity {
     private void onVerificationConfirmed() {
         // Update local DB + Firestore
         if (studentId != null) {
-            DatabaseHelper db = new DatabaseHelper(this);
+            DatabaseHelper db = DatabaseHelper.getInstance(this);
             db.setEmailVerified(studentId, true);
         }
 
@@ -196,7 +196,7 @@ public class EmailVerificationPendingActivity extends AppCompatActivity {
         } else {
             // Fallback: check local DB
             if (studentId != null) {
-                DatabaseHelper db = new DatabaseHelper(this);
+                DatabaseHelper db = DatabaseHelper.getInstance(this);
                 if (db.isEmailVerified(studentId)) {
                     onVerificationConfirmed();
                 }

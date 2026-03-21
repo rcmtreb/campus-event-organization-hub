@@ -55,17 +55,19 @@ public class MenuFragment extends Fragment {
 
         // Load avatar from DB
         avatarView = view.findViewById(R.id.menu_avatar);
+        String imgPath = null;
         if (avatarView != null && !studentId.isEmpty()) {
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             Cursor c = db.getUserByStudentId(studentId);
             if (c != null && c.moveToFirst()) {
                 int imgIdx = c.getColumnIndex(DatabaseHelper.COLUMN_USER_PROFILE_IMG);
-                String imgPath = imgIdx >= 0 ? c.getString(imgIdx) : null;
-                if (imgPath != null && !imgPath.isEmpty()) {
-                    loadAvatarInto(avatarView, imgPath);
-                }
+                imgPath = imgIdx >= 0 ? c.getString(imgIdx) : null;
                 c.close();
             }
+        }
+        // Always apply avatar (photo or placeholder) so scaleType/tint/padding are correct
+        if (avatarView != null) {
+            loadAvatarInto(avatarView, imgPath);
         }
 
         // Pull-to-refresh: reload avatar
@@ -75,14 +77,12 @@ public class MenuFragment extends Fragment {
                     ContextCompat.getColor(requireContext(), R.color.primary_green));
             swipeRefresh.setOnRefreshListener(() -> {
                 if (avatarView != null && studentId != null && !studentId.isEmpty()) {
-                    DatabaseHelper db = new DatabaseHelper(requireContext());
+                    DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
                     Cursor c = db.getUserByStudentId(studentId);
                     if (c != null && c.moveToFirst()) {
                         int imgIdx = c.getColumnIndex(DatabaseHelper.COLUMN_USER_PROFILE_IMG);
-                        String imgPath = imgIdx >= 0 ? c.getString(imgIdx) : null;
-                        if (imgPath != null && !imgPath.isEmpty()) {
-                            loadAvatarInto(avatarView, imgPath);
-                        }
+                        String refreshedPath = imgIdx >= 0 ? c.getString(imgIdx) : null;
+                        loadAvatarInto(avatarView, refreshedPath);
                         c.close();
                     }
                 }
@@ -163,8 +163,9 @@ public class MenuFragment extends Fragment {
     }
 
     private void loadAvatarInto(ShapeableImageView imageView, String path) {
-        ImageUtils.load(requireContext(), imageView, path, R.drawable.ic_image_placeholder);
-        imageView.clearColorFilter();
+        int paddingPx = Math.round(14 * requireContext().getResources().getDisplayMetrics().density);
+        ImageUtils.loadAvatar(requireContext(), imageView, path,
+                R.color.text_on_primary, paddingPx);
     }
 
     @Override
@@ -172,14 +173,12 @@ public class MenuFragment extends Fragment {
         super.onResume();
         // Reload avatar from DB in case it was updated while this fragment was in the back stack
         if (avatarView != null && studentId != null && !studentId.isEmpty()) {
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             Cursor c = db.getUserByStudentId(studentId);
             if (c != null && c.moveToFirst()) {
                 int imgIdx = c.getColumnIndex(DatabaseHelper.COLUMN_USER_PROFILE_IMG);
                 String imgPath = imgIdx >= 0 ? c.getString(imgIdx) : null;
-                if (imgPath != null && !imgPath.isEmpty()) {
-                    loadAvatarInto(avatarView, imgPath);
-                }
+                loadAvatarInto(avatarView, imgPath);
                 c.close();
             }
         }

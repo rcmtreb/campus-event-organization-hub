@@ -62,7 +62,7 @@ public class LoginActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_login);
 
-        DatabaseHelper db = new DatabaseHelper(this);
+        DatabaseHelper db = DatabaseHelper.getInstance(this);
 
         EditText etEmail        = findViewById(R.id.et_login_email);
         EditText etPassword     = findViewById(R.id.et_login_password);
@@ -126,6 +126,41 @@ public class LoginActivity extends AppCompatActivity {
 
         tvGoToRegister.setOnClickListener(v ->
                 startActivity(new Intent(LoginActivity.this, RegisterActivity.class)));
+    }
+
+    /**
+     * Self-heal for accounts whose BCrypt password was wiped by the old sync bug.
+     * Verifies the user's credentials via Firebase Auth, then re-hashes and restores
+     * the password in SQLite (and pushes it back to Firestore).
+     */
+    private void healEmptyPassword(DatabaseHelper db, SessionManager session,
+                                   String loginInput, String password) {
+        // We need the email to sign in with Firebase Auth
+        String email = db.getEmailForLoginInput(loginInput);
+        if (email == null || email.isEmpty()) email = loginInput;
+
+        final String firebaseEmail = email;
+        FirebaseAuth.getInstance().signInWithEmailAndPassword(firebaseEmail, password)
+                .addOnSuccessListener(authResult -> {
+                    Log.d(TAG, "Firebase Auth confirmed correct password — restoring hash");
+                    FirebaseAuth.getInstance().signOut();
+                    // Re-hash on background thread (BCrypt is slow)
+                    new Thread(() -> {
+                        db.restorePassword(loginInput, password);
+                        runOnUiThread(() -> {
+                            // Now retry local login — password is restored
+                            attemptLocalLogin(db, session, loginInput, password);
+                        });
+                    }).start();
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "Heal failed — Firebase Auth rejected credentials", e);
+                    db.incrementLoginAttempts(loginInput);
+                    int attemptsLeft = 5 - getLoginAttempts(db, loginInput);
+                    Toast.makeText(this,
+                            "Invalid credentials. " + attemptsLeft + " attempts remaining.",
+                            Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void attemptLocalLogin(DatabaseHelper db, SessionManager session,
@@ -215,7 +250,18 @@ public class LoginActivity extends AppCompatActivity {
 
             } else {
                 if (cursor != null) cursor.close();
-                
+
+                // ── Self-heal: password wiped by old sync bug ─────────────────
+                // If the user exists in local DB but has an empty password (caused by
+                // a previous CONFLICT_REPLACE sync overwriting the BCrypt hash with ""),
+                // use Firebase Auth to verify the credentials are correct, then
+                // re-hash and restore the password locally so future logins work.
+                if (db.userExistsWithEmptyPassword(loginInput)) {
+                    Log.w(TAG, "User exists with empty password — attempting Firebase Auth self-heal");
+                    healEmptyPassword(db, session, loginInput, password);
+                    return;
+                }
+
                 db.incrementLoginAttempts(loginInput);
                 
                 if (db.isLoginLocked(loginInput)) {

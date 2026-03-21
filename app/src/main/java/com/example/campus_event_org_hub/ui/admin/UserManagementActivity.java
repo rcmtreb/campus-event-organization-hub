@@ -49,7 +49,7 @@ public class UserManagementActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_user_management);
 
-        db = new DatabaseHelper(this);
+        db = DatabaseHelper.getInstance(this);
 
         // Back
         findViewById(R.id.btn_back_user_mgmt).setOnClickListener(v -> finish());

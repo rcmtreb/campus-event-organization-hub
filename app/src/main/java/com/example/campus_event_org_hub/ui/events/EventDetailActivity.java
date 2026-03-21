@@ -105,7 +105,7 @@ public class EventDetailActivity extends AppCompatActivity {
                     Toast.makeText(this, "Sharing event: " + event.getTitle(), Toast.LENGTH_SHORT).show());
 
             // ── Registration state ────────────────────────────────────────────
-            DatabaseHelper db = new DatabaseHelper(this);
+            DatabaseHelper db = DatabaseHelper.getInstance(this);
             final String finalStudentId = studentId;
             final String finalUserRole  = userRole;
             final int eventId = event.getId();

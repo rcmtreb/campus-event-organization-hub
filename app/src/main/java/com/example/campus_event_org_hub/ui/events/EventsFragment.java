@@ -51,6 +51,7 @@ public class EventsFragment extends Fragment {
     private ActivityResultLauncher<Intent> eventDetailLauncher;
 
     private String filterDept = "";
+    private String currentCategory = "All";
     private int scrollPosition = 0;
 
     @Override
@@ -82,7 +83,7 @@ public class EventsFragment extends Fragment {
         }
 
         try {
-            dbHelper = new DatabaseHelper(requireContext());
+            dbHelper = DatabaseHelper.getInstance(requireContext());
 
             if (getArguments() != null) {
                 String d = getArguments().getString("FILTER_DEPT", "");
@@ -156,7 +157,10 @@ public class EventsFragment extends Fragment {
             chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
                 if (!checkedIds.isEmpty() && adapter != null) {
                     Chip chip = group.findViewById(checkedIds.get(0));
-                    if (chip != null) adapter.filterByCategory(chip.getText().toString());
+                    if (chip != null) {
+                        currentCategory = chip.getText().toString();
+                        adapter.filterByCategory(currentCategory);
+                    }
                 }
             });
         }
@@ -218,14 +222,14 @@ public class EventsFragment extends Fragment {
             List<Event> fresh = dbHelper.getAllEvents(filterDept);
             if (fresh == null) fresh = new ArrayList<>();
 
-            eventList.clear();
+            List<Event> upcoming = new ArrayList<>();
             for (Event e : fresh) {
                 String eventDate = e.getDate();
                 if (eventDate != null && eventDate.compareTo(today) >= 0) {
-                    eventList.add(e);
+                    upcoming.add(e);
                 }
             }
-            adapter.notifyDataSetChanged();
+            adapter.updateFullList(upcoming, currentCategory);
             recyclerView.smoothScrollToPosition(0);
         } catch (Exception e) {
             Log.e(TAG, "Error in reloadEvents", e);

@@ -60,7 +60,7 @@ public class DiscoverFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_discover, container, false);
 
-        dbHelper = new DatabaseHelper(requireContext());
+        dbHelper = DatabaseHelper.getInstance(requireContext());
 
         Bundle args = getArguments();
         userDept = args != null ? args.getString("USER_DEPT", "") : "";

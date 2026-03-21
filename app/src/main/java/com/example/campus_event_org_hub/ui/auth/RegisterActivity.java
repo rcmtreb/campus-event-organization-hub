@@ -47,7 +47,7 @@ public class RegisterActivity extends AppCompatActivity {
         setContentView(R.layout.activity_register);
 
         mAuth = FirebaseAuth.getInstance();
-        DatabaseHelper db = new DatabaseHelper(this);
+        DatabaseHelper db = DatabaseHelper.getInstance(this);
 
         EditText etName = findViewById(R.id.et_reg_name);
         EditText etStudentId = findViewById(R.id.et_reg_id);

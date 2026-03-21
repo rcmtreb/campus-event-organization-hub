@@ -3,61 +3,137 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="@dimen/space_2"
+    android:layout_marginHorizontal="@dimen/space_3"
+    android:layout_marginBottom="@dimen/space_3"
+    android:foreground="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
     app:cardCornerRadius="@dimen/radius_medium"
     app:cardElevation="@dimen/elevation_low">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="@dimen/space_3">
+        android:orientation="vertical">
 
+        <!-- Image banner -->
         <ImageView
             android:id="@+id/approve_event_image"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="match_parent"
+            android:layout_height="140dp"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_image_placeholder" />
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="@dimen/space_3"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="@dimen/space_3">
 
+            <!-- Title -->
             <TextView
                 android:id="@+id/approve_event_title"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Event Title"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:maxLines="2"
+                android:ellipsize="end" />
 
+            <!-- Category badge -->
             <TextView
-                android:id="@+id/approve_event_organizer"
+                android:id="@+id/approve_event_category"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Organizer"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:layout_marginTop="@dimen/space_1"
+                android:paddingHorizontal="@dimen/space_2"
+                android:paddingVertical="2dp"
+                android:background="@color/primary_light"
+                android:textColor="@color/primary_dark"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
 
+            <!-- Date + Organizer row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="@dimen/space_2">
+                android:layout_marginTop="@dimen/space_2"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_calendar"
+                    app:tint="@color/text_hint" />
+
+                <TextView
+                    android:id="@+id/approve_event_date"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/space_1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_person"
+                    app:tint="@color/text_hint" />
+
+                <TextView
+                    android:id="@+id/approve_event_organizer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_1"
+                    android:text="Organizer"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <!-- Description preview -->
+            <TextView
+                android:id="@+id/approve_event_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_2"
+                android:textColor="@color/text_hint"
+                android:textSize="12sp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:visibility="gone" />
+
+            <!-- Tap hint -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_2"
+                android:text="Tap to view full details"
+                android:textColor="@color/text_hint"
+                android:textSize="11sp"
+                android:textStyle="italic" />
+
+            <!-- Action buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="@dimen/space_3">
 
                 <Button
                     android:id="@+id/btn_approve_now"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="40dp"
                     android:layout_weight="1"
                     android:text="Approve"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:backgroundTint="@color/success_green"
                     android:textColor="@color/white" />
 
@@ -65,11 +141,11 @@
                     android:id="@+id/btn_reject_now"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="40dp"
                     android:layout_weight="1"
                     android:layout_marginStart="@dimen/space_2"
                     android:text="Reject"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:backgroundTint="@color/error_red"
                     android:textColor="@color/white" />
             </LinearLayout>

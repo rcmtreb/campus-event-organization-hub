@@ -48,7 +48,7 @@ public class OfficerPendingEventsFragment extends Fragment {
     }
 
     private void loadPendingEvents() {
-        DatabaseHelper db = new DatabaseHelper(requireContext());
+        DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
         List<Event> pending = db.getEventsByCreatorSid(officerSid);
 
         // Keep only PENDING status

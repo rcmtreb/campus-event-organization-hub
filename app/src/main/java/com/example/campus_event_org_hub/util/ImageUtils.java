@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.widget.ImageView;
 
+import androidx.annotation.ColorRes;
 import androidx.annotation.DrawableRes;
 
 import com.example.campus_event_org_hub.R;
@@ -94,6 +95,57 @@ public final class ImageUtils {
     }
 
     /**
+     * Loads a profile/avatar image into a ShapeableImageView.
+     *
+     * When {@code path} is empty or the file cannot be decoded:
+     *   – Sets the placeholder icon (ic_person)
+     *   – Restores the tint to {@code placeholderTintColor}
+     *   – Restores the inner padding to {@code placeholderPaddingPx}
+     *
+     * When the image loads successfully:
+     *   – Clears the tint (setImageTintList(null)) and color filter
+     *   – Removes padding so the photo fills the full circle
+     *
+     * @param ctx                  Context
+     * @param imageView            Target ShapeableImageView (or any ImageView)
+     * @param path                 Absolute file path or content URI string, may be null/empty
+     * @param placeholderTintColor Color resource ID to apply as tint when showing placeholder
+     * @param placeholderPaddingPx Padding in pixels to restore when showing placeholder
+     */
+    public static void loadAvatar(Context ctx, ImageView imageView, String path,
+                                  @ColorRes int placeholderTintColor, int placeholderPaddingPx) {
+        if (path == null || path.isEmpty()) {
+            showAvatarPlaceholder(imageView);
+            return;
+        }
+        Bitmap bmp = decodeBitmap(ctx, path, imageView);
+        if (bmp != null) {
+            imageView.clearColorFilter();
+            imageView.setImageTintList(null);
+            imageView.setPadding(0, 0, 0, 0);
+            imageView.setBackground(null);
+            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            imageView.setImageBitmap(bmp);
+        } else {
+            showAvatarPlaceholder(imageView);
+        }
+    }
+
+    /**
+     * Resets an avatar ImageView to the placeholder state using a self-contained
+     * layer-list drawable (green circle + white person icon).  No padding,
+     * background, or tint manipulation needed.
+     */
+    private static void showAvatarPlaceholder(ImageView imageView) {
+        imageView.setImageTintList(null);
+        imageView.clearColorFilter();
+        imageView.setPadding(0, 0, 0, 0);
+        imageView.setBackground(null);
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        imageView.setImageResource(R.drawable.avatar_placeholder);
+    }
+
+    /**
      * Load an image into {@code imageView} from {@code path}, falling back to
      * {@code placeholderRes} on any error or when {@code path} is empty.
      *
@@ -112,8 +164,20 @@ public final class ImageUtils {
             imageView.setImageResource(placeholderRes);
             return;
         }
+        Bitmap bmp = decodeBitmap(ctx, path, imageView);
+        if (bmp != null) {
+            // Clear any color filter AND XML tint so the real photo renders correctly.
+            imageView.clearColorFilter();
+            imageView.setImageTintList(null);
+            imageView.setImageBitmap(bmp);
+        } else {
+            imageView.setImageResource(placeholderRes);
+        }
+    }
+
+    /** Decode a bitmap from an absolute path or content URI string. Returns null on failure. */
+    private static Bitmap decodeBitmap(Context ctx, String path, ImageView imageView) {
         try {
-            Bitmap bmp = null;
             if (path.startsWith("/")) {
                 // ── Step 1: read bounds only ──────────────────────────────
                 BitmapFactory.Options opts = new BitmapFactory.Options();
@@ -121,11 +185,11 @@ public final class ImageUtils {
                 BitmapFactory.decodeFile(path, opts);
 
                 // ── Step 2: compute sample size ───────────────────────────
-                opts.inSampleSize    = calculateInSampleSize(opts, imageView);
+                opts.inSampleSize       = calculateInSampleSize(opts, imageView);
                 opts.inJustDecodeBounds = false;
                 opts.inPreferredConfig  = Bitmap.Config.ARGB_8888;
 
-                bmp = BitmapFactory.decodeFile(path, opts);
+                return BitmapFactory.decodeFile(path, opts);
             } else {
                 // Content URI — must use ContentResolver; NEVER call setImageURI()
                 Uri uri = Uri.parse(path);
@@ -143,24 +207,15 @@ public final class ImageUtils {
 
                 is = ctx.getContentResolver().openInputStream(uri);
                 if (is != null) {
-                    bmp = BitmapFactory.decodeStream(is, null, opts);
+                    Bitmap bmp = BitmapFactory.decodeStream(is, null, opts);
                     is.close();
+                    return bmp;
                 }
             }
-            if (bmp != null) {
-                // Clear any color filter AND XML tint so the real photo renders correctly.
-                // clearColorFilter() only clears setColorFilter(); setImageTintList(null)
-                // is needed to remove any app:tint set in XML.
-                imageView.clearColorFilter();
-                imageView.setImageTintList(null);
-                imageView.setImageBitmap(bmp);
-            } else {
-                imageView.setImageResource(placeholderRes);
-            }
         } catch (Exception e) {
-            // SecurityException, FileNotFoundException, IOException, etc.
-            imageView.setImageResource(placeholderRes);
+            // SecurityException, FileNotFoundException, IOException, etc. — return null
         }
+        return null;
     }
 
     /**

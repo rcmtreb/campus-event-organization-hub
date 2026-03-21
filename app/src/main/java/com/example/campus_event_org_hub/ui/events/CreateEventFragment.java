@@ -245,7 +245,7 @@ public class CreateEventFragment extends Fragment {
             String organizerDisplay = organizer + " \u2013 " + venue + " \u2013 " + dept;
 
             String imagePath = selectedImageUri != null ? selectedImageUri.toString() : "";
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             Event newEvent = new Event(title, desc, date, startTime + " - " + endTime, tags, organizerDisplay, category, imagePath, "PENDING");
             newEvent.setCreatorSid(userStudentId);
             newEvent.setVenue(venue);

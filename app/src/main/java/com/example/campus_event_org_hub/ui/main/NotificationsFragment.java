@@ -67,7 +67,7 @@ public class NotificationsFragment extends Fragment {
         Bundle args = getArguments();
         studentId = args != null ? args.getString("USER_STUDENT_ID", "") : "";
 
-        db = new DatabaseHelper(requireContext());
+        db = DatabaseHelper.getInstance(requireContext());
         allNotifs     = db.getNotificationsForUser(studentId);
         visibleNotifs = new ArrayList<>(allNotifs);
 
@@ -169,6 +169,7 @@ public class NotificationsFragment extends Fragment {
     private void reloadNotifications() {
         selectionMode = false;
         selectedIds.clear();
+        db.markAllNotificationsRead(studentId);
         allNotifs.clear();
         allNotifs.addAll(db.getNotificationsForUser(studentId));
         visibleNotifs.clear();

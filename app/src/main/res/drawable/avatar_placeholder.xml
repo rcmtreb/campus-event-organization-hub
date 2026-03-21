@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Self-contained circular avatar placeholder: green circle + white person icon -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Green circle background -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/primary_green_dark"/>
+        </shape>
+    </item>
+
+    <!-- Person icon centred inside the circle with padding -->
+    <item
+        android:drawable="@drawable/ic_person"
+        android:gravity="center"
+        android:left="16dp"
+        android:right="16dp"
+        android:top="16dp"
+        android:bottom="16dp"/>
+
+</layer-list>

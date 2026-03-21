@@ -80,7 +80,7 @@ public class RegisteredEventsFragment extends Fragment {
             return;
         }
 
-        DatabaseHelper db = new DatabaseHelper(requireContext());
+        DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
         List<Event> events = db.getRegisteredEvents(sid);
 
         if (events.isEmpty()) {

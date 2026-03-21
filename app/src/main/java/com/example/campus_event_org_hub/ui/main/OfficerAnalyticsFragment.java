@@ -35,7 +35,7 @@ public class OfficerAnalyticsFragment extends Fragment {
         LinearLayout breakdownContainer = view.findViewById(R.id.container_event_breakdown);
         View tvNoEvents              = view.findViewById(R.id.tv_no_events);
 
-        DatabaseHelper db = new DatabaseHelper(requireContext());
+        DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
 
         List<Event> officerEvents = db.getEventsByOfficer(officerName);
         int totalRegs = db.getTotalRegistrationsForOfficer(officerName);

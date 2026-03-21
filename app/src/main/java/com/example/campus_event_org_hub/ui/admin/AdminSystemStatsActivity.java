@@ -24,7 +24,7 @@ public class AdminSystemStatsActivity extends AppCompatActivity {
         ImageButton btnBack = findViewById(R.id.btn_back_sys_stats);
         btnBack.setOnClickListener(v -> finish());
 
-        DatabaseHelper db = new DatabaseHelper(this);
+        DatabaseHelper db = DatabaseHelper.getInstance(this);
         Map<String, Object> stats = db.getSystemStats();
 
         // Users

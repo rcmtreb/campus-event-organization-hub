@@ -89,7 +89,7 @@ public class OfficerMyEventsFragment extends Fragment {
     }
 
     private void loadEvents() {
-        DatabaseHelper db = new DatabaseHelper(requireContext());
+        DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
 
         // Start with events the officer created
         List<Event> created = db.getEventsByCreatorSid(officerSid);
@@ -160,7 +160,7 @@ public class OfficerMyEventsFragment extends Fragment {
     // ── Dialog: attendance code management ──────────────────────────────────
 
     void showAttendanceCodeDialog(Event event) {
-        DatabaseHelper db = new DatabaseHelper(requireContext());
+        DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
         List<Event> fresh = db.getEventsByCreatorSid(officerSid);
         Event ev = event;
         for (Event fe : fresh) { if (fe.getId() == event.getId()) { ev = fe; break; } }
@@ -242,7 +242,7 @@ public class OfficerMyEventsFragment extends Fragment {
     // ── Dialog: officer confirms admin date or proposes their own ────────────
 
     void showPostponedActionDialog(Event e) {
-        DatabaseHelper db = new DatabaseHelper(requireContext());
+        DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
         final String adminDate = e.getDate();
         final Event finalEvent = e;
         final DatabaseHelper finalDb = db;

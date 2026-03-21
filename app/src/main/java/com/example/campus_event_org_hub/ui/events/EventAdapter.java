@@ -257,6 +257,13 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         }
     };
 
+    /** Replaces the full backing list (used after a data refresh) then re-applies the active filter. */
+    public void updateFullList(List<Event> freshList, String activeCategory) {
+        eventListFull.clear();
+        eventListFull.addAll(freshList);
+        filterByCategory(activeCategory != null ? activeCategory : "All");
+    }
+
     public void filterByCategory(String category) {
         List<Event> filteredList = new ArrayList<>();
         if (category.equalsIgnoreCase("All")) {

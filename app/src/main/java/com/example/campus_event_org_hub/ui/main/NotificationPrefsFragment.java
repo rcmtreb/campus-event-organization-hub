@@ -36,7 +36,7 @@ public class NotificationPrefsFragment extends Fragment {
 
         // Load current pref from DB
         if (!sid.isEmpty()) {
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             Cursor c = db.getUserByStudentId(sid);
             if (c != null && c.moveToFirst()) {
                 int idx = c.getColumnIndex(DatabaseHelper.COLUMN_USER_NOTIF_PREF);
@@ -57,7 +57,7 @@ public class NotificationPrefsFragment extends Fragment {
                 Toast.makeText(getContext(), "Cannot save: no student ID.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             db.updateNotifPref(sid, selected);
             Toast.makeText(getContext(), "Preferences saved!", Toast.LENGTH_SHORT).show();
         });

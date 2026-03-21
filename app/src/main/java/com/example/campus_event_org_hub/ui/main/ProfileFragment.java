@@ -100,7 +100,7 @@ public class ProfileFragment extends Fragment {
 
         // Load existing profile data from DB
         if (!studentId.isEmpty()) {
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             Cursor c = db.getUserByStudentId(studentId);
             if (c != null && c.moveToFirst()) {
                 int gIdx   = c.getColumnIndex(DatabaseHelper.COLUMN_USER_GENDER);
@@ -113,13 +113,15 @@ public class ProfileFragment extends Fragment {
 
                 if (savedGender != null && !savedGender.isEmpty()) genderDropdown.setText(savedGender, false);
                 if (savedMobile != null && !savedMobile.isEmpty()) mobileField.setText(savedMobile);
-                if (savedImg != null && !savedImg.isEmpty()) {
+                if (savedImg != null && !savedImg.isEmpty()
+                        && new File(savedImg).exists()) {
                     selectedImagePath = savedImg;
-                    loadAvatarFromPath(savedImg);
                 }
                 c.close();
             }
         }
+        // Always apply avatar (photo or placeholder) so scaleType/tint/padding are correct
+        loadAvatarFromPath(selectedImagePath);
 
         // Tap avatar to show Upload / Delete dialog
         view.findViewById(R.id.profile_avatar_container).setOnClickListener(v ->
@@ -140,7 +142,13 @@ public class ProfileFragment extends Fragment {
             // If neither (no change), pass null which skips the column update.
             String imgPathForDb = imageDeleted ? "" : selectedImagePath;
 
-            DatabaseHelper db = new DatabaseHelper(requireContext());
+            // If user chose to delete, also remove the file from disk so it
+            // cannot be resurrected by a stale Firestore path on next sync.
+            if (imageDeleted) {
+                deleteProfileFileFromDisk();
+            }
+
+            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             boolean ok = db.updateUserProfile(studentId, gender, mobile, imgPathForDb);
             Toast.makeText(getContext(), ok ? "Profile saved!" : "Save failed.", Toast.LENGTH_SHORT).show();
             if (ok) {
@@ -186,16 +194,8 @@ public class ProfileFragment extends Fragment {
     private void deleteProfileImage() {
         selectedImagePath = null;
         imageDeleted = true;
-        // Reset avatar to placeholder with tint restored
-        if (avatarView != null) {
-            avatarView.setImageResource(R.drawable.ic_person);
-            avatarView.setImageTintList(
-                    android.content.res.ColorStateList.valueOf(
-                            androidx.core.content.ContextCompat.getColor(
-                                    requireContext(), R.color.text_on_primary)));
-            avatarView.setPadding(
-                    dpToPx(10), dpToPx(10), dpToPx(10), dpToPx(10));
-        }
+        // Reset avatar to placeholder (null path → loadAvatar shows ic_person with correct tint/padding)
+        loadAvatarFromPath(null);
         Toast.makeText(getContext(), "Photo removed. Tap Save to confirm.", Toast.LENGTH_SHORT).show();
     }
 
@@ -241,9 +241,21 @@ public class ProfileFragment extends Fragment {
 
     /** Load avatar from an internal file path (absolute) or content URI string. */
     private void loadAvatarFromPath(String path) {
-        // ImageUtils.load() already calls clearColorFilter() + setImageTintList(null)
-        ImageUtils.load(requireContext(), avatarView, path, R.drawable.ic_image_placeholder);
-        avatarView.setPadding(0, 0, 0, 0);
+        int paddingPx = dpToPx(10);
+        ImageUtils.loadAvatar(requireContext(), avatarView, path,
+                R.color.text_on_primary, paddingPx);
+    }
+
+    /**
+     * Permanently delete the profile photo file from internal storage so that a
+     * stale Firestore path can never resurrect it on the next sync.
+     */
+    private void deleteProfileFileFromDisk() {
+        try {
+            String safeId = studentId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+            File f = new File(requireContext().getFilesDir(), "profile_pics/" + safeId + ".jpg");
+            if (f.exists()) f.delete();
+        } catch (Exception ignored) {}
     }
 
     private int dpToPx(int dp) {

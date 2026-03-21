@@ -34,7 +34,7 @@ public class AdminActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin);
 
-        db = new DatabaseHelper(this);
+        db = DatabaseHelper.getInstance(this);
 
         swipeRefresh = findViewById(R.id.swipe_refresh_admin);
         swipeRefresh.setColorSchemeResources(R.color.primary_blue);

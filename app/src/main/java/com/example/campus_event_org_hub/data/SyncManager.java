@@ -38,7 +38,7 @@ public class SyncManager {
      */
     public static void sync(Context context, Runnable onComplete) {
         EXECUTOR.execute(() -> {
-            DatabaseHelper db   = new DatabaseHelper(context.getApplicationContext());
+            DatabaseHelper db   = DatabaseHelper.getInstance(context);
             FirestoreHelper fsh = new FirestoreHelper();
 
             syncUsers(db, fsh);
