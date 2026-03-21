@@ -2,11 +2,16 @@ package com.example.campus_event_org_hub.data;
 
 import android.util.Log;
 
+import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Thin wrapper around Firestore.
@@ -117,6 +122,81 @@ public class FirestoreHelper {
         db.collection(COL_USERS).document(studentId)
                 .delete()
                 .addOnFailureListener(e -> Log.e(TAG, "deleteUser failed: " + studentId, e));
+    }
+
+    /**
+     * Delete all Firestore registration documents belonging to a student.
+     * Fire-and-forget — called alongside the local SQLite delete.
+     */
+    public void deleteUserRegistrations(String studentId) {
+        db.collection(COL_REGISTRATIONS)
+                .whereEqualTo("student_id", studentId)
+                .get()
+                .addOnSuccessListener(snap -> {
+                    for (DocumentSnapshot doc : snap.getDocuments()) {
+                        doc.getReference().delete()
+                                .addOnFailureListener(e -> Log.e(TAG, "deleteUserRegistration doc failed", e));
+                    }
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "deleteUserRegistrations query failed: " + studentId, e));
+    }
+
+    /**
+     * Delete all Firestore notification documents addressed to a student.
+     * Fire-and-forget — called alongside the local SQLite delete.
+     */
+    public void deleteUserNotifications(String studentId) {
+        db.collection(COL_NOTIFICATIONS)
+                .whereEqualTo("recipient_sid", studentId)
+                .get()
+                .addOnSuccessListener(snap -> {
+                    for (DocumentSnapshot doc : snap.getDocuments()) {
+                        doc.getReference().delete()
+                                .addOnFailureListener(e -> Log.e(TAG, "deleteUserNotification doc failed", e));
+                    }
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "deleteUserNotifications query failed: " + studentId, e));
+    }
+
+    /**
+     * Wipe all data from every Firestore collection.
+     * Admin user documents (role == "Admin") are preserved.
+     * MUST be called from a background thread — uses Tasks.await() internally.
+     */
+    public void deleteAllData() throws Exception {
+        deleteCollection(COL_REGISTRATIONS, null, null);
+        deleteCollection(COL_NOTIFICATIONS, null, null);
+        deleteCollection(COL_EVENTS, null, null);
+        deleteCollection(COL_USERS, "role", "Admin"); // keep admins
+    }
+
+    /**
+     * Delete all documents in a Firestore collection, optionally skipping documents
+     * where {@code skipField} equals {@code skipValue}.
+     * Uses WriteBatch (max 500 per commit) and Tasks.await() — background thread only.
+     */
+    private void deleteCollection(String collectionName, String skipField, String skipValue)
+            throws Exception {
+        QuerySnapshot snapshot = Tasks.await(
+                db.collection(collectionName).get(), 30, TimeUnit.SECONDS);
+        WriteBatch batch = db.batch();
+        int count = 0;
+        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+            if (skipField != null) {
+                String val = doc.getString(skipField);
+                if (skipValue.equals(val)) continue;
+            }
+            batch.delete(doc.getReference());
+            count++;
+            if (count == 500) {
+                Tasks.await(batch.commit(), 30, TimeUnit.SECONDS);
+                batch = db.batch();
+                count = 0;
+            }
+        }
+        if (count > 0) {
+            Tasks.await(batch.commit(), 30, TimeUnit.SECONDS);
+        }
     }
 
     // ── Events ────────────────────────────────────────────────────────────────

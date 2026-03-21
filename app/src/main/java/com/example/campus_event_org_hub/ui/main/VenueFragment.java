@@ -8,9 +8,11 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
@@ -35,6 +37,10 @@ public class VenueFragment extends Fragment {
             {"Conference Room B",  "50"},
     };
 
+    private DatabaseHelper dbHelper;
+    private RecyclerView rv;
+    private SwipeRefreshLayout swipeRefresh;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -42,7 +48,7 @@ public class VenueFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_venue, container, false);
 
-        DatabaseHelper dbHelper = new DatabaseHelper(requireContext());
+        dbHelper = new DatabaseHelper(requireContext());
 
         // Show today's date in header
         TextView tvDate = view.findViewById(R.id.tv_venue_date);
@@ -50,24 +56,37 @@ public class VenueFragment extends Fragment {
                 .format(Calendar.getInstance().getTime());
         tvDate.setText(today);
 
+        rv = view.findViewById(R.id.rv_venues);
+        rv.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        swipeRefresh = view.findViewById(R.id.swipe_refresh_venue);
+        if (swipeRefresh != null) {
+            swipeRefresh.setColorSchemeColors(
+                    ContextCompat.getColor(requireContext(), R.color.primary_green));
+            swipeRefresh.setOnRefreshListener(() -> {
+                loadData();
+                swipeRefresh.setRefreshing(false);
+            });
+        }
+
+        loadData();
+
+        return view;
+    }
+
+    private void loadData() {
         String todayDb = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 .format(Calendar.getInstance().getTime());
 
-        // Build venue data with today's bookings
         List<VenueItem> items = new ArrayList<>();
         for (String[] v : VENUES) {
             String name     = v[0];
             String capacity = v[1];
-            // Query events that mention this venue in tags (e.g. #GYM) or title
             List<Event> bookings = dbHelper.getEventsByVenueAndDate(name, todayDb);
             items.add(new VenueItem(name, capacity, bookings));
         }
 
-        RecyclerView rv = view.findViewById(R.id.rv_venues);
-        rv.setLayoutManager(new LinearLayoutManager(requireContext()));
         rv.setAdapter(new VenueAdapter(items));
-
-        return view;
     }
 
     // ── Data model ────────────────────────────────────────────────────────

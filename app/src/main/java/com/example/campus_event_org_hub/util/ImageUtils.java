@@ -148,8 +148,11 @@ public final class ImageUtils {
                 }
             }
             if (bmp != null) {
-                // Clear any XML tint so the real photo renders with correct colours
+                // Clear any color filter AND XML tint so the real photo renders correctly.
+                // clearColorFilter() only clears setColorFilter(); setImageTintList(null)
+                // is needed to remove any app:tint set in XML.
                 imageView.clearColorFilter();
+                imageView.setImageTintList(null);
                 imageView.setImageBitmap(bmp);
             } else {
                 imageView.setImageResource(placeholderRes);

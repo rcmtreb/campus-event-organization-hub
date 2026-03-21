@@ -1,6 +1,7 @@
 package com.example.campus_event_org_hub.ui.main;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
@@ -42,6 +43,8 @@ public class ProfileFragment extends Fragment {
 
     private String studentId, email, dept, name, role;
     private String selectedImagePath = null;
+    /** True when the user has explicitly deleted their photo this session (before saving). */
+    private boolean imageDeleted = false;
     private ImageView avatarView;
     private OnProfileUpdatedListener profileUpdatedListener;
 
@@ -74,11 +77,11 @@ public class ProfileFragment extends Fragment {
         studentId = args != null ? args.getString("USER_STUDENT_ID", "")        : "";
 
         avatarView = view.findViewById(R.id.profile_avatar);
-        TextView tvName     = view.findViewById(R.id.profile_name);
+        TextView tvName      = view.findViewById(R.id.profile_name);
         TextView tvRoleBadge = view.findViewById(R.id.profile_role_badge);
-        TextView tvSid      = view.findViewById(R.id.profile_student_id);
-        TextView tvEmail    = view.findViewById(R.id.profile_email);
-        TextView tvDept     = view.findViewById(R.id.profile_dept);
+        TextView tvSid       = view.findViewById(R.id.profile_student_id);
+        TextView tvEmail     = view.findViewById(R.id.profile_email);
+        TextView tvDept      = view.findViewById(R.id.profile_dept);
 
         tvName.setText(name);
         tvRoleBadge.setText(role);
@@ -118,12 +121,9 @@ public class ProfileFragment extends Fragment {
             }
         }
 
-        // Tap avatar to pick image
-        view.findViewById(R.id.profile_avatar_container).setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_PICK);
-            intent.setType("image/*");
-            startActivityForResult(intent, PICK_IMAGE_REQUEST);
-        });
+        // Tap avatar to show Upload / Delete dialog
+        view.findViewById(R.id.profile_avatar_container).setOnClickListener(v ->
+                showAvatarOptionsDialog());
 
         // Save button
         view.findViewById(R.id.profile_save_btn).setOnClickListener(v -> {
@@ -135,15 +135,68 @@ public class ProfileFragment extends Fragment {
                 return;
             }
 
+            // If imageDeleted is true, pass "" to explicitly clear DB column.
+            // If selectedImagePath is non-null, pass it to update.
+            // If neither (no change), pass null which skips the column update.
+            String imgPathForDb = imageDeleted ? "" : selectedImagePath;
+
             DatabaseHelper db = new DatabaseHelper(requireContext());
-            boolean ok = db.updateUserProfile(studentId, gender, mobile, selectedImagePath);
+            boolean ok = db.updateUserProfile(studentId, gender, mobile, imgPathForDb);
             Toast.makeText(getContext(), ok ? "Profile saved!" : "Save failed.", Toast.LENGTH_SHORT).show();
-            if (ok && profileUpdatedListener != null) {
-                profileUpdatedListener.onProfilePictureUpdated(selectedImagePath);
+            if (ok) {
+                imageDeleted = false; // reset flag after successful save
+                if (profileUpdatedListener != null) {
+                    profileUpdatedListener.onProfilePictureUpdated(imgPathForDb);
+                }
             }
         });
 
         return view;
+    }
+
+    // ── Avatar options dialog ─────────────────────────────────────────────────
+
+    private void showAvatarOptionsDialog() {
+        boolean hasPhoto = (selectedImagePath != null && !selectedImagePath.isEmpty());
+
+        String[] options = hasPhoto
+                ? new String[]{"Upload Photo", "Delete Photo"}
+                : new String[]{"Upload Photo"};
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Profile Photo")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        pickImageFromGallery();
+                    } else {
+                        // which == 1 → Delete Photo (only reachable when hasPhoto == true)
+                        deleteProfileImage();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void pickImageFromGallery() {
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setType("image/*");
+        startActivityForResult(intent, PICK_IMAGE_REQUEST);
+    }
+
+    private void deleteProfileImage() {
+        selectedImagePath = null;
+        imageDeleted = true;
+        // Reset avatar to placeholder with tint restored
+        if (avatarView != null) {
+            avatarView.setImageResource(R.drawable.ic_person);
+            avatarView.setImageTintList(
+                    android.content.res.ColorStateList.valueOf(
+                            androidx.core.content.ContextCompat.getColor(
+                                    requireContext(), R.color.text_on_primary)));
+            avatarView.setPadding(
+                    dpToPx(10), dpToPx(10), dpToPx(10), dpToPx(10));
+        }
+        Toast.makeText(getContext(), "Photo removed. Tap Save to confirm.", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -155,6 +208,7 @@ public class ProfileFragment extends Fragment {
             String internalPath = copyImageToInternal(uri);
             if (internalPath != null) {
                 selectedImagePath = internalPath;
+                imageDeleted = false; // new photo overrides any pending deletion
                 loadAvatarFromPath(internalPath);
             } else {
                 Toast.makeText(getContext(), "Could not load image.", Toast.LENGTH_SHORT).show();
@@ -187,7 +241,13 @@ public class ProfileFragment extends Fragment {
 
     /** Load avatar from an internal file path (absolute) or content URI string. */
     private void loadAvatarFromPath(String path) {
+        // ImageUtils.load() already calls clearColorFilter() + setImageTintList(null)
         ImageUtils.load(requireContext(), avatarView, path, R.drawable.ic_image_placeholder);
         avatarView.setPadding(0, 0, 0, 0);
+    }
+
+    private int dpToPx(int dp) {
+        float density = requireContext().getResources().getDisplayMetrics().density;
+        return Math.round(dp * density);
     }
 }

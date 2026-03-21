@@ -12,7 +12,9 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
@@ -64,6 +66,28 @@ public class MenuFragment extends Fragment {
                 }
                 c.close();
             }
+        }
+
+        // Pull-to-refresh: reload avatar
+        SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipe_refresh_menu);
+        if (swipeRefresh != null) {
+            swipeRefresh.setColorSchemeColors(
+                    ContextCompat.getColor(requireContext(), R.color.primary_green));
+            swipeRefresh.setOnRefreshListener(() -> {
+                if (avatarView != null && studentId != null && !studentId.isEmpty()) {
+                    DatabaseHelper db = new DatabaseHelper(requireContext());
+                    Cursor c = db.getUserByStudentId(studentId);
+                    if (c != null && c.moveToFirst()) {
+                        int imgIdx = c.getColumnIndex(DatabaseHelper.COLUMN_USER_PROFILE_IMG);
+                        String imgPath = imgIdx >= 0 ? c.getString(imgIdx) : null;
+                        if (imgPath != null && !imgPath.isEmpty()) {
+                            loadAvatarInto(avatarView, imgPath);
+                        }
+                        c.close();
+                    }
+                }
+                swipeRefresh.setRefreshing(false);
+            });
         }
 
         // Officer tools

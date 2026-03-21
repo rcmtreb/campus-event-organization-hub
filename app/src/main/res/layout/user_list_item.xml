@@ -60,7 +60,7 @@
                 android:layout_height="wrap_content"
                 android:text="Student"
                 android:textStyle="bold"
-                android:textColor="@color/primary_blue"
+                android:textColor="@color/text_on_primary"
                 android:background="@drawable/bg_button_stretchable"
                 android:paddingHorizontal="@dimen/space_2"
                 android:paddingVertical="@dimen/space_1"

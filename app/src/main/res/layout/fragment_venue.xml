@@ -40,6 +40,12 @@
 
     </LinearLayout>
 
+    <!-- Pull-to-refresh wraps the list (header stays fixed above) -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_venue"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
     <!-- Venue list -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_venues"
@@ -48,5 +54,7 @@
         android:padding="8dp"
         android:clipToPadding="false"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </LinearLayout>

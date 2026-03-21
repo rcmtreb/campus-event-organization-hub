@@ -217,8 +217,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_edit_text_rounded"
-                    android:padding="12dp"
-                    android:entries="@array/departments_array" />
+                    android:padding="12dp" />
 
                 <Button
                     android:id="@+id/btn_register_submit"

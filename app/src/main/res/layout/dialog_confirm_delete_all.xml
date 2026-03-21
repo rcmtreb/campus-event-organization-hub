@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Type DELETE ALL below to confirm:"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:layout_marginBottom="12dp"/>
+
+    <EditText
+        android:id="@+id/et_confirm_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="DELETE ALL"
+        android:inputType="textCapCharacters"
+        android:maxLines="1"
+        android:textSize="16sp"
+        android:textColor="@color/error_red"
+        android:textColorHint="@color/text_hint"/>
+
+</LinearLayout>

@@ -5,6 +5,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.example.campus_event_org_hub.model.Event;
@@ -593,6 +595,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     "", "", "", "All Events", false, verificationToken);
         }
         return id;
+    }
+
+    /** Returns true if this email already has a row in the local SQLite users table. */
+    public boolean isEmailInLocalDb(String email) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT 1 FROM " + TABLE_USERS + " WHERE " + COLUMN_USER_EMAIL + "=? LIMIT 1",
+                    new String[]{email});
+            boolean exists = (c != null && c.moveToFirst());
+            if (c != null) c.close();
+            return exists;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "isEmailInLocalDb failed", e);
+            return false;
+        }
     }
 
     public Cursor checkUser(String loginInput, String password) {
@@ -2894,11 +2912,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Delete a user account by student_id.
-     * Also deletes their registrations and notifications from local DB and Firestore.
+     * Wraps all SQLite deletes in a transaction and cascade-deletes the user's
+     * registrations and notifications from Firestore as well.
      */
     public void deleteUserAccount(String studentId) {
         if (studentId == null || studentId.isEmpty()) return;
         SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
         try {
             // Delete registrations
             db.delete(TABLE_REGISTRATIONS, COLUMN_REG_STUDENT_ID + "=?", new String[]{studentId});
@@ -2906,12 +2926,55 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.delete(TABLE_NOTIFICATIONS, COLUMN_NOTIF_RECIPIENT_SID + "=?", new String[]{studentId});
             // Delete the user row
             db.delete(TABLE_USERS, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
-            // Mirror to Firestore
-            FirestoreHelper fs = new FirestoreHelper();
-            fs.deleteUser(studentId);
+            db.setTransactionSuccessful();
         } catch (Exception e) {
-            Log.e("DatabaseHelper", "deleteUserAccount failed", e);
+            Log.e("DatabaseHelper", "deleteUserAccount SQLite failed", e);
+        } finally {
+            db.endTransaction();
         }
+        // Mirror all three deletes to Firestore (fire-and-forget)
+        FirestoreHelper fs = new FirestoreHelper();
+        fs.deleteUser(studentId);
+        fs.deleteUserRegistrations(studentId);
+        fs.deleteUserNotifications(studentId);
+    }
+
+    /**
+     * Wipe ALL student/officer data from both local SQLite and Firestore.
+     * Admin accounts are preserved. Runs Firestore cleanup on a background thread
+     * and posts the result callback back to the main thread.
+     *
+     * @param onSuccess called on the main thread when both SQLite and Firestore are clear
+     * @param onFailure called on the main thread if the Firestore phase fails
+     */
+    public void deleteAllStudentData(Runnable onSuccess, Runnable onFailure) {
+        // Phase 1 — SQLite (fast, do it synchronously before spawning the thread)
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete(TABLE_REGISTRATIONS, null, null);
+            db.delete(TABLE_NOTIFICATIONS, null, null);
+            db.delete(TABLE_EVENTS, null, null);
+            db.delete(TABLE_USERS, COLUMN_USER_ROLE + " != ?", new String[]{"Admin"});
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "deleteAllStudentData SQLite failed", e);
+        } finally {
+            db.endTransaction();
+        }
+
+        // Phase 2 — Firestore (requires network + Tasks.await, run off main thread)
+        new Thread(() -> {
+            try {
+                new FirestoreHelper().deleteAllData();
+                if (onSuccess != null)
+                    new Handler(Looper.getMainLooper()).post(onSuccess);
+            } catch (Exception e) {
+                Log.e("DatabaseHelper", "deleteAllStudentData Firestore failed", e);
+                if (onFailure != null)
+                    new Handler(Looper.getMainLooper()).post(onFailure);
+            }
+        }).start();
     }
 
     // ── CSV helpers ───────────────────────────────────────────────────────────

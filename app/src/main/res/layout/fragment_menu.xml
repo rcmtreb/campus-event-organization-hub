@@ -8,6 +8,12 @@
     android:background="@color/background_gray"
     tools:context=".ui.main.MenuFragment">
 
+    <!-- ── Pull-to-refresh wraps the scrollable content ──────────────────── -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_menu"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
     <!-- ── Scrollable Content ─────────────────────────────────────────── -->
     <ScrollView
         android:layout_width="match_parent"
@@ -295,4 +301,6 @@
 
         </LinearLayout>
     </ScrollView>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 </LinearLayout>

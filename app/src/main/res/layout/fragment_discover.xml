@@ -81,6 +81,12 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- Pull-to-refresh wraps the scrollable content only (tabs stay fixed above) -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_discover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
     <!-- Scrollable Content Area -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/nested_scroll_view"
@@ -266,4 +272,6 @@
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 </LinearLayout>

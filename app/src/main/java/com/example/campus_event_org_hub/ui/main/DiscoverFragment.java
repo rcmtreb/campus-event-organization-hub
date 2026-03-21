@@ -9,10 +9,12 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.core.widget.NestedScrollView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
@@ -46,6 +48,7 @@ public class DiscoverFragment extends Fragment {
     private ChipGroup chipGroupDeptFilter;
 
     private EventAdapter todayAdapter, campusAdapter, deptAdapter;
+    private SwipeRefreshLayout swipeRefresh;
 
     private int currentTab = 0;
     private int scrollPositionToday = 0, scrollPositionCampus = 0, scrollPositionMyDept = 0, scrollPositionExplore = 0;
@@ -64,6 +67,17 @@ public class DiscoverFragment extends Fragment {
 
         initViews(view);
         setupTabSwitching();
+
+        swipeRefresh = view.findViewById(R.id.swipe_refresh_discover);
+        if (swipeRefresh != null) {
+            swipeRefresh.setColorSchemeColors(
+                    ContextCompat.getColor(requireContext(), R.color.primary_green));
+            swipeRefresh.setOnRefreshListener(() -> {
+                loadAllContent();
+                swipeRefresh.setRefreshing(false);
+            });
+        }
+
         loadAllContent();
 
         return view;

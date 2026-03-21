@@ -249,12 +249,14 @@
             android:background="@drawable/nav_item_background"
             android:paddingVertical="@dimen/space_2">
 
-            <ImageView
+            <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/tab_profile_icon"
                 android:layout_width="26dp"
                 android:layout_height="26dp"
                 android:src="@drawable/ic_person"
                 android:tint="@color/text_hint"
+                android:scaleType="centerCrop"
+                app:shapeAppearanceOverlay="@style/CircleImageStyle"
                 android:contentDescription="Profile"/>
 
             <TextView

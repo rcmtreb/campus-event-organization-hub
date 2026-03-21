@@ -6,6 +6,7 @@ import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Spanned;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.util.Patterns;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -25,18 +26,27 @@ import androidx.core.content.ContextCompat;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.util.PasswordStrengthUtil;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class RegisterActivity extends AppCompatActivity {
 
+    private static final String TAG = "CEOH_REGISTER";
     private static final int MAX_NAME_LENGTH = 20;
     private static final int MIN_PASSWORD_LENGTH = 8;
     private static final int STUDENT_ID_LENGTH = 8;
+
+    private FirebaseAuth mAuth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
+        mAuth = FirebaseAuth.getInstance();
         DatabaseHelper db = new DatabaseHelper(this);
 
         EditText etName = findViewById(R.id.et_reg_name);
@@ -52,10 +62,33 @@ public class RegisterActivity extends AppCompatActivity {
         ProgressBar progressPasswordStrength = findViewById(R.id.progress_password_strength);
         TextView tvPasswordStrength = findViewById(R.id.tv_password_strength);
 
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
-                R.array.departments_array, R.layout.spinner_item);
+        // ── Spinner with "Select Department" placeholder ──────────────────────
+        String[] depts = getResources().getStringArray(R.array.departments_array);
+        List<String> deptList = new ArrayList<>();
+        deptList.add("Select Department");
+        for (String d : depts) deptList.add(d);
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.spinner_item, deptList) {
+            @Override
+            public boolean isEnabled(int position) {
+                return position != 0; // disable the placeholder so it can't be re-selected
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                TextView tv = (TextView) view;
+                if (position == 0) {
+                    tv.setTextColor(ContextCompat.getColor(RegisterActivity.this, R.color.text_hint));
+                } else {
+                    tv.setTextColor(ContextCompat.getColor(RegisterActivity.this, R.color.text_primary));
+                }
+                return view;
+            }
+        };
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerDept.setAdapter(adapter);
+        spinnerDept.setSelection(0); // show placeholder by default
 
         setupStudentIdField(etStudentId);
 
@@ -108,11 +141,17 @@ public class RegisterActivity extends AppCompatActivity {
             String email = etEmail.getText().toString().trim();
             String password = etPassword.getText().toString().trim();
             String confirmPassword = etConfirmPassword.getText().toString().trim();
-            String department = spinnerDept.getSelectedItem().toString();
-            
+
             int selectedId = rgRole.getCheckedRadioButtonId();
             RadioButton rb = findViewById(selectedId);
             String role = (rb != null) ? rb.getText().toString() : "Student";
+
+            // ── Validate department selection ─────────────────────────────────
+            if (spinnerDept.getSelectedItemPosition() == 0) {
+                Toast.makeText(this, "Please select a department", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String department = spinnerDept.getSelectedItem().toString();
 
             if (name.isEmpty() || studentId.isEmpty() || email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
                 Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
@@ -145,20 +184,115 @@ public class RegisterActivity extends AppCompatActivity {
             }
 
             btnRegister.setEnabled(false);
-            Toast.makeText(this, "Registering...", Toast.LENGTH_SHORT).show();
+            btnRegister.setText("Registering...");
 
-            long id = db.registerUser(name, studentId, email, password, role, department);
-            if (id != -1) {
-                Toast.makeText(this, "Registration successful! Please check your email to verify your account.", Toast.LENGTH_LONG).show();
-                startActivity(new Intent(RegisterActivity.this, EmailVerificationPendingActivity.class));
-                finish();
-            } else {
-                btnRegister.setEnabled(true);
-                Toast.makeText(this, "Failed: Email or ID already exists", Toast.LENGTH_LONG).show();
-            }
+            // ── Step 1: Create Firebase Auth account (for email verification only) ──
+            mAuth.createUserWithEmailAndPassword(email, password)
+                    .addOnSuccessListener(authResult -> proceedAfterFirebaseAuth(authResult.getUser(), db, name, studentId, email, password, role, department, btnRegister))
+                    .addOnFailureListener(e -> {
+                        String msg = e.getMessage();
+                        if (msg != null && msg.contains("email address is already in use")) {
+                            // Firebase Auth has this email — check if SQLite also has it
+                            if (db.isEmailInLocalDb(email)) {
+                                // Legitimate duplicate: user already fully registered
+                                btnRegister.setEnabled(true);
+                                btnRegister.setText("Sign Up");
+                                Toast.makeText(this, "This email is already registered. Try logging in.", Toast.LENGTH_LONG).show();
+                            } else {
+                                // Orphan Firebase Auth account (SQLite was wiped / mis-matched state)
+                                // → sign in to get a handle on it, delete it, then re-register cleanly
+                                Log.w(TAG, "Orphan Firebase Auth account detected for " + email + " — attempting self-heal");
+                                healOrphanAndRegister(db, name, studentId, email, password, role, department, btnRegister);
+                            }
+                        } else {
+                            btnRegister.setEnabled(true);
+                            btnRegister.setText("Sign Up");
+                            Toast.makeText(this, "Registration failed: " + msg, Toast.LENGTH_LONG).show();
+                            Log.e(TAG, "Firebase Auth createUser failed", e);
+                        }
+                    });
         });
 
         tvGoToLogin.setOnClickListener(v -> finish());
+    }
+
+    /**
+     * Called after Firebase Auth account is ready (newly created OR after orphan was healed).
+     * Sends verification email and saves the profile to SQLite + Firestore.
+     */
+    private void proceedAfterFirebaseAuth(FirebaseUser firebaseUser, DatabaseHelper db,
+                                          String name, String studentId, String email,
+                                          String password, String role, String department,
+                                          Button btnRegister) {
+        if (firebaseUser != null) {
+            firebaseUser.sendEmailVerification()
+                    .addOnSuccessListener(unused -> Log.d(TAG, "Verification email sent to " + email))
+                    .addOnFailureListener(e -> Log.w(TAG, "Failed to send verification email", e));
+        }
+
+        // BCrypt hashing is slow (~1s) — must NOT run on the main thread
+        new Thread(() -> {
+            long id = db.registerUser(name, studentId, email, password, role, department);
+            runOnUiThread(() -> {
+                if (id != -1) {
+                    Toast.makeText(this, "Registration successful! Check your email to verify.", Toast.LENGTH_LONG).show();
+                    Intent intent = new Intent(RegisterActivity.this, EmailVerificationPendingActivity.class);
+                    intent.putExtra("STUDENT_ID", studentId);
+                    intent.putExtra("EMAIL", email);
+                    startActivity(intent);
+                    finish();
+                } else {
+                    btnRegister.setEnabled(true);
+                    btnRegister.setText("Sign Up");
+                    Toast.makeText(this, "Failed: Email or Student ID already exists.", Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
+    }
+
+    /**
+     * Handles the "orphan Firebase Auth account" case: SQLite is empty but Firebase Auth
+     * already has this email (e.g. app data was cleared after a previous registration).
+     * Signs in with the supplied password, deletes the orphan account, then re-creates it.
+     */
+    private void healOrphanAndRegister(DatabaseHelper db, String name, String studentId,
+                                       String email, String password, String role,
+                                       String department, Button btnRegister) {
+        mAuth.signInWithEmailAndPassword(email, password)
+                .addOnSuccessListener(authResult -> {
+                    FirebaseUser orphan = authResult.getUser();
+                    if (orphan == null) {
+                        onHealFailed(btnRegister, "Could not access orphan account.");
+                        return;
+                    }
+                    Log.d(TAG, "Signed in to orphan account, deleting it...");
+                    orphan.delete()
+                            .addOnSuccessListener(unused -> {
+                                Log.d(TAG, "Orphan Firebase Auth account deleted. Re-registering...");
+                                // Now re-create the account cleanly
+                                mAuth.createUserWithEmailAndPassword(email, password)
+                                        .addOnSuccessListener(newAuth -> proceedAfterFirebaseAuth(
+                                                newAuth.getUser(), db, name, studentId,
+                                                email, password, role, department, btnRegister))
+                                        .addOnFailureListener(e -> onHealFailed(btnRegister, e.getMessage()));
+                            })
+                            .addOnFailureListener(e -> onHealFailed(btnRegister, e.getMessage()));
+                })
+                .addOnFailureListener(e -> {
+                    // Sign-in failed → orphan was created with a different password.
+                    // We can't delete it without the original password; tell the user.
+                    Log.w(TAG, "Could not sign in to orphan account", e);
+                    onHealFailed(btnRegister,
+                            "An account with this email already exists. " +
+                            "If you previously registered, try logging in instead. " +
+                            "Otherwise use a different email.");
+                });
+    }
+
+    private void onHealFailed(Button btnRegister, String message) {
+        btnRegister.setEnabled(true);
+        btnRegister.setText("Sign Up");
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     private void setupStudentIdField(EditText etStudentId) {

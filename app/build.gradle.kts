@@ -44,6 +44,7 @@ dependencies {
     // Firebase BoM — pins all Firebase library versions together
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-functions")
     implementation("org.mindrot:jbcrypt:0.4")

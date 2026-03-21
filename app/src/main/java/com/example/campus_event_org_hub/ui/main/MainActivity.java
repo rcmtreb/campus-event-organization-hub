@@ -2,6 +2,7 @@ package com.example.campus_event_org_hub.ui.main;
 
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -30,6 +31,7 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.receiver.NetworkCallbackHandler;
 import com.example.campus_event_org_hub.ui.events.EventsFragment;
+import com.example.campus_event_org_hub.util.ImageUtils;
 
 public class MainActivity extends BaseActivity
         implements ProfileFragment.OnProfileUpdatedListener {
@@ -50,6 +52,7 @@ public class MainActivity extends BaseActivity
     private TextView    textDiscover, textEvents, textVenue, textProfile;
 
     private int currentTab = 0; // 0=Discover, 1=Events, 2=Venue, 3=Profile
+    private boolean profilePhotoLoaded = false;
 
     // ── Network connectivity ───────────────────────────────────────────────
     private NetworkCallbackHandler networkCallbackHandler;
@@ -142,6 +145,7 @@ public class MainActivity extends BaseActivity
         super.onResume();
         SyncManager.sync(this, null);
         updateNotificationBadge();
+        loadProfileNavPhoto();
         
         // Register network callback for connectivity changes
         networkCallbackHandler = new NetworkCallbackHandler(this, connected -> 
@@ -318,7 +322,12 @@ public class MainActivity extends BaseActivity
         int color = active
                 ? ContextCompat.getColor(this, R.color.primary_green)
                 : ContextCompat.getColor(this, R.color.text_hint);
-        icon.setColorFilter(color);
+        // Skip color filter for profile icon when a real photo is loaded
+        if (icon == iconProfile && profilePhotoLoaded) {
+            icon.setAlpha(active ? 1.0f : 0.6f);
+        } else {
+            icon.setColorFilter(color);
+        }
         label.setTextColor(color);
     }
 
@@ -415,6 +424,36 @@ public class MainActivity extends BaseActivity
     @Override
     public void onProfilePictureUpdated(String newImagePath) {
         currentProfileImagePath = newImagePath;
+        loadProfileNavPhoto();
+    }
+
+    /** Load the user's profile photo into the bottom-nav Profile tab icon. */
+    private void loadProfileNavPhoto() {
+        if (iconProfile == null || userStudentId == null || userStudentId.isEmpty()) return;
+        new Thread(() -> {
+            try {
+                DatabaseHelper db = new DatabaseHelper(this);
+                Cursor c = db.getUserByStudentId(userStudentId);
+                if (c != null && c.moveToFirst()) {
+                    int imgIdx = c.getColumnIndex(DatabaseHelper.COLUMN_USER_PROFILE_IMG);
+                    String imgPath = imgIdx >= 0 ? c.getString(imgIdx) : null;
+                    c.close();
+                    if (imgPath != null && !imgPath.isEmpty()) {
+                        runOnUiThread(() -> {
+                            ImageUtils.load(this, iconProfile, imgPath, R.drawable.ic_person);
+                            iconProfile.clearColorFilter();
+                            profilePhotoLoaded = true;
+                            // Re-apply active/inactive alpha now that photo is loaded
+                            iconProfile.setAlpha(currentTab == 3 ? 1.0f : 0.6f);
+                        });
+                    }
+                } else if (c != null) {
+                    c.close();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadProfileNavPhoto failed", e);
+            }
+        }).start();
     }
 
     // ── Options Menu (Action Bar) ────────────────────────────────────────────

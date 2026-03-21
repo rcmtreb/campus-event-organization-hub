@@ -29,6 +29,8 @@ import com.example.campus_event_org_hub.service.CEOHFirebaseMessagingService;
 import com.example.campus_event_org_hub.ui.admin.AdminActivity;
 import com.example.campus_event_org_hub.ui.main.MainActivity;
 import com.example.campus_event_org_hub.util.SessionManager;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.messaging.FirebaseMessaging;
 
 public class LoginActivity extends AppCompatActivity {
@@ -159,10 +161,46 @@ public class LoginActivity extends AppCompatActivity {
                 Log.d(TAG, "User found: " + name + " (" + role + ") sid=" + sid);
 
                 if (!emailVerified) {
-                    Intent intent = new Intent(this, EmailVerificationPendingActivity.class);
-                    intent.putExtra("STUDENT_ID", sid);
-                    intent.putExtra("EMAIL", email);
-                    startActivity(intent);
+                    // Check Firebase Auth to see if user has verified since last login
+                    final String fName = name, fRole = role, fDept = dept, fEmail = email, fSid = sid;
+                    FirebaseAuth.getInstance().signInWithEmailAndPassword(fEmail, password)
+                            .addOnSuccessListener(authResult -> {
+                                FirebaseUser firebaseUser = authResult.getUser();
+                                if (firebaseUser != null) {
+                                    firebaseUser.reload().addOnCompleteListener(reloadTask -> {
+                                        FirebaseUser refreshed = FirebaseAuth.getInstance().getCurrentUser();
+                                        if (refreshed != null && refreshed.isEmailVerified()) {
+                                            // Verified! Update local DB and proceed
+                                            db.setEmailVerified(fSid, true);
+                                            FirebaseAuth.getInstance().signOut();
+                                            session.saveSession(fName, fRole, fDept, fEmail, fSid);
+                                            uploadPendingFcmToken(fSid);
+                                            launchHome(fName, fRole, fDept, fEmail, fSid);
+                                        } else {
+                                            // Still not verified — keep Firebase Auth signed in
+                                            // so EmailVerificationPendingActivity can resend/poll
+                                            Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
+                                            intent.putExtra("STUDENT_ID", fSid);
+                                            intent.putExtra("EMAIL", fEmail);
+                                            startActivity(intent);
+                                        }
+                                    });
+                                } else {
+                                    Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
+                                    intent.putExtra("STUDENT_ID", fSid);
+                                    intent.putExtra("EMAIL", fEmail);
+                                    startActivity(intent);
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                // Firebase Auth sign-in failed (maybe no internet or account mismatch)
+                                // Fall back to sending them to the pending screen
+                                Log.w(TAG, "Firebase Auth sign-in for verify check failed", e);
+                                Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
+                                intent.putExtra("STUDENT_ID", fSid);
+                                intent.putExtra("EMAIL", fEmail);
+                                startActivity(intent);
+                            });
                     return;
                 }
 
