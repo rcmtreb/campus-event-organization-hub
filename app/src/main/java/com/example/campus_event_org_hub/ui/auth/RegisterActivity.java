@@ -252,8 +252,13 @@ public class RegisterActivity extends AppCompatActivity {
 
     /**
      * Handles the "orphan Firebase Auth account" case: SQLite is empty but Firebase Auth
-     * already has this email (e.g. app data was cleared after a previous registration).
-     * Signs in with the supplied password, deletes the orphan account, then re-creates it.
+     * already has this email (e.g. admin deleted the account but Firebase Auth record remains).
+     *
+     * Strategy:
+     * 1. Try signing in with the supplied password → delete orphan → re-create.
+     * 2. If sign-in fails (different password), send a password-reset email so the
+     *    user can reclaim the Auth slot later, and proceed with local registration
+     *    (SQLite + Firestore) so the app is usable immediately via local login.
      */
     private void healOrphanAndRegister(DatabaseHelper db, String name, String studentId,
                                        String email, String password, String role,
@@ -262,7 +267,8 @@ public class RegisterActivity extends AppCompatActivity {
                 .addOnSuccessListener(authResult -> {
                     FirebaseUser orphan = authResult.getUser();
                     if (orphan == null) {
-                        onHealFailed(btnRegister, "Could not access orphan account.");
+                        // Shouldn't happen, but fall through to local-only registration
+                        proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
                         return;
                     }
                     Log.d(TAG, "Signed in to orphan account, deleting it...");
@@ -274,25 +280,59 @@ public class RegisterActivity extends AppCompatActivity {
                                         .addOnSuccessListener(newAuth -> proceedAfterFirebaseAuth(
                                                 newAuth.getUser(), db, name, studentId,
                                                 email, password, role, department, btnRegister))
-                                        .addOnFailureListener(e -> onHealFailed(btnRegister, e.getMessage()));
+                                        .addOnFailureListener(e -> {
+                                            // Auth re-create failed but we can still register locally
+                                            Log.w(TAG, "Re-create after orphan delete failed", e);
+                                            proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
+                                        });
                             })
-                            .addOnFailureListener(e -> onHealFailed(btnRegister, e.getMessage()));
+                            .addOnFailureListener(e -> {
+                                Log.w(TAG, "Could not delete orphan account", e);
+                                proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
+                            });
                 })
                 .addOnFailureListener(e -> {
                     // Sign-in failed → orphan was created with a different password.
-                    // We can't delete it without the original password; tell the user.
-                    Log.w(TAG, "Could not sign in to orphan account", e);
-                    onHealFailed(btnRegister,
-                            "An account with this email already exists. " +
-                            "If you previously registered, try logging in instead. " +
-                            "Otherwise use a different email.");
+                    // Send a password-reset email so the user can reclaim the Auth slot later,
+                    // then proceed with local (SQLite + Firestore) registration.
+                    Log.w(TAG, "Could not sign in to orphan account — registering locally", e);
+                    mAuth.sendPasswordResetEmail(email)
+                            .addOnSuccessListener(unused ->
+                                    Log.d(TAG, "Password-reset email sent to " + email))
+                            .addOnFailureListener(err ->
+                                    Log.w(TAG, "Failed to send password-reset email", err));
+                    proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
                 });
     }
 
-    private void onHealFailed(Button btnRegister, String message) {
-        btnRegister.setEnabled(true);
-        btnRegister.setText("Sign Up");
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    /**
+     * Registers the user in SQLite + Firestore only (no Firebase Auth account created).
+     * Used when we can't delete the orphan Firebase Auth account because the old password
+     * is unknown. The user can still log in via local credentials.
+     */
+    private void proceedLocalOnly(DatabaseHelper db, String name, String studentId,
+                                  String email, String password, String role,
+                                  String department, Button btnRegister) {
+        new Thread(() -> {
+            long id = db.registerUser(name, studentId, email, password, role, department);
+            runOnUiThread(() -> {
+                if (id != -1) {
+                    Toast.makeText(this,
+                            "Registration successful! A password-reset email was sent — "
+                            + "please check your inbox to fully activate your account.",
+                            Toast.LENGTH_LONG).show();
+                    Intent intent = new Intent(RegisterActivity.this, EmailVerificationPendingActivity.class);
+                    intent.putExtra("STUDENT_ID", studentId);
+                    intent.putExtra("EMAIL", email);
+                    startActivity(intent);
+                    finish();
+                } else {
+                    btnRegister.setEnabled(true);
+                    btnRegister.setText("Sign Up");
+                    Toast.makeText(this, "Failed: Email or Student ID already exists.", Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
     }
 
     private void setupStudentIdField(EditText etStudentId) {

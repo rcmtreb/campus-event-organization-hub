@@ -30,6 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class DiscoverFragment extends Fragment {
 
@@ -208,6 +210,34 @@ public class DiscoverFragment extends Fragment {
         return tag.equals("CAMPUS") || tag.equals("UCC") || tag.equals("UNIVERSITY");
     }
 
+    /**
+     * Extracts the abbreviation from a department string.
+     * e.g. "College of Liberal Arts and Sciences (CLAS)" → "CLAS"
+     * If no parenthesised abbreviation found, returns the trimmed input uppercased.
+     */
+    private String deptAbbr(String dept) {
+        if (dept == null || dept.isEmpty()) return "";
+        Matcher m = Pattern.compile("\\(([^)]+)\\)").matcher(dept);
+        if (m.find()) return m.group(1).trim().toUpperCase();
+        return dept.trim().toUpperCase();
+    }
+
+    /**
+     * Returns true if the event's tags include the given department abbreviation
+     * OR if the event is campus-wide (#CAMPUS / #UCC / #UNIVERSITY).
+     * Tags are stored as space-separated tokens like "#CLAS #COE".
+     */
+    private boolean eventMatchesDept(String tags, String abbr) {
+        if (tags == null || tags.isEmpty()) return false;
+        // Split on whitespace, strip leading '#', compare
+        for (String token : tags.trim().split("\\s+")) {
+            String t = token.replace("#", "").toUpperCase();
+            if (isCampusTag(t)) return true;
+            if (t.equals(abbr)) return true;
+        }
+        return false;
+    }
+
     // ── Today Events ─────────────────────────────────────────────────────────
 
     private void loadTodayEvents() {
@@ -220,16 +250,13 @@ public class DiscoverFragment extends Fragment {
 
             if (allEvents != null) {
                 for (Event e : allEvents) {
-                    if (!"APPROVED".equals(e.getStatus())) continue;
+                    String status = e.getStatus();
+                    if (!"APPROVED".equals(status) && !"HAPPENING".equals(status)) continue;
                     String eventDate = e.getDate();
-                    if (eventDate == null || !eventDate.equals(today)) continue;
-                    String tags = e.getTags();
-                    if (tags != null) {
-                        String upperTags = tags.toUpperCase();
-                        if (upperTags.contains("CAMPUS") || upperTags.contains("UCC") || upperTags.contains("UNIVERSITY")) {
-                            continue;
-                        }
-                    }
+                    if (eventDate == null) continue;
+                    // Normalise to yyyy-MM-dd in case a timestamp was stored
+                    if (eventDate.length() > 10) eventDate = eventDate.substring(0, 10);
+                    if (!eventDate.equals(today)) continue;
                     todayEvents.add(e);
                 }
             }
@@ -300,12 +327,15 @@ public class DiscoverFragment extends Fragment {
             List<Event> myDeptEvents = new ArrayList<>();
 
             if (allEvents != null && userDept != null && !userDept.isEmpty()) {
+                String abbr = deptAbbr(userDept);
                 for (Event e : allEvents) {
-                    if (!"APPROVED".equals(e.getStatus())) continue;
+                    String status = e.getStatus();
+                    if (!"APPROVED".equals(status) && !"HAPPENING".equals(status)) continue;
                     String eventDate = e.getDate();
-                    if (eventDate == null || eventDate.compareTo(today) < 0) continue;
-                    String tags = e.getTags();
-                    if (tags != null && tags.toUpperCase().contains(userDept.toUpperCase())) {
+                    if (eventDate == null) continue;
+                    if (eventDate.length() > 10) eventDate = eventDate.substring(0, 10);
+                    if (eventDate.compareTo(today) < 0) continue;
+                    if (eventMatchesDept(e.getTags(), abbr)) {
                         myDeptEvents.add(e);
                     }
                 }

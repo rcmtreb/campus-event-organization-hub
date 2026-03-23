@@ -72,6 +72,65 @@ function pickTitle(type) {
   }
 }
 
+// ── Delete user account (Auth + Firestore + sub-collections) ─────────────────
+
+/**
+ * Callable function: deleteUserAccount
+ *
+ * Deletes a user's Firebase Auth account, Firestore user document,
+ * registrations, and notifications.
+ *
+ * Expected data: { studentId: string }
+ * Returns:       { success: true } or throws an HttpsError
+ */
+exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
+  const studentId = data.studentId;
+  if (!studentId || typeof studentId !== "string") {
+    throw new functions.https.HttpsError(
+        "invalid-argument", "studentId is required.");
+  }
+
+  // 1. Look up the user doc in Firestore to get their email
+  const userDoc = await db.collection("users").doc(studentId).get();
+  const email = userDoc.exists ? userDoc.get("email") : null;
+
+  // 2. Delete Firebase Auth account (by email lookup)
+  if (email) {
+    try {
+      const authUser = await admin.auth().getUserByEmail(email);
+      await admin.auth().deleteUser(authUser.uid);
+      console.log(`deleteUserAccount: deleted Auth uid=${authUser.uid} email=${email}`);
+    } catch (err) {
+      // auth/user-not-found is fine — already gone
+      if (err.code !== "auth/user-not-found") {
+        console.error("deleteUserAccount: Auth deletion error", err);
+      }
+    }
+  }
+
+  // 3. Delete Firestore user document
+  if (userDoc.exists) {
+    await userDoc.ref.delete();
+  }
+
+  // 4. Delete registrations
+  const regs = await db.collection("registrations")
+      .where("student_id", "==", studentId).get();
+  const batch1 = db.batch();
+  regs.docs.forEach((doc) => batch1.delete(doc.ref));
+  if (!regs.empty) await batch1.commit();
+
+  // 5. Delete notifications
+  const notifs = await db.collection("notifications")
+      .where("recipient_sid", "==", studentId).get();
+  const batch2 = db.batch();
+  notifs.docs.forEach((doc) => batch2.delete(doc.ref));
+  if (!notifs.empty) await batch2.commit();
+
+  console.log(`deleteUserAccount: fully deleted studentId=${studentId}`);
+  return {success: true};
+});
+
 // ── Main trigger ─────────────────────────────────────────────────────────────
 
 exports.sendPushOnNotification = functions.firestore
