@@ -1812,12 +1812,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 v.put(COLUMN_USER_GENDER,     gender    != null ? gender    : "");
                 v.put(COLUMN_USER_MOBILE,     mobile    != null ? mobile    : "");
                 v.put(COLUMN_USER_NOTIF_PREF, notifPref != null ? notifPref : "All Events");
-                // Only update profile_image from Firestore when Firestore has a real value
-                // AND the file actually exists on this device.  Stale local paths
-                // (e.g. from before a deletion or from another device) are ignored.
+                // Only update profile_image from Firestore when Firestore has a real value.
+                // For data:image/ Base64 URIs and https:// URLs: always accept — device-independent.
+                // For legacy local absolute paths: only use them if the file still exists on this device.
                 if (profileImage != null && !profileImage.isEmpty()) {
-                    if (profileImage.startsWith("/") && !new java.io.File(profileImage).exists()) {
-                        // Stale local path — file was deleted; skip
+                    if (profileImage.startsWith("data:image/")
+                            || profileImage.startsWith("http://")
+                            || profileImage.startsWith("https://")) {
+                        // Base64 data-URI or network URL — valid on any device
+                        v.put(COLUMN_USER_PROFILE_IMG, profileImage);
+                    } else if (profileImage.startsWith("/") && !new java.io.File(profileImage).exists()) {
+                        // Stale local path — file was deleted or path is from another device; skip
                     } else {
                         v.put(COLUMN_USER_PROFILE_IMG, profileImage);
                     }

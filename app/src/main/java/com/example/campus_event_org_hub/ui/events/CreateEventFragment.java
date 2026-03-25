@@ -21,6 +21,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.FirebaseStorageHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
 import com.google.android.material.chip.Chip;
@@ -244,22 +245,74 @@ public class CreateEventFragment extends Fragment {
             // organizer field = "Organizer – Venue – Dept" so existing display code still shows meaningful text
             String organizerDisplay = organizer + " \u2013 " + venue + " \u2013 " + dept;
 
-            String imagePath = selectedImageUri != null ? selectedImageUri.toString() : "";
-            DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
-            Event newEvent = new Event(title, desc, date, startTime + " - " + endTime, tags, organizerDisplay, category, imagePath, "PENDING");
-            newEvent.setCreatorSid(userStudentId);
-            newEvent.setVenue(venue);
-            newEvent.setStartTime(startTime);
-            newEvent.setEndTime(endTime);
-            if (db.addEvent(newEvent) != -1) {
-                Toast.makeText(getContext(), "Event submitted for approval!", Toast.LENGTH_LONG).show();
-                requireActivity().getSupportFragmentManager().popBackStack();
+            // Capture final strings for use inside lambdas
+            final String finalTitle          = title;
+            final String finalDesc           = desc;
+            final String finalDate           = date;
+            final String finalStartTime      = startTime;
+            final String finalEndTime        = endTime;
+            final String finalTags           = tags;
+            final String finalOrganizerDisplay = organizerDisplay;
+            final String finalCategory       = category;
+            final String finalUserStudentId  = userStudentId;
+
+            if (selectedImageUri != null) {
+                // Encode banner to Base64 first, then save the event
+                Toast.makeText(getContext(), "Processing banner...", Toast.LENGTH_SHORT).show();
+                String eventKey = android.text.TextUtils.htmlEncode(finalTitle).replaceAll("[^a-zA-Z0-9]", "_")
+                        + "_" + System.currentTimeMillis();
+                new FirebaseStorageHelper().uploadEventBanner(
+                        requireContext(), selectedImageUri, eventKey,
+                        new FirebaseStorageHelper.UploadCallback() {
+                            @Override
+                            public void onSuccess(String downloadUrl) {
+                                if (getContext() == null) return;
+                                saveEvent(finalTitle, finalDesc, finalDate, finalStartTime, finalEndTime,
+                                        finalTags, finalOrganizerDisplay, finalCategory, downloadUrl, finalUserStudentId);
+                            }
+
+                            @Override
+                            public void onFailure(String errorMessage) {
+                                if (getContext() == null) return;
+                                Toast.makeText(getContext(),
+                                        "Banner processing failed: " + errorMessage + ". Saving without image.",
+                                        Toast.LENGTH_LONG).show();
+                                saveEvent(finalTitle, finalDesc, finalDate, finalStartTime, finalEndTime,
+                                        finalTags, finalOrganizerDisplay, finalCategory, "", finalUserStudentId);
+                            }
+                        });
             } else {
-                Toast.makeText(getContext(), "Failed to submit event. Please try again.", Toast.LENGTH_SHORT).show();
+                saveEvent(finalTitle, finalDesc, finalDate, finalStartTime, finalEndTime,
+                        finalTags, finalOrganizerDisplay, finalCategory, "", finalUserStudentId);
             }
         });
 
         return view;
+    }
+
+    /** Save the event to the local DB (and Firestore via DatabaseHelper). */
+    private void saveEvent(String title, String desc, String date,
+                           String startTime, String endTime,
+                           String tags, String organizerDisplay,
+                           String category, String imagePath,
+                           String userStudentId) {
+        DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
+        Event newEvent = new Event(title, desc, date, startTime + " - " + endTime,
+                tags, organizerDisplay, category, imagePath, "PENDING");
+        newEvent.setCreatorSid(userStudentId);
+        // Venue is embedded in organizerDisplay; store it separately too
+        String venue = "";
+        String[] parts = organizerDisplay.split(" \u2013 ");
+        if (parts.length >= 2) venue = parts[1].trim();
+        newEvent.setVenue(venue);
+        newEvent.setStartTime(startTime);
+        newEvent.setEndTime(endTime);
+        if (db.addEvent(newEvent) != -1) {
+            Toast.makeText(getContext(), "Event submitted for approval!", Toast.LENGTH_LONG).show();
+            requireActivity().getSupportFragmentManager().popBackStack();
+        } else {
+            Toast.makeText(getContext(), "Failed to submit event. Please try again.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**

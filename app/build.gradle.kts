@@ -47,6 +47,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-functions")
+
     implementation("org.mindrot:jbcrypt:0.4")
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.12.2")

@@ -5,8 +5,6 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -24,13 +22,11 @@ import androidx.fragment.app.Fragment;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.FirebaseStorageHelper;
 import com.example.campus_event_org_hub.util.ImageUtils;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 public class ProfileFragment extends Fragment {
 
@@ -113,9 +109,16 @@ public class ProfileFragment extends Fragment {
 
                 if (savedGender != null && !savedGender.isEmpty()) genderDropdown.setText(savedGender, false);
                 if (savedMobile != null && !savedMobile.isEmpty()) mobileField.setText(savedMobile);
-                if (savedImg != null && !savedImg.isEmpty()
-                        && new File(savedImg).exists()) {
-                    selectedImagePath = savedImg;
+                if (savedImg != null && !savedImg.isEmpty()) {
+                    // Accept device-independent formats directly.
+                    // For legacy local paths, only use them if the file still exists on this device.
+                    if (savedImg.startsWith("data:image/")
+                            || savedImg.startsWith("http://")
+                            || savedImg.startsWith("https://")) {
+                        selectedImagePath = savedImg;
+                    } else if (new File(savedImg).exists()) {
+                        selectedImagePath = savedImg;
+                    }
                 }
                 c.close();
             }
@@ -141,12 +144,6 @@ public class ProfileFragment extends Fragment {
             // If selectedImagePath is non-null, pass it to update.
             // If neither (no change), pass null which skips the column update.
             String imgPathForDb = imageDeleted ? "" : selectedImagePath;
-
-            // If user chose to delete, also remove the file from disk so it
-            // cannot be resurrected by a stale Firestore path on next sync.
-            if (imageDeleted) {
-                deleteProfileFileFromDisk();
-            }
 
             DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
             boolean ok = db.updateUserProfile(studentId, gender, mobile, imgPathForDb);
@@ -194,7 +191,7 @@ public class ProfileFragment extends Fragment {
     private void deleteProfileImage() {
         selectedImagePath = null;
         imageDeleted = true;
-        // Reset avatar to placeholder (null path → loadAvatar shows ic_person with correct tint/padding)
+        // Reset avatar to placeholder (null path → loadAvatar shows placeholder)
         loadAvatarFromPath(null);
         Toast.makeText(getContext(), "Photo removed. Tap Save to confirm.", Toast.LENGTH_SHORT).show();
     }
@@ -205,57 +202,37 @@ public class ProfileFragment extends Fragment {
         if (requestCode == PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK
                 && data != null && data.getData() != null) {
             Uri uri = data.getData();
-            String internalPath = copyImageToInternal(uri);
-            if (internalPath != null) {
-                selectedImagePath = internalPath;
-                imageDeleted = false; // new photo overrides any pending deletion
-                loadAvatarFromPath(internalPath);
-            } else {
-                Toast.makeText(getContext(), "Could not load image.", Toast.LENGTH_SHORT).show();
-            }
+            // Show a local preview immediately while encoding happens in the background
+            loadAvatarFromPath(uri.toString());
+            // Encode to Base64 so the image works on any device
+            Toast.makeText(getContext(), "Processing photo...", Toast.LENGTH_SHORT).show();
+            new FirebaseStorageHelper().uploadProfilePhoto(requireContext(), uri, studentId,
+                    new FirebaseStorageHelper.UploadCallback() {
+                        @Override
+                        public void onSuccess(String downloadUrl) {
+                            if (getContext() == null) return;
+                            selectedImagePath = downloadUrl;
+                            imageDeleted = false;
+                            // Refresh avatar with the Base64 data-URI
+                            loadAvatarFromPath(downloadUrl);
+                            Toast.makeText(getContext(), "Photo ready.", Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            if (getContext() == null) return;
+                            Toast.makeText(getContext(),
+                                    "Photo processing failed: " + errorMessage, Toast.LENGTH_LONG).show();
+                        }
+                    });
         }
     }
 
-    /** Copy picked image to internal storage and return the file path, or null on failure. */
-    private String copyImageToInternal(Uri uri) {
-        try {
-            File dir = new File(requireContext().getFilesDir(), "profile_pics");
-            if (!dir.exists()) dir.mkdirs();
-            // Sanitize studentId for use as filename
-            String safeId = studentId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
-            File dest = new File(dir, safeId + ".jpg");
-            InputStream in = requireContext().getContentResolver().openInputStream(uri);
-            if (in == null) return null;
-            Bitmap bmp = BitmapFactory.decodeStream(in);
-            in.close();
-            if (bmp == null) return null;
-            OutputStream out = new FileOutputStream(dest);
-            bmp.compress(Bitmap.CompressFormat.JPEG, 90, out);
-            out.flush();
-            out.close();
-            return dest.getAbsolutePath();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /** Load avatar from an internal file path (absolute) or content URI string. */
+    /** Load avatar from an https:// URL, absolute file path, or content URI string. */
     private void loadAvatarFromPath(String path) {
         int paddingPx = dpToPx(10);
         ImageUtils.loadAvatar(requireContext(), avatarView, path,
                 R.color.text_on_primary, paddingPx);
-    }
-
-    /**
-     * Permanently delete the profile photo file from internal storage so that a
-     * stale Firestore path can never resurrect it on the next sync.
-     */
-    private void deleteProfileFileFromDisk() {
-        try {
-            String safeId = studentId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
-            File f = new File(requireContext().getFilesDir(), "profile_pics/" + safeId + ".jpg");
-            if (f.exists()) f.delete();
-        } catch (Exception ignored) {}
     }
 
     private int dpToPx(int dp) {

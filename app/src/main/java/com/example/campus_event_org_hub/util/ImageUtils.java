@@ -4,6 +4,9 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Base64;
 import android.widget.ImageView;
 
 import androidx.annotation.ColorRes;
@@ -12,6 +15,10 @@ import androidx.annotation.DrawableRes;
 import com.example.campus_event_org_hub.R;
 
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Safe image loading utility.
@@ -28,6 +35,10 @@ import java.io.InputStream;
 public final class ImageUtils {
 
     private ImageUtils() {}
+
+    /** Background thread pool for off-main-thread network/disk image loading. */
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(3);
+    private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
 
     /**
      * Returns the appropriate banner drawable for a given event category.
@@ -118,6 +129,46 @@ public final class ImageUtils {
             showAvatarPlaceholder(imageView);
             return;
         }
+        // Base64 data-URIs can be decoded directly (but off the main thread — they can be large)
+        if (path.startsWith("data:image/")) {
+            showAvatarPlaceholder(imageView); // show placeholder while decoding
+            EXECUTOR.execute(() -> {
+                Bitmap bmp = decodeBitmapFromBase64(path);
+                MAIN_HANDLER.post(() -> {
+                    if (bmp != null) {
+                        imageView.clearColorFilter();
+                        imageView.setImageTintList(null);
+                        imageView.setPadding(0, 0, 0, 0);
+                        imageView.setBackground(null);
+                        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        imageView.setImageBitmap(bmp);
+                    } else {
+                        showAvatarPlaceholder(imageView);
+                    }
+                });
+            });
+            return;
+        }
+        // Network URLs must be loaded off the main thread
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            showAvatarPlaceholder(imageView); // show placeholder while loading
+            EXECUTOR.execute(() -> {
+                Bitmap bmp = decodeBitmapFromUrl(path);
+                MAIN_HANDLER.post(() -> {
+                    if (bmp != null) {
+                        imageView.clearColorFilter();
+                        imageView.setImageTintList(null);
+                        imageView.setPadding(0, 0, 0, 0);
+                        imageView.setBackground(null);
+                        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        imageView.setImageBitmap(bmp);
+                    } else {
+                        showAvatarPlaceholder(imageView);
+                    }
+                });
+            });
+            return;
+        }
         Bitmap bmp = decodeBitmap(ctx, path, imageView);
         if (bmp != null) {
             imageView.clearColorFilter();
@@ -162,6 +213,40 @@ public final class ImageUtils {
     public static void load(Context ctx, ImageView imageView, String path, int placeholderRes) {
         if (path == null || path.isEmpty()) {
             imageView.setImageResource(placeholderRes);
+            return;
+        }
+        // Base64 data-URIs — decode off the main thread
+        if (path.startsWith("data:image/")) {
+            imageView.setImageResource(placeholderRes); // show placeholder while decoding
+            EXECUTOR.execute(() -> {
+                Bitmap bmp = decodeBitmapFromBase64(path);
+                MAIN_HANDLER.post(() -> {
+                    if (bmp != null) {
+                        imageView.clearColorFilter();
+                        imageView.setImageTintList(null);
+                        imageView.setImageBitmap(bmp);
+                    } else {
+                        imageView.setImageResource(placeholderRes);
+                    }
+                });
+            });
+            return;
+        }
+        // Network URLs must be loaded off the main thread
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            imageView.setImageResource(placeholderRes); // show placeholder while loading
+            EXECUTOR.execute(() -> {
+                Bitmap bmp = decodeBitmapFromUrl(path);
+                MAIN_HANDLER.post(() -> {
+                    if (bmp != null) {
+                        imageView.clearColorFilter();
+                        imageView.setImageTintList(null);
+                        imageView.setImageBitmap(bmp);
+                    } else {
+                        imageView.setImageResource(placeholderRes);
+                    }
+                });
+            });
             return;
         }
         Bitmap bmp = decodeBitmap(ctx, path, imageView);
@@ -273,5 +358,49 @@ public final class ImageUtils {
         }
 
         return new int[] { 1080, 1080 };
+    }
+
+    /**
+     * Decodes a bitmap from a data:image/...;base64,... URI.
+     * Must be called from a background thread for large images.
+     * Returns null on any error.
+     */
+    private static Bitmap decodeBitmapFromBase64(String dataUri) {
+        try {
+            int commaIndex = dataUri.indexOf(',');
+            if (commaIndex < 0) return null;
+            String base64Data = dataUri.substring(commaIndex + 1);
+            byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Downloads and decodes a bitmap from an http/https URL.
+     * Must be called from a background thread.
+     * Returns null on any error.
+     */
+    private static Bitmap decodeBitmapFromUrl(String urlString) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlString);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(10_000);
+            conn.setReadTimeout(15_000);
+            conn.setDoInput(true);
+            conn.connect();
+            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) return null;
+            InputStream is = conn.getInputStream();
+            Bitmap bmp = BitmapFactory.decodeStream(is);
+            is.close();
+            return bmp;
+        } catch (Exception e) {
+            // Network error, timeout, etc.
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 }
