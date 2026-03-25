@@ -12,6 +12,7 @@ import android.util.Log;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.model.NotifModel;
 import com.example.campus_event_org_hub.service.FcmSender;
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -998,8 +999,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public boolean registerForEvent(String studentId, int eventId) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
-            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    .format(new Date());
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                    .format(ServerTimeUtil.now());
             ContentValues v = new ContentValues();
             v.put(COLUMN_REG_STUDENT_ID, studentId);
             v.put(COLUMN_REG_EVENT_ID, eventId);
@@ -1059,7 +1060,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Set (or replace) the Time-In code for an event.
-     * Returns true if the update succeeded.
+     * Persists to local SQLite AND pushes both codes to Firestore so other devices
+     * can receive the code via the next SyncManager run.
+     * Returns true if the local update succeeded.
      */
     public boolean setTimeInCode(int eventId, String code) {
         try {
@@ -1069,6 +1072,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                     new String[]{String.valueOf(eventId)});
             db.close();
+            if (rows > 0) {
+                // Also push to Firestore so students on other devices receive it.
+                String currentTimeOut = getTimeOutCodeForEvent(eventId);
+                new FirestoreHelper().updateEventAttendanceCodes(eventId, code, currentTimeOut);
+            }
             return rows > 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "setTimeInCode failed", e);
@@ -1078,7 +1086,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Set (or replace) the Time-Out code for an event.
-     * Returns true if the update succeeded.
+     * Persists to local SQLite AND pushes both codes to Firestore so other devices
+     * can receive the code via the next SyncManager run.
+     * Returns true if the local update succeeded.
      */
     public boolean setTimeOutCode(int eventId, String code) {
         try {
@@ -1088,10 +1098,55 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                     new String[]{String.valueOf(eventId)});
             db.close();
+            if (rows > 0) {
+                // Also push to Firestore so students on other devices receive it.
+                String currentTimeIn = getTimeInCodeForEvent(eventId);
+                new FirestoreHelper().updateEventAttendanceCodes(eventId, currentTimeIn, code);
+            }
             return rows > 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "setTimeOutCode failed", e);
             return false;
+        }
+    }
+
+    /** Returns the stored time_in_code for an event, or "" if not set. */
+    private String getTimeInCodeForEvent(int eventId) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT " + COLUMN_TIME_IN_CODE + " FROM " + TABLE_EVENTS +
+                    " WHERE " + COLUMN_ID + "=?",
+                    new String[]{String.valueOf(eventId)});
+            String code = "";
+            if (c != null) {
+                if (c.moveToFirst()) code = c.getString(0);
+                c.close();
+            }
+            db.close();
+            return code != null ? code : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Returns the stored time_out_code for an event, or "" if not set. */
+    private String getTimeOutCodeForEvent(int eventId) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT " + COLUMN_TIME_OUT_CODE + " FROM " + TABLE_EVENTS +
+                    " WHERE " + COLUMN_ID + "=?",
+                    new String[]{String.valueOf(eventId)});
+            String code = "";
+            if (c != null) {
+                if (c.moveToFirst()) code = c.getString(0);
+                c.close();
+            }
+            db.close();
+            return code != null ? code : "";
+        } catch (Exception e) {
+            return "";
         }
     }
 
@@ -1441,13 +1496,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.close();
 
             // Current local time
-            Calendar now = Calendar.getInstance();
-            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now.getTime());
+            String today = ServerTimeUtil.todayString();
             if (!today.equals(eventDate)) {
                 return 1; // date mismatch - but allow on event date
             }
 
-            int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+            long nowMs = ServerTimeUtil.nowMillis();
+            int nowMinutes = (int) ((nowMs / 60000) % (24 * 60));
             int startMinutes = 0;
             int endMinutes = 24 * 60 - 1;
 
@@ -1581,8 +1636,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 return 1;
             }
 
-            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    .format(new Date());
+            // Use server-corrected time to prevent phone clock manipulation.
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                    .format(new java.util.Date(ServerTimeUtil.nowMillis()));
             ContentValues av = new ContentValues();
             av.put(COLUMN_ATT_EVENT_ID,   eventId);
             av.put(COLUMN_ATT_STUDENT_ID, studentId);
@@ -1695,8 +1751,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 return 1;
             }
 
-            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    .format(new Date());
+            // Use server-corrected time to prevent phone clock manipulation.
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                    .format(new java.util.Date(ServerTimeUtil.nowMillis()));
             ContentValues av = new ContentValues();
             av.put(COLUMN_ATT_TIME_OUT_AT, timestamp);
             db.update(TABLE_ATTENDANCE, av,
@@ -1854,15 +1911,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Upsert an event row from Firestore. localId is the Firestore doc id (= original SQLite id).
-     * For new rows: full INSERT (venue/is_hidden/time_in_code/time_out_code get defaults).
-     * For existing rows: UPDATE only the Firestore-owned columns;
-     *   venue, is_hidden, time_in_code, time_out_code are local-only and are never touched.
+     * For new rows: full INSERT (venue/is_hidden get defaults; time_in_code/time_out_code
+     *   are seeded from Firestore so codes are available immediately on first install / new device).
+     * For existing rows: UPDATE all Firestore-owned columns including the attendance codes.
+     *   venue and is_hidden remain local-only and are never touched.
      */
     public void syncUpsertEvent(int localId, String title, String description,
                                  String date, String time, String tags,
                                  String organizer, String category,
                                  String imagePath, String status, String creatorSid,
-                                 String startTime, String endTime) {
+                                 String startTime, String endTime,
+                                 String timeInCode, String timeOutCode) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
 
@@ -1879,37 +1938,41 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             if (!exists) {
                 // New event: insert with defaults for local-only columns.
                 ContentValues v = new ContentValues();
-                v.put(COLUMN_ID,          localId);
-                v.put(COLUMN_TITLE,       title);
-                v.put(COLUMN_DESC,        description);
-                v.put(COLUMN_DATE,        date);
-                v.put(COLUMN_EVENT_TIME,  time       != null ? time       : "");
-                v.put(COLUMN_START_TIME,  startTime  != null ? startTime  : "");
-                v.put(COLUMN_END_TIME,    endTime    != null ? endTime    : "");
-                v.put(COLUMN_TAGS,        tags       != null ? tags       : "");
-                v.put(COLUMN_ORGANIZER,   organizer);
-                v.put(COLUMN_CATEGORY,    category);
-                v.put(COLUMN_IMAGE_PATH,  imagePath  != null ? imagePath  : "");
-                v.put(COLUMN_STATUS,      status);
-                v.put(COLUMN_CREATOR_SID, creatorSid != null ? creatorSid : "");
-                // venue, is_hidden, time_in_code, time_out_code use column DEFAULT values
+                v.put(COLUMN_ID,           localId);
+                v.put(COLUMN_TITLE,        title);
+                v.put(COLUMN_DESC,         description);
+                v.put(COLUMN_DATE,         date);
+                v.put(COLUMN_EVENT_TIME,   time       != null ? time       : "");
+                v.put(COLUMN_START_TIME,   startTime  != null ? startTime  : "");
+                v.put(COLUMN_END_TIME,     endTime    != null ? endTime    : "");
+                v.put(COLUMN_TAGS,         tags       != null ? tags       : "");
+                v.put(COLUMN_ORGANIZER,    organizer);
+                v.put(COLUMN_CATEGORY,     category);
+                v.put(COLUMN_IMAGE_PATH,   imagePath  != null ? imagePath  : "");
+                v.put(COLUMN_STATUS,       status);
+                v.put(COLUMN_CREATOR_SID,  creatorSid != null ? creatorSid : "");
+                v.put(COLUMN_TIME_IN_CODE,  timeInCode  != null ? timeInCode  : "");
+                v.put(COLUMN_TIME_OUT_CODE, timeOutCode != null ? timeOutCode : "");
+                // venue, is_hidden use column DEFAULT values
                 db.insertWithOnConflict(TABLE_EVENTS, null, v, SQLiteDatabase.CONFLICT_IGNORE);
             } else {
-                // Existing event: update Firestore-owned columns only.
-                // Do NOT touch: venue, is_hidden, time_in_code, time_out_code.
+                // Existing event: update Firestore-owned columns including attendance codes.
+                // Do NOT touch: venue, is_hidden.
                 ContentValues v = new ContentValues();
-                v.put(COLUMN_TITLE,       title);
-                v.put(COLUMN_DESC,        description);
-                v.put(COLUMN_DATE,        date);
-                v.put(COLUMN_EVENT_TIME,  time       != null ? time       : "");
-                v.put(COLUMN_START_TIME,  startTime  != null ? startTime  : "");
-                v.put(COLUMN_END_TIME,    endTime    != null ? endTime    : "");
-                v.put(COLUMN_TAGS,        tags       != null ? tags       : "");
-                v.put(COLUMN_ORGANIZER,   organizer);
-                v.put(COLUMN_CATEGORY,    category);
-                v.put(COLUMN_IMAGE_PATH,  imagePath  != null ? imagePath  : "");
-                v.put(COLUMN_STATUS,      status);
-                v.put(COLUMN_CREATOR_SID, creatorSid != null ? creatorSid : "");
+                v.put(COLUMN_TITLE,        title);
+                v.put(COLUMN_DESC,         description);
+                v.put(COLUMN_DATE,         date);
+                v.put(COLUMN_EVENT_TIME,   time       != null ? time       : "");
+                v.put(COLUMN_START_TIME,   startTime  != null ? startTime  : "");
+                v.put(COLUMN_END_TIME,     endTime    != null ? endTime    : "");
+                v.put(COLUMN_TAGS,         tags       != null ? tags       : "");
+                v.put(COLUMN_ORGANIZER,    organizer);
+                v.put(COLUMN_CATEGORY,     category);
+                v.put(COLUMN_IMAGE_PATH,   imagePath  != null ? imagePath  : "");
+                v.put(COLUMN_STATUS,       status);
+                v.put(COLUMN_CREATOR_SID,  creatorSid != null ? creatorSid : "");
+                v.put(COLUMN_TIME_IN_CODE,  timeInCode  != null ? timeInCode  : "");
+                v.put(COLUMN_TIME_OUT_CODE, timeOutCode != null ? timeOutCode : "");
                 db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                         new String[]{String.valueOf(localId)});
             }
@@ -1918,6 +1981,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             Log.e("DatabaseHelper", "syncUpsertEvent failed", e);
         }
+    }
+
+    // Keep old overload for any existing callers (no codes)
+    public void syncUpsertEvent(int localId, String title, String description,
+                                 String date, String time, String tags,
+                                 String organizer, String category,
+                                 String imagePath, String status, String creatorSid,
+                                 String startTime, String endTime) {
+        syncUpsertEvent(localId, title, description, date, time, tags, organizer, category,
+                imagePath, status, creatorSid, startTime, endTime, null, null);
     }
 
     /**
@@ -2210,6 +2283,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Returns a single Event by its local DB id, or null if not found.
+     */
+    public Event getEventById(int id) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT * FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?",
+                    new String[]{String.valueOf(id)});
+            if (c != null && c.moveToFirst()) {
+                Event e = eventFromCursor(c);
+                c.close();
+                return e;
+            }
+            if (c != null) c.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getEventById failed", e);
+        }
+        return null;
+    }
+
     public List<Event> getEventsByStatus(String status) {
         List<Event> events = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
@@ -2225,16 +2319,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Returns all non-PENDING, non-hidden events for the student browse list.
+     * Only returns events with date >= today (upcoming events only).
+     * Uses server-corrected time to prevent device clock manipulation.
      */
     public List<Event> getAllEvents() {
         List<Event> events = new ArrayList<>();
         try {
             SQLiteDatabase db = this.getReadableDatabase();
+            String today = ServerTimeUtil.todayString();
             Cursor c = db.rawQuery(
                     "SELECT * FROM " + TABLE_EVENTS +
                     " WHERE " + COLUMN_STATUS + " != 'PENDING'" +
                     " AND (IFNULL(" + COLUMN_IS_HIDDEN + ",0) = 0)" +
-                    " ORDER BY " + COLUMN_DATE + " DESC", null);
+                    " AND " + COLUMN_DATE + " >= ?" +
+                    " ORDER BY " + COLUMN_DATE + " ASC", new String[]{today});
             if (c != null && c.moveToFirst()) {
                 do { events.add(eventFromCursor(c)); } while (c.moveToNext());
                 c.close();
@@ -2803,12 +2901,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         List<Event> events = new ArrayList<>();
         try {
             SQLiteDatabase db = this.getReadableDatabase();
+            String today = ServerTimeUtil.todayString();
             String hiddenCol = " AND (IFNULL(" + COLUMN_IS_HIDDEN + ",0) = 0)";
+            String dateCol = " AND " + COLUMN_DATE + " >= '" + today + "'";
             if (deptAbbr == null || deptAbbr.isEmpty()) {
                 Cursor c = db.rawQuery(
                         "SELECT * FROM " + TABLE_EVENTS +
-                        " WHERE " + COLUMN_STATUS + " != 'PENDING'" + hiddenCol +
-                        " ORDER BY " + COLUMN_DATE + " DESC", null);
+                        " WHERE " + COLUMN_STATUS + " != 'PENDING'" + hiddenCol + dateCol +
+                        " ORDER BY " + COLUMN_DATE + " ASC", null);
                 if (c != null && c.moveToFirst()) {
                     do { events.add(eventFromCursor(c)); } while (c.moveToNext());
                     c.close();
@@ -2816,9 +2916,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             } else {
                 Cursor c = db.rawQuery(
                         "SELECT * FROM " + TABLE_EVENTS +
-                        " WHERE " + COLUMN_STATUS + " != 'PENDING'" + hiddenCol +
+                        " WHERE " + COLUMN_STATUS + " != 'PENDING'" + hiddenCol + dateCol +
                         " AND UPPER(IFNULL(" + COLUMN_TAGS + ",'')) LIKE ?" +
-                        " ORDER BY " + COLUMN_DATE + " DESC",
+                        " ORDER BY " + COLUMN_DATE + " ASC",
                         new String[]{"%" + deptAbbr.toUpperCase(Locale.getDefault()) + "%"});
                 if (c != null && c.moveToFirst()) {
                     do { events.add(eventFromCursor(c)); } while (c.moveToNext());
@@ -3118,8 +3218,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Delete a user account by student_id.
-     * Wraps all SQLite deletes in a transaction and cascade-deletes the user's
-     * registrations and notifications from Firestore as well.
+     * Wraps all SQLite deletes in a transaction, cascade-deletes from Firestore,
+     * and calls the deleteUserAccount Cloud Function to also remove the Firebase
+     * Auth credential (which cannot be done from the client SDK for other users).
      */
     public void deleteUserAccount(String studentId) {
         if (studentId == null || studentId.isEmpty()) return;
@@ -3138,11 +3239,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         } finally {
             db.endTransaction();
         }
-        // Mirror all three deletes to Firestore (fire-and-forget)
-        FirestoreHelper fs = new FirestoreHelper();
-        fs.deleteUser(studentId);
-        fs.deleteUserRegistrations(studentId);
-        fs.deleteUserNotifications(studentId);
+        // Call Cloud Function to delete Firebase Auth credential + Firestore documents.
+        // The Cloud Function handles: Auth deletion, Firestore user doc, registrations,
+        // and notifications — all in one atomic server-side operation.
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("studentId", studentId);
+        com.google.firebase.functions.FirebaseFunctions.getInstance()
+                .getHttpsCallable("deleteUserAccount")
+                .call(payload)
+                .addOnSuccessListener(result ->
+                        Log.i("DatabaseHelper", "deleteUserAccount CF: Auth deleted for " + studentId))
+                .addOnFailureListener(e ->
+                        Log.e("DatabaseHelper", "deleteUserAccount CF failed for " + studentId
+                                + " — Firestore/Auth may need manual cleanup", e));
     }
 
     /**

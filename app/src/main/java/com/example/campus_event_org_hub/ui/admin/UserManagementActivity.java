@@ -15,13 +15,13 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.ui.base.BaseActivity;
 import com.example.campus_event_org_hub.util.ImageUtils;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -30,7 +30,7 @@ import com.google.android.material.imageview.ShapeableImageView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class UserManagementActivity extends AppCompatActivity {
+public class UserManagementActivity extends com.example.campus_event_org_hub.ui.base.BaseActivity {
 
     private DatabaseHelper db;
     private RecyclerView rv;
@@ -45,14 +45,17 @@ public class UserManagementActivity extends AppCompatActivity {
     private String currentDept  = "All"; // chip text: "All","CBA","CCJE","COED","COE","COL","CLAS","GS"
 
     @Override
+    protected boolean useEdgeToEdge() { return true; }
+
+    @Override
+    protected boolean isExitOnBackEnabled() { return false; }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_user_management);
 
         db = DatabaseHelper.getInstance(this);
-
-        // Back
-        findViewById(R.id.btn_back_user_mgmt).setOnClickListener(v -> finish());
 
         // Result count label
         tvCount = findViewById(R.id.tv_user_count);

@@ -6,31 +6,36 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
+import com.example.campus_event_org_hub.ui.base.BaseActivity;
 import com.example.campus_event_org_hub.ui.events.EventDetailActivity;
 import com.example.campus_event_org_hub.util.ImageUtils;
 
 import java.util.List;
 
-public class ApproveEventsActivity extends AppCompatActivity {
+public class ApproveEventsActivity extends BaseActivity {
 
     private DatabaseHelper db;
     private RecyclerView rv;
     private TextView tvEmpty;
     private ApproveAdapter adapter;
+
+    @Override
+    protected boolean useEdgeToEdge() { return true; }
+
+    @Override
+    protected boolean isExitOnBackEnabled() { return false; }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,9 +46,6 @@ public class ApproveEventsActivity extends AppCompatActivity {
         rv = findViewById(R.id.rv_approve_events);
         tvEmpty = findViewById(R.id.tv_approve_empty);
         rv.setLayoutManager(new LinearLayoutManager(this));
-
-        ImageButton btnBack = findViewById(R.id.btn_back_approve);
-        if (btnBack != null) btnBack.setOnClickListener(v -> finish());
 
         loadPendingEvents();
     }

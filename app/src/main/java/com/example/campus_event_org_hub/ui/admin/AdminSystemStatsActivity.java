@@ -2,27 +2,28 @@ package com.example.campus_event_org_hub.ui.admin;
 
 import android.os.Bundle;
 import android.view.Gravity;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.ui.base.BaseActivity;
 
 import java.util.List;
 import java.util.Map;
 
-public class AdminSystemStatsActivity extends AppCompatActivity {
+public class AdminSystemStatsActivity extends BaseActivity {
+
+    @Override
+    protected boolean isExitOnBackEnabled() { return false; }
+
+    @Override
+    protected boolean useEdgeToEdge() { return true; }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin_system_stats);
-
-        ImageButton btnBack = findViewById(R.id.btn_back_sys_stats);
-        btnBack.setOnClickListener(v -> finish());
 
         DatabaseHelper db = DatabaseHelper.getInstance(this);
         Map<String, Object> stats = db.getSystemStats();

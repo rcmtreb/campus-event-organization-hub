@@ -23,10 +23,11 @@ import com.example.campus_event_org_hub.util.ImageUtils;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> implements Filterable {
 
@@ -138,10 +139,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 holder.timelineBadge.setBackgroundColor(0xFF7B1FA2);
                 holder.timelineBadge.setVisibility(View.VISIBLE);
             } else if ("APPROVED".equals(status)) {
-                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                String today = dateFormat.format(new Date());
+                String today = ServerTimeUtil.todayString();
                 String eventDateStr = event.getDate();
-                
+
                 if (eventDateStr == null || eventDateStr.isEmpty()) {
                     holder.timelineBadge.setVisibility(View.GONE);
                 } else if (eventDateStr.compareTo(today) == 0) {
@@ -150,8 +150,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     if (endTime != null && !endTime.isEmpty()) {
                         try {
                             SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                            Calendar now = Calendar.getInstance();
-                            String currentTimeStr = timeFormat.format(now.getTime());
+                            Date now = ServerTimeUtil.now();
+                            String currentTimeStr = timeFormat.format(now);
                             Date currentTime = timeFormat.parse(currentTimeStr);
                             Date endTimeDate = timeFormat.parse(endTime);
                             if (currentTime != null && endTimeDate != null && endTimeDate.before(currentTime)) {

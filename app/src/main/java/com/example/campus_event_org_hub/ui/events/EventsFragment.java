@@ -27,17 +27,17 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
+import com.example.campus_event_org_hub.util.Refreshable;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
-public class EventsFragment extends Fragment {
+// Fix Bug 2 + Bug 1 (Refreshable): implement Refreshable so MainActivity can trigger
+// a data reload from the RealtimeSyncManager callback.
+public class EventsFragment extends Fragment implements Refreshable {
 
     private static final String TAG = "CEOH_EVENTS";
 
@@ -57,7 +57,7 @@ public class EventsFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         eventDetailLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -184,19 +184,11 @@ public class EventsFragment extends Fragment {
 
     private void loadEvents() {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            String today = sdf.format(new Date());
-
+            // Show upcoming approved events only (past events are filtered by getAllEvents).
             List<Event> allEvents = dbHelper.getAllEvents(filterDept);
             if (allEvents == null) allEvents = new ArrayList<>();
 
-            eventList = new ArrayList<>();
-            for (Event e : allEvents) {
-                String eventDate = e.getDate();
-                if (eventDate != null && eventDate.compareTo(today) >= 0) {
-                    eventList.add(e);
-                }
-            }
+            eventList = new ArrayList<>(allEvents);
 
             String sid = getArguments() != null
                     ? getArguments().getString("USER_STUDENT_ID", "") : "";
@@ -216,29 +208,30 @@ public class EventsFragment extends Fragment {
 
     private void reloadEvents() {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            String today = sdf.format(new Date());
-
+            // Show upcoming approved events only.
             List<Event> fresh = dbHelper.getAllEvents(filterDept);
             if (fresh == null) fresh = new ArrayList<>();
 
-            List<Event> upcoming = new ArrayList<>();
-            for (Event e : fresh) {
-                String eventDate = e.getDate();
-                if (eventDate != null && eventDate.compareTo(today) >= 0) {
-                    upcoming.add(e);
-                }
-            }
-            adapter.updateFullList(upcoming, currentCategory);
+            adapter.updateFullList(new ArrayList<>(fresh), currentCategory);
             recyclerView.smoothScrollToPosition(0);
         } catch (Exception e) {
             Log.e(TAG, "Error in reloadEvents", e);
         }
     }
 
+    /** Fix Bug 1 (Refreshable): called by MainActivity after a Firestore real-time update. */
+    @Override
+    public void refresh() {
+        if (adapter != null) {
+            reloadEvents();
+        }
+    }
+
     @Override
     public void onResume() {
         super.onResume();
+        // Fix Bug 2: reload events when the fragment becomes visible again.
+        reloadEvents();
         restoreScrollPosition();
     }
 }

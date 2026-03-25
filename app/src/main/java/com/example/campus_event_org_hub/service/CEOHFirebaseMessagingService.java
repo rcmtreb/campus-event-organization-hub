@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.FirestoreHelper;
 import com.example.campus_event_org_hub.ui.auth.LoginActivity;
+import com.example.campus_event_org_hub.ui.main.MainActivity;
 import com.example.campus_event_org_hub.util.SessionManager;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -103,9 +104,18 @@ public class CEOHFirebaseMessagingService extends FirebaseMessagingService {
     private void showNotification(String title, String body, String channelId) {
         ensureChannels();
 
-        // Tap the notification → open the app (LoginActivity handles auto-login redirect)
-        Intent intent = new Intent(this, LoginActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        // Fix Bug 5: route NEW_EVENT taps straight to the Events tab in MainActivity.
+        // All other notification types (APPROVED/REJECTED officer decisions, admin alerts)
+        // still go through LoginActivity which handles auto-login redirect.
+        final Intent intent;
+        if (CHANNEL_EVENTS.equals(channelId)) {
+            intent = new Intent(this, MainActivity.class);
+            intent.putExtra("OPEN_TAB", 1); // 1 = Events tab
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        } else {
+            intent = new Intent(this, LoginActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        }
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 0, intent,
                 PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);

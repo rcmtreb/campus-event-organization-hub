@@ -4,6 +4,7 @@ import android.util.Log;
 
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
@@ -212,23 +213,45 @@ public class FirestoreHelper {
                             String organizer, String category,
                             String imagePath, String status, String creatorSid,
                             String startTime, String endTime) {
+        upsertEvent(localId, title, description, date, time, tags, organizer, category,
+                imagePath, status, creatorSid, startTime, endTime, null, null);
+    }
+
+    public void upsertEvent(int localId, String title, String description,
+                            String date, String time, String tags,
+                            String organizer, String category,
+                            String imagePath, String status, String creatorSid,
+                            String startTime, String endTime,
+                            String timeInCode, String timeOutCode) {
         Map<String, Object> data = new HashMap<>();
-        data.put("local_id",    localId);
-        data.put("title",       title);
-        data.put("description", description);
-        data.put("date",        date);
-        data.put("event_time",  time    != null ? time    : "");
-        data.put("start_time",  startTime != null ? startTime : "");
-        data.put("end_time",    endTime != null ? endTime : "");
-        data.put("tags",        tags    != null ? tags    : "");
-        data.put("organizer",   organizer);
-        data.put("category",    category);
-        data.put("image_path",  imagePath != null ? imagePath : "");
-        data.put("status",      status);
-        data.put("creator_sid", creatorSid != null ? creatorSid : "");
+        data.put("local_id",      localId);
+        data.put("title",         title);
+        data.put("description",   description);
+        data.put("date",          date);
+        data.put("event_time",    time      != null ? time      : "");
+        data.put("start_time",    startTime != null ? startTime : "");
+        data.put("end_time",      endTime   != null ? endTime   : "");
+        data.put("tags",          tags      != null ? tags      : "");
+        data.put("organizer",     organizer);
+        data.put("category",      category);
+        data.put("image_path",    imagePath  != null ? imagePath  : "");
+        data.put("status",        status);
+        data.put("creator_sid",   creatorSid != null ? creatorSid : "");
+        data.put("time_in_code",  timeInCode  != null ? timeInCode  : "");
+        data.put("time_out_code", timeOutCode != null ? timeOutCode : "");
         db.collection(COL_EVENTS).document(String.valueOf(localId))
                 .set(data, SetOptions.merge())
                 .addOnFailureListener(e -> Log.e(TAG, "upsertEvent failed: " + localId, e));
+    }
+
+    /** Push updated attendance codes to Firestore without touching other fields. */
+    public void updateEventAttendanceCodes(int localId, String timeInCode, String timeOutCode) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("time_in_code",  timeInCode  != null ? timeInCode  : "");
+        data.put("time_out_code", timeOutCode != null ? timeOutCode : "");
+        db.collection(COL_EVENTS).document(String.valueOf(localId))
+                .update(data)
+                .addOnFailureListener(e -> Log.e(TAG, "updateEventAttendanceCodes failed: " + localId, e));
     }
 
     public void updateEventStatus(int localId, String status) {
@@ -267,9 +290,122 @@ public class FirestoreHelper {
         data.put("tags",        tags     != null ? tags     : "");
         data.put("organizer",   organizer);
         data.put("category",    category);
+        data.put("updated_at",  FieldValue.serverTimestamp()); // optimistic-lock sentinel
         db.collection(COL_EVENTS).document(String.valueOf(localId))
                 .update(data)
                 .addOnFailureListener(e -> Log.e(TAG, "updateEventFields failed", e));
+    }
+
+    /**
+     * Fetches a single event from Firestore and upserts it into local SQLite.
+     * Call this on a background thread. Returns the event ID on success, -1 on failure.
+     */
+    public int fetchEventById(int localId, android.content.Context context) {
+        try {
+            DocumentSnapshot snap = Tasks.await(
+                    db.collection(COL_EVENTS).document(String.valueOf(localId)).get(),
+                    10, java.util.concurrent.TimeUnit.SECONDS);
+            if (!snap.exists()) return -1;
+
+            DatabaseHelper dbHelper = DatabaseHelper.getInstance(context);
+            String title      = snap.getString("title");
+            String desc       = snap.getString("description");
+            String date       = snap.getString("date");
+            String time       = snap.getString("event_time");
+            String startTime  = snap.getString("start_time");
+            String endTime    = snap.getString("end_time");
+            String tags       = snap.getString("tags");
+            String organizer  = snap.getString("organizer");
+            String category   = snap.getString("category");
+            String imagePath  = snap.getString("image_path");
+            String status     = snap.getString("status");
+            String creatorSid = snap.getString("creator_sid");
+            String timeInCode  = snap.getString("time_in_code");
+            String timeOutCode = snap.getString("time_out_code");
+
+            dbHelper.syncUpsertEvent(localId, title, desc, date, time, tags,
+                    organizer, category, imagePath, status, creatorSid,
+                    startTime, endTime, timeInCode, timeOutCode);
+            return localId;
+        } catch (Exception e) {
+            Log.e(TAG, "fetchEventById failed", e);
+            return -1;
+        }
+    }
+
+    /**
+     * Read the current {@code updated_at} timestamp for an event document.
+     * Returns null if the document does not exist or has no timestamp.
+     * MUST be called from a background thread.
+     */
+    public com.google.firebase.Timestamp getEventUpdatedAt(int localId) {
+        try {
+            DocumentSnapshot snap = Tasks.await(
+                    db.collection(COL_EVENTS).document(String.valueOf(localId)).get(),
+                    10, java.util.concurrent.TimeUnit.SECONDS);
+            if (snap.exists()) {
+                return snap.getTimestamp("updated_at");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "getEventUpdatedAt failed", e);
+        }
+        return null;
+    }
+
+    /**
+     * Conflict-safe event update using a Firestore transaction.
+     * Reads the document inside the transaction; if {@code expectedUpdatedAt} doesn't match
+     * the server value, aborts and calls {@code onConflict}. Otherwise writes the fields
+     * and calls {@code onSuccess}.
+     *
+     * Pass {@code expectedUpdatedAt = null} to skip the conflict check (first-time write).
+     */
+    public void updateEventFieldsWithConflictCheck(
+            int localId,
+            String title, String description, String date, String time,
+            String tags, String organizer, String category,
+            com.google.firebase.Timestamp expectedUpdatedAt,
+            Runnable onSuccess, Runnable onConflict) {
+
+        db.runTransaction(transaction -> {
+            com.google.firebase.firestore.DocumentReference ref =
+                    db.collection(COL_EVENTS).document(String.valueOf(localId));
+            DocumentSnapshot snap = transaction.get(ref);
+
+            if (expectedUpdatedAt != null) {
+                com.google.firebase.Timestamp current = snap.getTimestamp("updated_at");
+                // If server timestamp differs from what admin read, another edit happened.
+                if (current != null && !current.equals(expectedUpdatedAt)) {
+                    throw new com.google.firebase.firestore.FirebaseFirestoreException(
+                            "CONFLICT",
+                            com.google.firebase.firestore.FirebaseFirestoreException.Code.ABORTED);
+                }
+            }
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("title",       title);
+            data.put("description", description);
+            data.put("date",        date);
+            data.put("event_time",  time     != null ? time     : "");
+            data.put("tags",        tags     != null ? tags     : "");
+            data.put("organizer",   organizer);
+            data.put("category",    category);
+            data.put("updated_at",  FieldValue.serverTimestamp());
+            transaction.update(ref, data);
+            return null;
+        }).addOnSuccessListener(v -> {
+            if (onSuccess != null) onSuccess.run();
+        }).addOnFailureListener(e -> {
+            if (e instanceof com.google.firebase.firestore.FirebaseFirestoreException) {
+                com.google.firebase.firestore.FirebaseFirestoreException ffe =
+                        (com.google.firebase.firestore.FirebaseFirestoreException) e;
+                if (ffe.getCode() == com.google.firebase.firestore.FirebaseFirestoreException.Code.ABORTED) {
+                    if (onConflict != null) onConflict.run();
+                    return;
+                }
+            }
+            Log.e(TAG, "updateEventFieldsWithConflictCheck failed", e);
+        });
     }
 
     public void deleteEvent(int localId) {

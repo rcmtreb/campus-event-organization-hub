@@ -3,6 +3,7 @@ package com.example.campus_event_org_hub.ui.main;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,7 +25,12 @@ import androidx.core.content.ContextCompat;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.FirestoreHelper;
+import com.example.campus_event_org_hub.data.SyncManager;
+import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.model.NotifModel;
+import com.example.campus_event_org_hub.ui.events.EventDetailActivity;
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
@@ -49,8 +55,6 @@ public class NotificationsFragment extends Fragment {
     private DatabaseHelper db;
     private String studentId;
 
-    private TextView tvUnreadCount;
-    private MaterialButton btnClearAll;
     private MaterialButton btnArchiveSelected;
 
     /** Whether we are currently in multi-select (archive) mode. */
@@ -75,13 +79,11 @@ public class NotificationsFragment extends Fragment {
         adapter = new NotifAdapter(visibleNotifs, db, this);
         rv.setAdapter(adapter);
 
-        tvUnreadCount    = view.findViewById(R.id.tv_notif_unread_count);
-        btnClearAll      = view.findViewById(R.id.btn_clear_all_notifications);
         btnArchiveSelected = view.findViewById(R.id.btn_archive_selected);
 
+        // Header badge and Clear All are rendered inside the RecyclerView header row.
         updateUnreadBadge();
 
-        btnClearAll.setOnClickListener(v -> clearAllNotifications());
         btnArchiveSelected.setOnClickListener(v -> confirmArchiveSelected());
 
         swipeRefresh = view.findViewById(R.id.swipe_refresh_notifications);
@@ -101,8 +103,9 @@ public class NotificationsFragment extends Fragment {
         selectedIds.add(firstItem.getNotifId());
         adapter.collapseAll();
         btnArchiveSelected.setVisibility(View.VISIBLE);
-        btnClearAll.setVisibility(View.GONE);
         updateArchiveButtonLabel();
+        // Refresh header row so Clear All hides while in selection mode
+        adapter.notifyItemChanged(0);
     }
 
     void exitSelectionMode() {
@@ -182,15 +185,13 @@ public class NotificationsFragment extends Fragment {
 
     // ── Clear All (in-memory only, no DB change) ──────────────────────────────
 
-    private void clearAllNotifications() {
+    void clearAllNotifications() {
         new AlertDialog.Builder(requireContext())
                 .setTitle("Clear Notifications")
                 .setMessage("Are you sure that you will clear all your notifications?")
                 .setPositiveButton("Yes, Clear All", (dialog, which) -> {
                     visibleNotifs.clear();
                     adapter.notifyDataSetChanged();
-                    if (tvUnreadCount    != null) tvUnreadCount.setVisibility(View.GONE);
-                    if (btnClearAll      != null) btnClearAll.setVisibility(View.GONE);
                     if (btnArchiveSelected != null) btnArchiveSelected.setVisibility(View.GONE);
                     if (getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).clearNotificationBadge();
@@ -203,22 +204,9 @@ public class NotificationsFragment extends Fragment {
     // ── Badge helpers ─────────────────────────────────────────────────────────
 
     void updateUnreadBadge() {
-        int unread = 0;
-        for (NotifModel n : visibleNotifs) {
-            if (!n.isRead()) unread++;
-        }
-
-        if (tvUnreadCount != null) {
-            if (unread > 0) {
-                tvUnreadCount.setText(unread + " unread");
-                tvUnreadCount.setVisibility(View.VISIBLE);
-            } else {
-                tvUnreadCount.setVisibility(View.GONE);
-            }
-        }
-
-        if (btnClearAll != null && !selectionMode) {
-            btnClearAll.setVisibility(visibleNotifs.isEmpty() ? View.GONE : View.VISIBLE);
+        // Refresh the header row (position 0) which renders the unread badge and Clear All button
+        if (adapter != null) {
+            adapter.notifyItemChanged(0);
         }
 
         if (getActivity() instanceof MainActivity) {
@@ -310,7 +298,11 @@ public class NotificationsFragment extends Fragment {
 
     // ── Adapter ──────────────────────────────────────────────────────────────
 
-    static class NotifAdapter extends RecyclerView.Adapter<NotifAdapter.VH> {
+    static class NotifAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+
+        private static final int VIEW_TYPE_HEADER = 0;
+        private static final int VIEW_TYPE_ITEM   = 1;
+
         private final List<NotifModel> items;
         private final DatabaseHelper db;
         private final NotificationsFragment fragment;
@@ -327,23 +319,69 @@ public class NotificationsFragment extends Fragment {
             notifyDataSetChanged();
         }
 
+        @Override
+        public int getItemViewType(int position) {
+            return position == 0 ? VIEW_TYPE_HEADER : VIEW_TYPE_ITEM;
+        }
+
         @NonNull
         @Override
-        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.notification_list_item, parent, false);
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            LayoutInflater inflater = LayoutInflater.from(parent.getContext());
+            if (viewType == VIEW_TYPE_HEADER) {
+                View v = inflater.inflate(R.layout.notification_list_header, parent, false);
+                return new HeaderVH(v);
+            }
+            View v = inflater.inflate(R.layout.notification_list_item, parent, false);
             return new VH(v);
         }
 
         @Override
-        public void onBindViewHolder(@NonNull VH h, int pos) {
-            NotifModel item = items.get(pos);
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int pos) {
+            if (pos == 0) {
+                bindHeader((HeaderVH) holder);
+            } else {
+                bindItem((VH) holder, pos - 1);
+            }
+        }
+
+        // ── Header binding ────────────────────────────────────────────────────
+
+        private void bindHeader(HeaderVH h) {
+            boolean inSelection = fragment.isSelectionMode();
+
+            // Unread count badge
+            int unread = 0;
+            for (NotifModel n : items) { if (!n.isRead()) unread++; }
+            if (unread > 0) {
+                h.tvUnreadCount.setText(unread + " unread");
+                h.tvUnreadCount.setVisibility(View.VISIBLE);
+            } else {
+                h.tvUnreadCount.setVisibility(View.GONE);
+            }
+
+            // Clear All button — visible only when not in selection mode and list is non-empty
+            if (!inSelection && !items.isEmpty()) {
+                h.btnClearAll.setVisibility(View.VISIBLE);
+                h.btnClearAll.setOnClickListener(v -> fragment.clearAllNotifications());
+            } else {
+                h.btnClearAll.setVisibility(View.GONE);
+            }
+        }
+
+        // ── Item binding ──────────────────────────────────────────────────────
+
+        private void bindItem(@NonNull VH h, int itemPos) {
+            NotifModel item = items.get(itemPos);
+            // The adapter position in the RecyclerView is itemPos + 1 (header at 0)
+            int adapterPos = itemPos + 1;
+
             boolean inSelection = fragment.isSelectionMode();
             boolean checked = fragment.isSelected(item.getNotifId());
             boolean isExpanded = expandedIds.contains(item.getNotifId());
 
             // ── Summary Section ──
-            
+
             // Title label
             String typeLabel;
             switch (item.getType() != null ? item.getType() : "") {
@@ -409,12 +447,49 @@ public class NotificationsFragment extends Fragment {
                             h.unreadDot.setVisibility(View.GONE);
                             fragment.updateUnreadBadge();
                         }
-                        fragment.openReschedulePicker(item, h.getAdapterPosition());
+                        fragment.openReschedulePicker(item, adapterPos);
                     });
                 }
             } else {
                 h.suggestedDate.setVisibility(View.GONE);
                 h.btnRespond.setVisibility(View.GONE);
+            }
+
+            // View Event button — for NEW_EVENT and APPROVED types
+            if (("NEW_EVENT".equals(item.getType()) || "APPROVED".equals(item.getType())) && !inSelection) {
+                h.btnViewEvent.setVisibility(View.VISIBLE);
+                h.btnViewEvent.setOnClickListener(v -> {
+                    // Mark read before navigating
+                    if (!item.isRead()) {
+                        db.markNotificationRead(item.getNotifId());
+                        item.setRead(true);
+                        h.unreadDot.setVisibility(View.GONE);
+                        fragment.updateUnreadBadge();
+                    }
+                    // Fetch this event from Firestore and update local SQLite, then open it
+                    android.content.Context viewContext = h.itemView.getContext();
+                    new Thread(() -> {
+                        new FirestoreHelper().fetchEventById(item.getEventId(), viewContext);
+                        new Handler(Looper.getMainLooper()).post(() -> {
+                            Event event = db.getEventById(item.getEventId());
+                            if (event == null) {
+                                Toast.makeText(viewContext,
+                                        "Event not found.", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            Bundle args = fragment.getArguments();
+                            String studentId = args != null ? args.getString("USER_STUDENT_ID", "") : "";
+                            String userRole  = args != null ? args.getString("USER_ROLE", "") : "";
+                            Intent intent = new Intent(viewContext, EventDetailActivity.class);
+                            intent.putExtra("event", event);
+                            intent.putExtra("USER_STUDENT_ID", studentId);
+                            intent.putExtra("USER_ROLE", userRole);
+                            viewContext.startActivity(intent);
+                        });
+                    }).start();
+                });
+            } else {
+                h.btnViewEvent.setVisibility(View.GONE);
             }
 
             // Mark as read/unread button
@@ -448,7 +523,7 @@ public class NotificationsFragment extends Fragment {
             );
 
             // ── Click Handlers ──
-            
+
             // Long-press: enter selection mode
             h.itemView.setOnLongClickListener(v -> {
                 if (!fragment.isSelectionMode()) {
@@ -473,7 +548,7 @@ public class NotificationsFragment extends Fragment {
                     } else {
                         expandedIds.add(item.getNotifId());
                     }
-                    notifyItemChanged(pos);
+                    notifyItemChanged(adapterPos);
                 }
             });
         }
@@ -484,7 +559,8 @@ public class NotificationsFragment extends Fragment {
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                 java.util.Date date = sdf.parse(createdAt);
                 if (date == null) return createdAt;
-                long diff = System.currentTimeMillis() - date.getTime();
+                // Use server-corrected time to prevent device clock manipulation
+                long diff = ServerTimeUtil.nowMillis() - date.getTime();
                 long minutes = diff / (60 * 1000);
                 long hours = minutes / 60;
                 long days = hours / 24;
@@ -525,7 +601,23 @@ public class NotificationsFragment extends Fragment {
             return time;
         }
 
-        @Override public int getItemCount() { return items.size(); }
+        // items.size() + 1 for the header row at position 0
+        @Override public int getItemCount() { return items.size() + 1; }
+
+        // ── Header ViewHolder ─────────────────────────────────────────────────
+
+        static class HeaderVH extends RecyclerView.ViewHolder {
+            TextView tvUnreadCount;
+            com.google.android.material.button.MaterialButton btnClearAll;
+
+            HeaderVH(@NonNull View v) {
+                super(v);
+                tvUnreadCount = v.findViewById(R.id.tv_notif_unread_count);
+                btnClearAll   = v.findViewById(R.id.btn_clear_all_notifications);
+            }
+        }
+
+        // ── Item ViewHolder ───────────────────────────────────────────────────
 
         static class VH extends RecyclerView.ViewHolder {
             MaterialCardView card;
@@ -537,6 +629,7 @@ public class NotificationsFragment extends Fragment {
             View unreadDot;
             MaterialButton btnRespond;
             MaterialButton btnMarkReadToggle;
+            MaterialButton btnViewEvent;
 
             VH(@NonNull View v) {
                 super(v);
@@ -554,6 +647,7 @@ public class NotificationsFragment extends Fragment {
                 unreadDot         = v.findViewById(R.id.notif_unread_dot);
                 btnRespond        = v.findViewById(R.id.btn_respond_postpone);
                 btnMarkReadToggle = v.findViewById(R.id.btn_mark_read_toggle);
+                btnViewEvent      = v.findViewById(R.id.btn_view_event);
             }
         }
     }

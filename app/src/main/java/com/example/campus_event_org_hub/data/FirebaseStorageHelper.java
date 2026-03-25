@@ -17,8 +17,10 @@ import java.util.concurrent.Executors;
 /**
  * Encodes images as Base64 data-URIs and returns them via the callback.
  *
- * Images are stored directly in Firestore / SQLite as
- *   data:image/jpeg;base64,<base64-encoded-bytes>
+ * All images are converted to PNG (lossless) before encoding, regardless of
+ * the source format (JPEG, HEIC, WebP, etc.).  They are stored directly in
+ * Firestore / SQLite as:
+ *   data:image/png;base64,<base64-encoded-bytes>
  * which is completely device-independent — no Firebase Storage needed.
  *
  * Profile photos are capped at 200×200 px; event banners at 400×400 px,
@@ -27,7 +29,8 @@ import java.util.concurrent.Executors;
 public class FirebaseStorageHelper {
 
     private static final String TAG = "FirebaseStorageHelper";
-    private static final int JPEG_QUALITY = 80;
+    // PNG is lossless; quality is ignored by Android for PNG but kept for clarity.
+    private static final int PNG_QUALITY = 100;
 
     /** Max dimension for profile photos (keeps the Base64 string small). */
     private static final int MAX_DIM_PROFILE = 200;
@@ -86,7 +89,8 @@ public class FirebaseStorageHelper {
 
     /**
      * Read a content:// or file:// URI, scale the bitmap so its longest side
-     * is at most {@code maxDim}, then re-encode as JPEG bytes.
+     * is at most {@code maxDim}, then re-encode as PNG bytes.
+     * All source formats (JPEG, HEIC, WebP, etc.) are converted to PNG.
      */
     private byte[] uriToJpegBytes(Context ctx, Uri uri, int maxDim) {
         try {
@@ -96,7 +100,7 @@ public class FirebaseStorageHelper {
             is.close();
             if (bmp == null) return null;
             bmp = scaleBitmapIfNeeded(bmp, maxDim);
-            return bitmapToJpegBytes(bmp);
+            return bitmapToPngBytes(bmp);
         } catch (Exception e) {
             Log.e(TAG, "uriToJpegBytes failed", e);
             return null;
@@ -114,15 +118,15 @@ public class FirebaseStorageHelper {
                 Math.max(1, Math.round(h * scale)), true);
     }
 
-    private byte[] bitmapToJpegBytes(Bitmap bmp) {
+    private byte[] bitmapToPngBytes(Bitmap bmp) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        bmp.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, baos);
+        bmp.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, baos);
         return baos.toByteArray();
     }
 
-    /** Wrap raw JPEG bytes in a data-URI prefix. */
-    private String toDataUri(byte[] jpegBytes) {
-        return "data:image/jpeg;base64," +
-                Base64.encodeToString(jpegBytes, Base64.NO_WRAP);
+    /** Wrap raw PNG bytes in a data-URI prefix. */
+    private String toDataUri(byte[] pngBytes) {
+        return "data:image/png;base64," +
+                Base64.encodeToString(pngBytes, Base64.NO_WRAP);
     }
 }

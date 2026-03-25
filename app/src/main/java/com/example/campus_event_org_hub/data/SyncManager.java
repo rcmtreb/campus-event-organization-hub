@@ -103,9 +103,12 @@ public class SyncManager {
                 String imagePath  = str(d, "image_path");
                 String status     = str(d, "status");
                 String creatorSid = str(d, "creator_sid");
+                String timeInCode  = str(d, "time_in_code");
+                String timeOutCode = str(d, "time_out_code");
                 if (localId <= 0 || title == null) continue;
                 db.syncUpsertEvent(localId, title, desc, date, time, tags,
-                        organizer, category, imagePath, status, creatorSid, startTime, endTime);
+                        organizer, category, imagePath, status, creatorSid, startTime, endTime,
+                        timeInCode, timeOutCode);
             }
             Log.d(TAG, "Synced " + docs.size() + " events");
         } catch (Exception e) {

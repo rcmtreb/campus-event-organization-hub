@@ -31,12 +31,24 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.receiver.NetworkCallbackHandler;
 import com.example.campus_event_org_hub.ui.events.EventsFragment;
+import com.example.campus_event_org_hub.ui.main.DiscoverFragment;
+import com.example.campus_event_org_hub.ui.main.MenuFragment;
+import com.example.campus_event_org_hub.ui.main.VenueFragment;
+import com.example.campus_event_org_hub.util.RealtimeSyncManager;
+import com.example.campus_event_org_hub.util.Refreshable;
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 
 public class MainActivity extends BaseActivity
         implements ProfileFragment.OnProfileUpdatedListener {
 
     private static final String TAG = "CEOH_MAIN";
     private static final String KEY_CURRENT_TAB = "current_tab";
+
+    // SharedPreferences key used to survive theme-change recreations
+    // (AppCompatDelegate recreation does not reliably preserve savedInstanceState).
+    private static final String PREFS_NAV = "nav_prefs";
+    private static final String KEY_NAV_TAB   = "last_tab";
+    private static final String KEY_NAV_TITLE = "last_title";
     private String userName, userRole, userDept, userEmail, userStudentId;
     private String currentProfileImagePath = null;
 
@@ -55,6 +67,9 @@ public class MainActivity extends BaseActivity
     // ── Network connectivity ───────────────────────────────────────────────
     private NetworkCallbackHandler networkCallbackHandler;
 
+    // ── Firestore real-time listener ──────────────────────────────────────────
+    private RealtimeSyncManager realtimeSyncManager;
+
     // ── Tab titles shown in the top bar ─────────────────────────────────────
     private static final String[] TAB_TITLES = { "Discover", "Events", "Venue", "Profile" };
 
@@ -62,23 +77,9 @@ public class MainActivity extends BaseActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Enable edge-to-edge display
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        setContentView(R.layout.activity_main);
 
-        try {
-            setContentView(R.layout.activity_main);
-
-            // Apply window insets for status bar
-            View statusBarBg = findViewById(R.id.status_bar_background);
-            if (statusBarBg != null) {
-                ViewCompat.setOnApplyWindowInsetsListener(statusBarBg, (v, insets) -> {
-                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                    v.setPadding(0, systemBars.top, 0, 0);
-                    return insets;
-                });
-            }
-
-            // Read user info from login intent
+        // Read user info from login intent
             if (getIntent() != null) {
                 userName      = getIntent().getStringExtra("USER_NAME");
                 userRole      = getIntent().getStringExtra("USER_ROLE");
@@ -125,22 +126,57 @@ public class MainActivity extends BaseActivity
             tabProfile .setOnClickListener(v -> selectTab(3));
 
             if (savedInstanceState == null) {
-                selectTab(0);
+                // Check whether we are recovering from a theme-change or process-death recreation.
+                // During such recreations savedInstanceState is null, but the tab we were on was
+                // written to SharedPreferences before the flip/kill.
+                android.content.SharedPreferences navPrefs =
+                        getSharedPreferences(PREFS_NAV, android.content.Context.MODE_PRIVATE);
+                int restoredTab   = navPrefs.getInt(KEY_NAV_TAB, 0);
+                String restoredTitle = navPrefs.getString(KEY_NAV_TITLE, null);
+
+                if (restoredTab != 0 || (restoredTitle != null && !restoredTitle.isEmpty())) {
+                    // Restored to a non-default tab — sync nav indicators AND load the fragment.
+                    // FragmentManager has already restored the correct fragment state, but our
+                    // currentTab and nav indicators still reflect the default. Call selectTab
+                    // to sync everything (nav + fragment + title) to the saved tab.
+                    selectTab(restoredTab);
+                    if (restoredTitle != null && !restoredTitle.isEmpty()
+                            && tvPageTitle != null) {
+                        tvPageTitle.setText(restoredTitle);
+                    }
+                } else {
+                    selectTab(0);
+                }
             } else {
                 currentTab = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
-                // Just restore tab indicators without clearing backstack
+                String savedTitle = savedInstanceState.getString(KEY_NAV_TITLE, null);
                 restoreTabIndicators(currentTab);
+                if (savedTitle != null && !savedTitle.isEmpty() && tvPageTitle != null) {
+                    tvPageTitle.setText(savedTitle);
+                }
             }
 
-        } catch (Exception e) {
-            Log.e(TAG, "CRITICAL CRASH in MainActivity onCreate", e);
-            Toast.makeText(this, "App Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+            // Fix Bug 5: if launched from a NEW_EVENT FCM notification, open the Events tab.
+            if (getIntent() != null && getIntent().hasExtra("OPEN_TAB")) {
+                int openTab = getIntent().getIntExtra("OPEN_TAB", 0);
+                selectTab(openTab);
+            }
+
+    }
+
+    private int tabForFragment(Fragment f) {
+        if (f instanceof DiscoverFragment)    return 0;
+        if (f instanceof EventsFragment)      return 1;
+        if (f instanceof VenueFragment)      return 2;
+        if (f instanceof MenuFragment)       return 3;
+        return -1;
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        // Sync server time to prevent device clock manipulation
+        ServerTimeUtil.sync();
         SyncManager.sync(this, null);
         updateNotificationBadge();
         
@@ -152,6 +188,17 @@ public class MainActivity extends BaseActivity
         
         // Check current state
         handleConnectivityChange(networkCallbackHandler.isConnected());
+
+        // Start Firestore real-time listeners so data updates appear without manual refresh.
+        if (realtimeSyncManager == null) {
+            realtimeSyncManager = new RealtimeSyncManager(this, () -> {
+                // Fix Bug 1: re-read badge AND tell the active fragment to reload its
+                // event list so newly-approved events appear without a manual swipe-refresh.
+                updateNotificationBadge();
+                refreshCurrentFragment();
+            });
+        }
+        realtimeSyncManager.start();
     }
 
     @Override
@@ -161,12 +208,19 @@ public class MainActivity extends BaseActivity
             networkCallbackHandler.unregister();
             networkCallbackHandler = null;
         }
+        // Stop real-time listeners while the app is in the background.
+        if (realtimeSyncManager != null) {
+            realtimeSyncManager.stop();
+        }
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(KEY_CURRENT_TAB, currentTab);
+        if (tvPageTitle != null) {
+            outState.putString(KEY_NAV_TITLE, tvPageTitle.getText().toString());
+        }
     }
 
     // ── Connectivity change handler ──────────────────────────────────────────
@@ -254,6 +308,22 @@ public class MainActivity extends BaseActivity
 
     // ── Tab selection ────────────────────────────────────────────────────────
 
+
+    // ── Real-time refresh helper ─────────────────────────────────────────────
+
+    /**
+     * If the currently visible fragment implements {@link Refreshable}, ask it to
+     * reload its data.  Called from the RealtimeSyncManager change callback so that
+     * newly-approved (or otherwise changed) events become visible immediately.
+     */
+    private void refreshCurrentFragment() {
+        androidx.fragment.app.Fragment f =
+                getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (f instanceof Refreshable) {
+            ((Refreshable) f).refresh();
+        }
+    }
+
     public void selectTab(int index) {
         selectTabWithArgs(index, null);
     }
@@ -265,6 +335,15 @@ public class MainActivity extends BaseActivity
     public void selectTabWithArgs(int index, Bundle extraArgs) {
         try {
             currentTab = index;
+
+            // Persist the selected tab so it survives theme-change recreations
+            // (AppCompatDelegate does not reliably preserve savedInstanceState).
+            getSharedPreferences(PREFS_NAV, android.content.Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_NAV_TAB, index)
+                    .putString(KEY_NAV_TITLE,
+                            (index >= 0 && index < TAB_TITLES.length) ? TAB_TITLES[index] : "Discover")
+                    .apply();
 
             // Reset all tabs
             setTabActive(iconDiscover, textDiscover, false);
@@ -324,6 +403,8 @@ public class MainActivity extends BaseActivity
     }
 
     private void restoreTabIndicators(int index) {
+        if (index < 0 || index > 3) index = 0;
+
         // Reset all tabs
         setTabActive(iconDiscover, textDiscover, false);
         setTabActive(iconEvents,   textEvents,   false);
@@ -362,6 +443,11 @@ public class MainActivity extends BaseActivity
         if (tvPageTitle != null) {
             tvPageTitle.setText(title);
         }
+        // Keep the persisted title in sync so theme-change recreation shows the right title
+        getSharedPreferences(PREFS_NAV, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_NAV_TITLE, title != null ? title : "")
+                .apply();
     }
 
     public void showNotificationBell(boolean show) {

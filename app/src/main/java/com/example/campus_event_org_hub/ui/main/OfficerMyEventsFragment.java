@@ -27,9 +27,10 @@ import com.google.android.material.tabs.TabLayout;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 
 public class OfficerMyEventsFragment extends Fragment {
 
@@ -109,7 +110,7 @@ public class OfficerMyEventsFragment extends Fragment {
     }
 
     private void showTab(int tab) {
-        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        String today = ServerTimeUtil.todayString();
         List<Event> filtered = new ArrayList<>();
 
         for (Event e : allOfficerEvents) {
@@ -155,7 +156,7 @@ public class OfficerMyEventsFragment extends Fragment {
         } else {
             rv.setVisibility(View.VISIBLE);
             tvEmpty.setVisibility(View.GONE);
-            boolean canManageAttendance = (tab == TAB_UPCOMING || tab == TAB_HAPPENING);
+            boolean canManageAttendance = (tab == TAB_HAPPENING);
             rv.setAdapter(new EventsAdapter(filtered, tab == TAB_POSTPONED, canManageAttendance, this));
         }
     }
@@ -399,8 +400,7 @@ public class OfficerMyEventsFragment extends Fragment {
                 h.timelineBadge.setBackgroundColor(0xFFF57C00);
                 h.timelineBadge.setVisibility(View.VISIBLE);
             } else {
-                String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        .format(new Date());
+                String today = ServerTimeUtil.todayString();
                 int cmp = e.getDate().compareTo(today);
                 if (cmp > 0) {
                     h.timelineBadge.setText("UPCOMING");

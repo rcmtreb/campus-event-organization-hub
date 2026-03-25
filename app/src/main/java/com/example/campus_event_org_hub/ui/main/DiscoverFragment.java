@@ -20,12 +20,12 @@ import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.ui.events.EventAdapter;
+import com.example.campus_event_org_hub.util.Refreshable;
 import com.google.android.material.chip.ChipGroup;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +33,9 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class DiscoverFragment extends Fragment {
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
+
+public class DiscoverFragment extends Fragment implements Refreshable {
 
     private DatabaseHelper dbHelper;
     private String userDept = "";
@@ -242,8 +244,7 @@ public class DiscoverFragment extends Fragment {
 
     private void loadTodayEvents() {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            String today = sdf.format(new Date());
+            String today = ServerTimeUtil.todayString();
 
             List<Event> allEvents = dbHelper.getAllEvents();
             List<Event> todayEvents = new ArrayList<>();
@@ -280,8 +281,7 @@ public class DiscoverFragment extends Fragment {
 
     private void loadCampusEvents() {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            String today = sdf.format(new Date());
+            String today = ServerTimeUtil.todayString();
 
             List<Event> allEvents = dbHelper.getAllEvents();
             List<Event> campusEvents = new ArrayList<>();
@@ -290,7 +290,9 @@ public class DiscoverFragment extends Fragment {
                 for (Event e : allEvents) {
                     if (!"APPROVED".equals(e.getStatus())) continue;
                     String eventDate = e.getDate();
-                    if (eventDate == null || eventDate.compareTo(today) < 0) continue;
+                    if (eventDate == null) continue;
+                    if (eventDate.length() > 10) eventDate = eventDate.substring(0, 10);
+                    if (eventDate.compareTo(today) < 0) continue;
                     String tags = e.getTags();
                     if (tags != null) {
                         String upperTags = tags.toUpperCase();
@@ -320,8 +322,7 @@ public class DiscoverFragment extends Fragment {
 
     private void loadMyDepartmentEvents() {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            String today = sdf.format(new Date());
+            String today = ServerTimeUtil.todayString();
 
             List<Event> allEvents = dbHelper.getAllEvents();
             List<Event> myDeptEvents = new ArrayList<>();
@@ -366,8 +367,8 @@ public class DiscoverFragment extends Fragment {
             List<Event> all = dbHelper.getAllEvents();
             if (all == null) all = new ArrayList<>();
 
+            String today = ServerTimeUtil.todayString();
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            String today = sdf.format(new Date());
 
             Calendar cal = Calendar.getInstance();
             String endOfWeek = sdf.format(cal.getTime());
@@ -476,4 +477,19 @@ public class DiscoverFragment extends Fragment {
 
         deptListContainer.addView(row);
     }
+
+    /** Fix Bug 1 (Refreshable): called by MainActivity after a Firestore real-time update. */
+    @Override
+    public void refresh() {
+        loadAllContent();
+    }
+
+    // Fix Bug 3: reload content when the fragment becomes visible again (e.g. after
+    // admin approves an event and the user switches back to the Discover tab).
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadAllContent();
+    }
+
 }

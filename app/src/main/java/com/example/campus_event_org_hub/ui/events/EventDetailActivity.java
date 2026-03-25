@@ -2,6 +2,8 @@ package com.example.campus_event_org_hub.ui.events;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.ContextThemeWrapper;
 import android.view.View;
 import android.widget.Button;
@@ -13,7 +15,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
-import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -21,6 +23,7 @@ import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -29,6 +32,17 @@ import com.google.android.material.textfield.TextInputEditText;
 public class EventDetailActivity extends AppCompatActivity {
 
     private boolean registrationChanged = false;
+
+    /** Polls isEventActive() every minute to show the attendance card when the event starts. */
+    private final Handler activeCheckHandler = new Handler(Looper.getMainLooper());
+    private Runnable activeCheckRunnable;
+    private static final long ACTIVE_CHECK_INTERVAL_MS = 60_000L; // 1 minute
+
+    // Held for the periodic active-check; set when student is registered.
+    private MaterialCardView attendanceCardRef;
+    private DatabaseHelper   dbRef;
+    private Event            eventRef;
+    private String           studentIdRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,7 +137,8 @@ public class EventDetailActivity extends AppCompatActivity {
                 registerButton.setText("Register for Event");
             } else if (db.isRegistered(finalStudentId, eventId)) {
                 setRegisteredState(registerButton);
-                // Student is registered — show attendance card
+                // Student is registered — show attendance card and start polling
+                scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
                 bindAttendanceCard(attendanceCard, db, event, finalStudentId);
             } else {
                 registerButton.setEnabled(true);
@@ -134,11 +149,13 @@ public class EventDetailActivity extends AppCompatActivity {
                         registrationChanged = true;
                         setRegisteredState(registerButton);
                         Toast.makeText(this, "Successfully registered!", Toast.LENGTH_LONG).show();
-                        // Now show attendance card
+                        // Now show attendance card and start polling
+                        scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
                         bindAttendanceCard(attendanceCard, db, event, finalStudentId);
                     } else {
                         setRegisteredState(registerButton);
                         Toast.makeText(this, "You are already registered for this event.", Toast.LENGTH_SHORT).show();
+                        scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
                         bindAttendanceCard(attendanceCard, db, event, finalStudentId);
                     }
                 });
@@ -147,39 +164,111 @@ public class EventDetailActivity extends AppCompatActivity {
     }
 
     /**
+     * Stores card/db/event/studentId refs and schedules a repeating check that shows
+     * the attendance card as soon as the event becomes active while the screen is open.
+     * Called immediately after the student is confirmed registered.
+     */
+    private void scheduleActiveCheck(MaterialCardView card, DatabaseHelper db,
+                                     Event event, String studentId) {
+        attendanceCardRef = card;
+        dbRef             = db;
+        eventRef          = event;
+        studentIdRef      = studentId;
+
+        if (activeCheckRunnable != null) {
+            activeCheckHandler.removeCallbacks(activeCheckRunnable);
+        }
+        activeCheckRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (attendanceCardRef != null && eventRef != null &&
+                        dbRef != null && studentIdRef != null) {
+                    // Re-check whether event is now active; if so, refresh the card.
+                    bindAttendanceCard(attendanceCardRef, dbRef, eventRef, studentIdRef);
+                }
+                activeCheckHandler.postDelayed(this, ACTIVE_CHECK_INTERVAL_MS);
+            }
+        };
+        activeCheckHandler.postDelayed(activeCheckRunnable, ACTIVE_CHECK_INTERVAL_MS);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Stop polling while screen is not visible.
+        if (activeCheckRunnable != null) {
+            activeCheckHandler.removeCallbacks(activeCheckRunnable);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Restart polling when screen returns to foreground (covers app-switch back).
+        if (activeCheckRunnable != null) {
+            activeCheckHandler.postDelayed(activeCheckRunnable, ACTIVE_CHECK_INTERVAL_MS);
+        }
+    }
+
+    /**
      * Checks if the event is currently active (within start/end time on event date).
+     *
+     * Uses UTC-normalized date comparison to avoid phone timezone/locale manipulation.
+     * Time-of-day comparison uses minutes-since-midnight to avoid the epoch-date bug
+     * where SimpleDateFormat("HH:mm").parse() returns a Date at Jan 1 1970 which
+     * would always compare as "in the past" against the real current Date.
      */
     private boolean isEventActive(Event event) {
         String startTime = event.getStartTime();
-        String endTime = event.getEndTime();
+        String endTime   = event.getEndTime();
 
         if (startTime == null || startTime.isEmpty() ||
-            endTime == null || endTime.isEmpty()) {
+            endTime   == null || endTime.isEmpty()) {
             return false;
         }
 
-        try {
-            SimpleDateFormat timeSdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-            SimpleDateFormat dateSdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        // Also show attendance for explicitly HAPPENING events even without a time window
+        if ("HAPPENING".equals(event.getStatus())) {
+            // If time window is set, still validate it; otherwise allow access
+            if (startTime.isEmpty() || endTime.isEmpty()) return true;
+        }
 
+        try {
+            // Use server-corrected date to prevent device clock manipulation.
             String eventDate = event.getDate();
-            String today = dateSdf.format(new Date());
+            String today     = ServerTimeUtil.todayString();
 
             if (!eventDate.equals(today)) {
                 return false;
             }
 
-            Date now = new Date();
-            Date start = timeSdf.parse(startTime);
-            Date end = timeSdf.parse(endTime);
+            // Compare time-of-day using minutes-since-midnight to avoid epoch-date bug
+            int nowMinutes   = minutesSinceMidnight(ServerTimeUtil.now());
+            int startMinutes = parseTimeToMinutes(startTime);
+            int endMinutes   = parseTimeToMinutes(endTime);
 
-            if (start == null || end == null) {
-                return false;
-            }
+            if (startMinutes < 0 || endMinutes < 0) return false;
 
-            return now.after(start) && now.before(end);
+            return nowMinutes >= startMinutes && nowMinutes < endMinutes;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /** Returns current time as minutes since midnight (0–1439). */
+    private int minutesSinceMidnight(Date now) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(now);
+        return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE);
+    }
+
+    /** Parses "HH:mm" string to minutes since midnight. Returns -1 on failure. */
+    private int parseTimeToMinutes(String time) {
+        try {
+            String[] parts = time.split(":");
+            return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
+        } catch (Exception e) {
+            return -1;
         }
     }
 

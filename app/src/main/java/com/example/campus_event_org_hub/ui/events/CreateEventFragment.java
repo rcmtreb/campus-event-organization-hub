@@ -24,6 +24,7 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.FirebaseStorageHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
@@ -104,8 +105,10 @@ public class CreateEventFragment extends Fragment {
 
         // --- Date picker ---
         View.OnClickListener openDatePicker = v -> {
+            // Use server-corrected time so device clock rollback cannot bypass the min-date guard.
             Calendar cal = Calendar.getInstance();
-            new DatePickerDialog(
+            cal.setTime(ServerTimeUtil.now());
+            DatePickerDialog dpd = new DatePickerDialog(
                     requireContext(),
                     (picker, year, month, dayOfMonth) -> {
                         String formatted = String.format(Locale.getDefault(),
@@ -115,7 +118,10 @@ public class CreateEventFragment extends Fragment {
                     cal.get(Calendar.YEAR),
                     cal.get(Calendar.MONTH),
                     cal.get(Calendar.DAY_OF_MONTH)
-            ).show();
+            );
+            // Prevent selecting a date in the past
+            dpd.getDatePicker().setMinDate(ServerTimeUtil.nowMillis());
+            dpd.show();
         };
         dateEt.setOnClickListener(openDatePicker);
         tilDate.setEndIconOnClickListener(openDatePicker);

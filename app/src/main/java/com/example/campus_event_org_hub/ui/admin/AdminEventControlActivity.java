@@ -11,7 +11,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,7 +18,6 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -37,7 +35,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class AdminEventControlActivity extends AppCompatActivity {
+public class AdminEventControlActivity extends com.example.campus_event_org_hub.ui.base.BaseActivity {
 
     private DatabaseHelper db;
     private List<Event> events;
@@ -54,14 +52,17 @@ public class AdminEventControlActivity extends AppCompatActivity {
             });
 
     @Override
+    protected boolean useEdgeToEdge() { return true; }
+
+    @Override
+    protected boolean isExitOnBackEnabled() { return false; }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin_event_control);
 
         db = DatabaseHelper.getInstance(this);
-
-        ImageButton btnBack = findViewById(R.id.btn_back_event_control);
-        btnBack.setOnClickListener(v -> finish());
 
         RecyclerView rv = findViewById(R.id.rv_event_control);
         rv.setLayoutManager(new LinearLayoutManager(this));

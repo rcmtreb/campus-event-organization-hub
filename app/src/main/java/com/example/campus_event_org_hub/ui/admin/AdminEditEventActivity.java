@@ -2,31 +2,50 @@ package com.example.campus_event_org_hub.ui.admin;
 
 import android.app.TimePickerDialog;
 import android.os.Bundle;
-import android.widget.ImageButton;
+import android.util.Log;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.FirestoreHelper;
+import com.example.campus_event_org_hub.ui.base.BaseActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
-
-// venue field is preserved from the original event; admin edit form does not expose it
+import com.google.firebase.Timestamp;
 
 import java.util.Calendar;
 import java.util.Locale;
+import java.util.concurrent.Executors;
+
+// venue field is preserved from the original event; admin edit form does not expose it
 
 /**
  * Allows the admin to edit the details of any event.
+ * Uses an optimistic-lock sentinel (Firestore updated_at timestamp) to detect
+ * concurrent edits by another admin and shows a conflict dialog instead of
+ * silently overwriting.
  * Returns RESULT_OK so AdminEventControlActivity reloads its list.
  */
-public class AdminEditEventActivity extends AppCompatActivity {
+public class AdminEditEventActivity extends com.example.campus_event_org_hub.ui.base.BaseActivity {
 
-    private int eventId;
-    private String originalVenue = "";
+    private static final String TAG = "AdminEditEvent";
+
+    private int       eventId;
+    private String    originalVenue = "";
+
+    /** Firestore updated_at at the time the admin opened this screen — used for conflict check. */
+    private Timestamp snapshotUpdatedAt = null;
+
     private TextInputEditText etTitle, etDesc, etDate, etTime, etOrganizer, etCategory, etTags;
+
+    @Override
+    protected boolean useEdgeToEdge() { return true; }
+
+    @Override
+    protected boolean isExitOnBackEnabled() { return false; }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,12 +73,6 @@ public class AdminEditEventActivity extends AppCompatActivity {
         etCategory.setText(getIntent().getStringExtra("EVENT_CATEGORY"));
         etTags.setText(getIntent().getStringExtra("EVENT_TAGS"));
 
-        // Back button
-        ImageButton btnBack = findViewById(R.id.btn_back_edit_event);
-        btnBack.setOnClickListener(v -> finish());
-
-        // Date field is locked — no picker attached
-
         // Time picker
         TextInputLayout tilTime = findViewById(R.id.til_edit_time);
         etTime.setOnClickListener(v -> openTimePicker());
@@ -68,6 +81,19 @@ public class AdminEditEventActivity extends AppCompatActivity {
         // Save button
         MaterialButton btnSave = findViewById(R.id.btn_save_event_edit);
         btnSave.setOnClickListener(v -> saveChanges());
+
+        // Read the current updated_at sentinel from Firestore in the background.
+        // This is used for optimistic-lock conflict detection when saving.
+        if (eventId != -1) {
+            Executors.newSingleThreadExecutor().execute(() -> {
+                try {
+                    FirestoreHelper fsh = new FirestoreHelper();
+                    snapshotUpdatedAt = fsh.getEventUpdatedAt(eventId);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not read updated_at; conflict detection disabled", e);
+                }
+            });
+        }
     }
 
     private void openTimePicker() {
@@ -100,14 +126,48 @@ public class AdminEditEventActivity extends AppCompatActivity {
             return;
         }
 
+        // Write local SQLite first (immediate, no conflict risk since SQLite is per-device).
         DatabaseHelper db = DatabaseHelper.getInstance(this);
-        boolean ok = db.updateEvent(eventId, title, desc, date, time, tags, organizer, category, originalVenue);
-        if (ok) {
-            Toast.makeText(this, "Event updated successfully.", Toast.LENGTH_SHORT).show();
-            setResult(RESULT_OK);
-            finish();
-        } else {
+        boolean localOk = db.updateEvent(eventId, title, desc, date, time, tags, organizer, category, originalVenue);
+
+        if (!localOk) {
             Toast.makeText(this, "Update failed. Please try again.", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        // Now write to Firestore with conflict check.
+        FirestoreHelper fsh = new FirestoreHelper();
+        fsh.updateEventFieldsWithConflictCheck(
+                eventId, title, desc, date, time, tags, organizer, category,
+                snapshotUpdatedAt,
+                /* onSuccess */ () -> runOnUiThread(() -> {
+                    Toast.makeText(this, "Event updated successfully.", Toast.LENGTH_SHORT).show();
+                    setResult(RESULT_OK);
+                    finish();
+                }),
+                /* onConflict */ () -> runOnUiThread(() -> {
+                    // Another admin edited this event while the screen was open.
+                    new AlertDialog.Builder(this)
+                            .setTitle("Edit Conflict")
+                            .setMessage("Another admin has modified this event since you opened it.\n\n" +
+                                    "Your local changes have been saved. " +
+                                    "Tap \"Reload\" to fetch the latest version, " +
+                                    "or \"Keep Mine\" to overwrite the server with your edits.")
+                            .setPositiveButton("Keep Mine", (d, w) -> {
+                                // Force-write without the conflict check.
+                                fsh.updateEventFields(eventId, title, desc, date, time, tags, organizer, category);
+                                Toast.makeText(this, "Your changes have been saved.", Toast.LENGTH_SHORT).show();
+                                setResult(RESULT_OK);
+                                finish();
+                            })
+                            .setNegativeButton("Reload", (d, w) -> {
+                                // Discard local edits — let AdminEventControlActivity reload.
+                                setResult(RESULT_CANCELED);
+                                finish();
+                            })
+                            .setCancelable(false)
+                            .show();
+                })
+        );
     }
 }

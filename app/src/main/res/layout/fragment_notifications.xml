@@ -9,59 +9,7 @@
     android:orientation="vertical"
     tools:context=".ui.main.NotificationsFragment">
 
-    <!-- Mini Header below main toolbar -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="@dimen/space_4"
-        android:paddingVertical="@dimen/space_3"
-        android:background="@color/surface">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Notifications"
-            android:textColor="@color/text_primary"
-            android:textSize="18sp"
-            android:textStyle="bold"/>
-
-        <!-- Red pill badge showing unread count -->
-        <TextView
-            android:id="@+id/tv_notif_unread_count"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/badge_timeline"
-            android:textColor="@color/text_on_primary"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="4dp"
-            android:visibility="gone"
-            tools:text="3"
-            tools:visibility="visible"/>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_clear_all_notifications"
-            style="@style/PremiumButton.Ghost"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:layout_marginStart="@dimen/space_2"
-            android:text="Clear All"
-            android:textSize="12sp"
-            android:visibility="gone"
-            tools:visibility="visible"/>
-
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/divider"/>
-
-    <!-- Archive Selected button -->
+    <!-- Archive Selected button (shown in selection mode, always outside scroll so it stays accessible) -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_archive_selected"
         style="@style/PremiumButton.Secondary"

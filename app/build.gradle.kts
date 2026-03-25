@@ -7,7 +7,6 @@ android {
     namespace = "com.example.campus_event_org_hub"
     compileSdk = 36
 
-
     defaultConfig {
         applicationId = "com.example.campus_event_org_hub"
         minSdk = 24

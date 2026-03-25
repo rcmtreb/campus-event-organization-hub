@@ -212,11 +212,13 @@ public final class ImageUtils {
      */
     public static void load(Context ctx, ImageView imageView, String path, int placeholderRes) {
         if (path == null || path.isEmpty()) {
+            imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
             imageView.setImageResource(placeholderRes);
             return;
         }
         // Base64 data-URIs — decode off the main thread
         if (path.startsWith("data:image/")) {
+            imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
             imageView.setImageResource(placeholderRes); // show placeholder while decoding
             EXECUTOR.execute(() -> {
                 Bitmap bmp = decodeBitmapFromBase64(path);
@@ -224,8 +226,10 @@ public final class ImageUtils {
                     if (bmp != null) {
                         imageView.clearColorFilter();
                         imageView.setImageTintList(null);
+                        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                         imageView.setImageBitmap(bmp);
                     } else {
+                        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         imageView.setImageResource(placeholderRes);
                     }
                 });
@@ -234,6 +238,7 @@ public final class ImageUtils {
         }
         // Network URLs must be loaded off the main thread
         if (path.startsWith("http://") || path.startsWith("https://")) {
+            imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
             imageView.setImageResource(placeholderRes); // show placeholder while loading
             EXECUTOR.execute(() -> {
                 Bitmap bmp = decodeBitmapFromUrl(path);
@@ -241,8 +246,10 @@ public final class ImageUtils {
                     if (bmp != null) {
                         imageView.clearColorFilter();
                         imageView.setImageTintList(null);
+                        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                         imageView.setImageBitmap(bmp);
                     } else {
+                        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         imageView.setImageResource(placeholderRes);
                     }
                 });
@@ -254,8 +261,10 @@ public final class ImageUtils {
             // Clear any color filter AND XML tint so the real photo renders correctly.
             imageView.clearColorFilter();
             imageView.setImageTintList(null);
+            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
             imageView.setImageBitmap(bmp);
         } else {
+            imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
             imageView.setImageResource(placeholderRes);
         }
     }

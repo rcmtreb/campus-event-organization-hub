@@ -11,9 +11,9 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.campus_event_org_hub.R;
+import com.example.campus_event_org_hub.ui.base.BaseActivity;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.SyncManager;
 
@@ -27,7 +27,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.Executors;
 
-public class ExportImportActivity extends AppCompatActivity {
+public class ExportImportActivity extends BaseActivity {
 
     private DatabaseHelper db;
     private TextView tvStatus;
@@ -39,13 +39,21 @@ public class ExportImportActivity extends AppCompatActivity {
             });
 
     @Override
+    protected boolean useEdgeToEdge() {
+        return true;
+    }
+
+    @Override
+    protected boolean isExitOnBackEnabled() {
+        return false;
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_export_import);
 
         db = DatabaseHelper.getInstance(this);
-
-        findViewById(R.id.btn_back_export).setOnClickListener(v -> finish());
 
         tvStatus = findViewById(R.id.tv_export_status);
 

@@ -8,12 +8,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.campus_event_org_hub.ui.base.BaseActivity;
@@ -28,6 +26,11 @@ public class AdminActivity extends BaseActivity {
 
     private DatabaseHelper db;
     private SwipeRefreshLayout swipeRefresh;
+
+    @Override
+    protected boolean useEdgeToEdge() {
+        return true;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,7 +50,7 @@ public class AdminActivity extends BaseActivity {
 
         updateStats();
 
-        ImageButton btnLogout = findViewById(R.id.btn_admin_logout);
+        LinearLayout cardLogout = findViewById(R.id.card_logout);
         LinearLayout cardApprove = findViewById(R.id.card_approve_events);
         LinearLayout cardUsers = findViewById(R.id.card_manage_users);
         LinearLayout cardEventControl = findViewById(R.id.card_event_control);
@@ -55,7 +58,7 @@ public class AdminActivity extends BaseActivity {
         LinearLayout cardExportImport = findViewById(R.id.card_export_import);
         LinearLayout cardDeleteAll = findViewById(R.id.card_delete_all);
 
-        btnLogout.setOnClickListener(v -> {
+        cardLogout.setOnClickListener(v -> {
             new SessionManager(this).clearSession();
             Toast.makeText(this, "Admin Logged Out", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(AdminActivity.this, LoginActivity.class);
@@ -104,7 +107,14 @@ public class AdminActivity extends BaseActivity {
         if (tvOfficers != null) tvOfficers.setText(String.valueOf(officerCount));
         if (tvEvents != null) tvEvents.setText(String.valueOf(eventCount));
         if (tvPending != null) tvPending.setText(String.valueOf(pendingCount));
-        if (tvPendingBadge != null) tvPendingBadge.setText(String.valueOf(pendingCount));
+        if (tvPendingBadge != null) {
+            if (pendingCount == 0) {
+                tvPendingBadge.setVisibility(View.GONE);
+            } else {
+                tvPendingBadge.setVisibility(View.VISIBLE);
+                tvPendingBadge.setText(String.valueOf(pendingCount));
+            }
+        }
     }
 
     // ── Delete All — Step 1: Warning dialog ──────────────────────────────────
