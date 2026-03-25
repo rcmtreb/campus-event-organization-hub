@@ -78,6 +78,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         this.userRole      = userRole  != null ? userRole  : "Student";
         this.dbHelper      = dbHelper;
         this.eventDetailLauncher = launcher;
+        setHasStableIds(true);
     }
 
     // ── ViewHolder lifecycle ─────────────────────────────────────────────────
@@ -212,6 +213,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     .show();
             return true;
         });
+    }
+
+    @Override
+    public long getItemId(int position) {
+        return eventList.get(position).getId();
     }
 
     @Override

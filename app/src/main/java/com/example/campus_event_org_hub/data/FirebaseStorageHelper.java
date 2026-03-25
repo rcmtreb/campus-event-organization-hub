@@ -35,7 +35,7 @@ public class FirebaseStorageHelper {
     /** Max dimension for profile photos (keeps the Base64 string small). */
     private static final int MAX_DIM_PROFILE = 200;
     /** Max dimension for event banners. */
-    private static final int MAX_DIM_BANNER  = 400;
+    private static final int MAX_DIM_BANNER  = 1080;
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(2);
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());

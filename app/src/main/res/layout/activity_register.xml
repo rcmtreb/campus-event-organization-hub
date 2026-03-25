@@ -8,62 +8,51 @@
     tools:context=".ui.auth.RegisterActivity">
 
     <!--
-        Percentage guideline: header occupies the top 28% of the screen.
-        The register card is anchored to 22% so it overlaps the header,
-        keeping the layered visual consistent with the login screen.
+        Same layout strategy as login: fixed-height gradient header (consistent
+        across all screen sizes) with title vertically centered inside it.
     -->
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline_reg_header_bottom"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.28" />
 
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline_reg_card_top"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.22" />
-
-    <!-- Header -->
+    <!-- Header background — fixed 160dp height, no drawable corner radius -->
     <View
         android:id="@+id/reg_header_background"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_width="0dp"
+        android:layout_height="160dp"
         android:background="@drawable/bg_login_header"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="@id/guideline_reg_header_bottom" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Register title — vertically centered in the header -->
     <TextView
         android:id="@+id/tv_reg_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="@dimen/space_8"
-        android:layout_marginTop="@dimen/space_10"
         android:text="Create\nAccount"
         android:textColor="@color/white"
         android:textSize="32sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintBottom_toBottomOf="@id/reg_header_background"
+        app:layout_constraintTop_toTopOf="@id/reg_header_background" />
 
-    <!-- Register Card — overlaps header via guideline_reg_card_top -->
+    <!-- Register Card — overlaps the gradient header by a fixed amount -->
     <androidx.cardview.widget.CardView
         android:id="@+id/reg_card"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="wrap_content"
         android:layout_marginHorizontal="@dimen/space_6"
+        android:layout_marginTop="-20dp"
         app:cardCornerRadius="@dimen/radius_xl"
         app:cardElevation="@dimen/elevation_high"
-        app:layout_constraintTop_toBottomOf="@id/guideline_reg_card_top"
-        app:layout_constraintBottom_toTopOf="@id/reg_bottom_actions"
+        app:layout_constraintTop_toBottomOf="@id/reg_header_background"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:fillViewport="true">
 
             <LinearLayout
                 android:layout_width="match_parent"

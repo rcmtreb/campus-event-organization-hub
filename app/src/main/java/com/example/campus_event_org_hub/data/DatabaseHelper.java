@@ -77,6 +77,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_ATT_STUDENT_ID     = "att_student_id";
     public static final String COLUMN_ATT_TIME_IN_AT     = "time_in_at";
     public static final String COLUMN_ATT_TIME_OUT_AT    = "time_out_at";
+    public static final String COLUMN_ATT_TIME_IN_PHOTO  = "time_in_photo";
+    public static final String COLUMN_ATT_TIME_OUT_PHOTO = "time_out_photo";
 
     // Table: Attendance Codes (per student)
     public static final String TABLE_ATTENDANCE_CODES        = "attendance_codes";
@@ -184,8 +186,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_ATT_ID         + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
             COLUMN_ATT_EVENT_ID   + " INTEGER, " +
             COLUMN_ATT_STUDENT_ID + " TEXT, " +
-            COLUMN_ATT_TIME_IN_AT + " TEXT, " +
+            COLUMN_ATT_TIME_IN_AT  + " TEXT, " +
             COLUMN_ATT_TIME_OUT_AT + " TEXT DEFAULT '', " +
+            COLUMN_ATT_TIME_IN_PHOTO  + " TEXT DEFAULT '', " +
+            COLUMN_ATT_TIME_OUT_PHOTO + " TEXT DEFAULT '', " +
             "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))";
 
     private static final String CREATE_TABLE_ATTENDANCE_CODES =
@@ -303,6 +307,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureAttendanceRateLimitTable(db);
         ensureAttendanceAuditTable(db);
         ensureLoginRateLimitTable(db);
+        migrateAttendancePhotoColumns(db);
     }
 
     @Override
@@ -496,9 +501,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     COLUMN_ATT_STUDENT_ID  + " TEXT, " +
                     COLUMN_ATT_TIME_IN_AT  + " TEXT, " +
                     COLUMN_ATT_TIME_OUT_AT + " TEXT DEFAULT '', " +
+                    COLUMN_ATT_TIME_IN_PHOTO  + " TEXT DEFAULT '', " +
+                    COLUMN_ATT_TIME_OUT_PHOTO + " TEXT DEFAULT '', " +
                     "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureAttendanceTable failed", e);
+        }
+    }
+
+    private void migrateAttendancePhotoColumns(SQLiteDatabase db) {
+        try {
+            db.execSQL("ALTER TABLE " + TABLE_ATTENDANCE
+                    + " ADD COLUMN " + COLUMN_ATT_TIME_IN_PHOTO + " TEXT DEFAULT ''");
+            db.execSQL("ALTER TABLE " + TABLE_ATTENDANCE
+                    + " ADD COLUMN " + COLUMN_ATT_TIME_OUT_PHOTO + " TEXT DEFAULT ''");
+        } catch (Exception e) {
+            // Columns may already exist (CREATE TABLE IF NOT EXISTS handles it)
+            Log.d("DatabaseHelper", "migrateAttendancePhotoColumns: " + e.getMessage());
         }
     }
 
@@ -1236,6 +1255,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     }
                 }
                 Calendar now = Calendar.getInstance();
+                now.setTime(ServerTimeUtil.now());
                 int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
                 if (nowMinutes > endMinutes) {
                     validationResult = 4;
@@ -1373,7 +1393,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         try {
                             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                             Date lockedUntil = sdf.parse(lockedUntilStr);
-                            if (lockedUntil != null && lockedUntil.getTime() > System.currentTimeMillis()) {
+                            if (lockedUntil != null && lockedUntil.getTime() > ServerTimeUtil.nowMillis()) {
                                 Log.w("DatabaseHelper", "Rate limited: student=" + studentId + ", event=" + eventId + ", type=" + type);
                                 return true;
                             }
@@ -1528,7 +1548,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 if (nowMinutes < allowedStart) {
                     return 2; // too early
                 }
-                if (nowMinutes > endMinutes) {
+                if (nowMinutes > endMinutes - 5) {
                     return 3; // too late
                 }
             } else if ("OUT".equals(type)) {
@@ -1666,6 +1686,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    public int submitTimeIn(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress, String photoBase64) {
+        int result = submitTimeIn(eventId, studentId, submittedCode, deviceInfo, ipAddress);
+        if (result == 0 && photoBase64 != null && !photoBase64.isEmpty()) {
+            try {
+                SQLiteDatabase db = this.getWritableDatabase();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_ATT_TIME_IN_PHOTO, photoBase64);
+                db.update(TABLE_ATTENDANCE, cv,
+                        COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
+                        new String[]{String.valueOf(eventId), studentId});
+                db.close();
+            } catch (Exception e) {
+                Log.e("DatabaseHelper", "submitTimeIn photo save failed", e);
+            }
+        }
+        return result;
+    }
+
     /**
      * Record a Time-Out for a student: validates the submitted code against the per-student
      * attendance code (preferred) or legacy event code, updates the attendance row,
@@ -1780,23 +1818,45 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    public int submitTimeOut(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress, String photoBase64) {
+        int result = submitTimeOut(eventId, studentId, submittedCode, deviceInfo, ipAddress);
+        if (result == 0 && photoBase64 != null && !photoBase64.isEmpty()) {
+            try {
+                SQLiteDatabase db = this.getWritableDatabase();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_ATT_TIME_OUT_PHOTO, photoBase64);
+                db.update(TABLE_ATTENDANCE, cv,
+                        COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
+                        new String[]{String.valueOf(eventId), studentId});
+                db.close();
+            } catch (Exception e) {
+                Log.e("DatabaseHelper", "submitTimeOut photo save failed", e);
+            }
+        }
+        return result;
+    }
+
     /**
      * Returns the attendance record for a student at an event, or null if none.
-     * Returns a String[2]: [0] = time_in_at, [1] = time_out_at (may be empty strings).
+     * Returns a String[4]: [0] = time_in_at, [1] = time_out_at, [2] = time_in_photo, [3] = time_out_photo
+     * (may be empty strings if not set).
      */
     public String[] getAttendanceRecord(int eventId, String studentId) {
         try {
             SQLiteDatabase db = this.getReadableDatabase();
             Cursor c = db.rawQuery(
-                    "SELECT " + COLUMN_ATT_TIME_IN_AT + ", " + COLUMN_ATT_TIME_OUT_AT +
+                    "SELECT " + COLUMN_ATT_TIME_IN_AT + ", " + COLUMN_ATT_TIME_OUT_AT + ", " +
+                    COLUMN_ATT_TIME_IN_PHOTO + ", " + COLUMN_ATT_TIME_OUT_PHOTO +
                     " FROM " + TABLE_ATTENDANCE +
                     " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
                     new String[]{String.valueOf(eventId), studentId});
             if (c != null && c.moveToFirst()) {
                 String ti = c.getString(0); if (ti == null) ti = "";
                 String to = c.getString(1); if (to == null) to = "";
+                String tiPhoto = c.getString(2); if (tiPhoto == null) tiPhoto = "";
+                String toPhoto = c.getString(3); if (toPhoto == null) toPhoto = "";
                 c.close();
-                return new String[]{ti, to};
+                return new String[]{ti, to, tiPhoto, toPhoto};
             }
             if (c != null) c.close();
         } catch (Exception e) {

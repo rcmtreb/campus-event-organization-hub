@@ -39,6 +39,8 @@ public final class ImageUtils {
     /** Background thread pool for off-main-thread network/disk image loading. */
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(3);
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+    /** Tag key used to track the currently-loaded URL so we skip redundant loads. */
+    private static final int TAG_URL = 0x7f123456;
 
     /**
      * Returns the appropriate banner drawable for a given event category.
@@ -123,18 +125,29 @@ public final class ImageUtils {
      * @param placeholderTintColor Color resource ID to apply as tint when showing placeholder
      * @param placeholderPaddingPx Padding in pixels to restore when showing placeholder
      */
-    public static void loadAvatar(Context ctx, ImageView imageView, String path,
+     public static void loadAvatar(Context ctx, ImageView imageView, String path,
                                   @ColorRes int placeholderTintColor, int placeholderPaddingPx) {
+        String oldTag = (String) imageView.getTag(TAG_URL);
+
         if (path == null || path.isEmpty()) {
+            imageView.setTag(TAG_URL, null);
             showAvatarPlaceholder(imageView);
             return;
         }
+
+        if (path.equals(oldTag)) {
+            return;
+        }
+
+        imageView.setTag(TAG_URL, path);
+
         // Base64 data-URIs can be decoded directly (but off the main thread — they can be large)
         if (path.startsWith("data:image/")) {
-            showAvatarPlaceholder(imageView); // show placeholder while decoding
+            showAvatarPlaceholder(imageView);
             EXECUTOR.execute(() -> {
                 Bitmap bmp = decodeBitmapFromBase64(path);
                 MAIN_HANDLER.post(() -> {
+                    if (!path.equals(imageView.getTag(TAG_URL))) return;
                     if (bmp != null) {
                         imageView.clearColorFilter();
                         imageView.setImageTintList(null);
@@ -151,10 +164,11 @@ public final class ImageUtils {
         }
         // Network URLs must be loaded off the main thread
         if (path.startsWith("http://") || path.startsWith("https://")) {
-            showAvatarPlaceholder(imageView); // show placeholder while loading
+            showAvatarPlaceholder(imageView);
             EXECUTOR.execute(() -> {
                 Bitmap bmp = decodeBitmapFromUrl(path);
                 MAIN_HANDLER.post(() -> {
+                    if (!path.equals(imageView.getTag(TAG_URL))) return;
                     if (bmp != null) {
                         imageView.clearColorFilter();
                         imageView.setImageTintList(null);
@@ -211,18 +225,35 @@ public final class ImageUtils {
      * @param placeholderRes Drawable resource ID to show as fallback
      */
     public static void load(Context ctx, ImageView imageView, String path, int placeholderRes) {
+        // Capture the tag BEFORE any changes — this is the "already loaded" state.
+        String oldTag = (String) imageView.getTag(TAG_URL);
+
         if (path == null || path.isEmpty()) {
+            imageView.setTag(TAG_URL, null);
             imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
             imageView.setImageResource(placeholderRes);
             return;
         }
+
+        // If the same URL is already tagged in this ImageView, skip entirely.
+        // Don't check drawable — it may still be decoding on a previous bind.
+        // This prevents the placeholder flash on scroll/filter rebinds.
+        if (path.equals(oldTag)) {
+            return;
+        }
+
+        // Update tag first — this guards against stale async results below.
+        imageView.setTag(TAG_URL, path);
+
         // Base64 data-URIs — decode off the main thread
         if (path.startsWith("data:image/")) {
             imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            imageView.setImageResource(placeholderRes); // show placeholder while decoding
+            imageView.setImageResource(placeholderRes);
             EXECUTOR.execute(() -> {
                 Bitmap bmp = decodeBitmapFromBase64(path);
                 MAIN_HANDLER.post(() -> {
+                    // Skip if the tag changed (view was rebound to a different URL).
+                    if (!path.equals(imageView.getTag(TAG_URL))) return;
                     if (bmp != null) {
                         imageView.clearColorFilter();
                         imageView.setImageTintList(null);
@@ -239,10 +270,11 @@ public final class ImageUtils {
         // Network URLs must be loaded off the main thread
         if (path.startsWith("http://") || path.startsWith("https://")) {
             imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            imageView.setImageResource(placeholderRes); // show placeholder while loading
+            imageView.setImageResource(placeholderRes);
             EXECUTOR.execute(() -> {
                 Bitmap bmp = decodeBitmapFromUrl(path);
                 MAIN_HANDLER.post(() -> {
+                    if (!path.equals(imageView.getTag(TAG_URL))) return;
                     if (bmp != null) {
                         imageView.clearColorFilter();
                         imageView.setImageTintList(null);
@@ -258,7 +290,6 @@ public final class ImageUtils {
         }
         Bitmap bmp = decodeBitmap(ctx, path, imageView);
         if (bmp != null) {
-            // Clear any color filter AND XML tint so the real photo renders correctly.
             imageView.clearColorFilter();
             imageView.setImageTintList(null);
             imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);

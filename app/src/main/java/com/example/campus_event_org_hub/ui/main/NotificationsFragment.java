@@ -455,8 +455,21 @@ public class NotificationsFragment extends Fragment {
                 h.btnRespond.setVisibility(View.GONE);
             }
 
-            // View Event button — for NEW_EVENT and APPROVED types
-            if (("NEW_EVENT".equals(item.getType()) || "APPROVED".equals(item.getType())) && !inSelection) {
+            // View Event button — for NEW_EVENT and APPROVED types (only if event hasn't ended)
+            boolean isEnded = false;
+            Event ev = db.getEventById(item.getEventId());
+            if (ev != null) {
+                String status = ev.getStatus();
+                if ("ENDED".equals(status) || "CANCELLED".equals(status)) {
+                    isEnded = true;
+                } else {
+                    String today = ServerTimeUtil.todayString();
+                    if (ev.getDate() != null && ev.getDate().compareTo(today) < 0) {
+                        isEnded = true;
+                    }
+                }
+            }
+            if (("NEW_EVENT".equals(item.getType()) || "APPROVED".equals(item.getType())) && !inSelection && !isEnded) {
                 h.btnViewEvent.setVisibility(View.VISIBLE);
                 h.btnViewEvent.setOnClickListener(v -> {
                     // Mark read before navigating

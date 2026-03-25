@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.ui.base.BaseActivity;
 import com.example.campus_event_org_hub.ui.events.EventDetailActivity;
@@ -48,6 +49,16 @@ public class ApproveEventsActivity extends BaseActivity {
         rv.setLayoutManager(new LinearLayoutManager(this));
 
         loadPendingEvents();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isFinishing()) return;
+        SyncManager.sync(this, () -> {
+            if (isFinishing()) return;
+            runOnUiThread(this::loadPendingEvents);
+        });
     }
 
     private void loadPendingEvents() {

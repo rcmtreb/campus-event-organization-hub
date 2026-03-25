@@ -10,6 +10,8 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.View;
 import android.util.Log;
 import android.util.Patterns;
 import android.widget.Button;
@@ -81,19 +83,19 @@ public class LoginActivity extends AppCompatActivity {
             Log.d(TAG, "Login attempt with: " + loginInput);
 
             if (loginInput.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Please enter all fields", Toast.LENGTH_SHORT).show();
+                showLoginToast("Please fill in your Student ID/Email and password.", true);
                 return;
             }
 
             if (loginInput.contains("@") && !Patterns.EMAIL_ADDRESS.matcher(loginInput).matches()) {
-                Toast.makeText(this, "Please enter a valid email address", Toast.LENGTH_SHORT).show();
+                showLoginToast("Please enter a valid email address.", true);
                 return;
             }
 
             if (db.isLoginLocked(loginInput)) {
                 long remainingMs = db.getLoginLockoutRemainingMs(loginInput);
                 int minutes = (int) (remainingMs / 60000) + 1;
-                Toast.makeText(this, "Too many failed attempts. Try again in " + minutes + " minute(s).", Toast.LENGTH_LONG).show();
+                showLoginToast("Account locked due to too many attempts. Try again in " + minutes + " minute(s).", true);
                 return;
             }
 
@@ -112,14 +114,14 @@ public class LoginActivity extends AppCompatActivity {
             btnLogin.setEnabled(false);
 
             if (isOnline()) {
-                Toast.makeText(this, "Syncing data...", Toast.LENGTH_SHORT).show();
+                showLoginToast("Syncing your account...", false);
                 SyncManager.sync(this, () -> {
                     btnLogin.setEnabled(true);
                     attemptLocalLogin(db, session, loginInput, password);
                 });
             } else {
                 btnLogin.setEnabled(true);
-                Toast.makeText(this, "No internet — using saved data", Toast.LENGTH_SHORT).show();
+                showLoginToast("No internet connection — logging in with saved data.", false);
                 attemptLocalLogin(db, session, loginInput, password);
             }
         });
@@ -243,7 +245,7 @@ public class LoginActivity extends AppCompatActivity {
                 uploadPendingFcmToken(sid);
                 
                 if (legacyUpgrade) {
-                    Toast.makeText(this, "Welcome back! Your password has been upgraded for security.", Toast.LENGTH_LONG).show();
+                    showLoginToast("Welcome back! Your password has been upgraded for security.", false);
                 }
                 
                 launchHome(name, role, dept, email, sid);
@@ -267,17 +269,15 @@ public class LoginActivity extends AppCompatActivity {
                 if (db.isLoginLocked(loginInput)) {
                     long remainingMs = db.getLoginLockoutRemainingMs(loginInput);
                     int minutes = (int) (remainingMs / 60000) + 1;
-                    Toast.makeText(this, "Too many failed attempts. Account locked for " + minutes + " minute(s).", Toast.LENGTH_LONG).show();
+                    showLoginToast("Account locked after too many attempts. Try again in " + minutes + " minute(s).", true);
                     return;
                 }
 
                 int attemptsLeft = 5 - getLoginAttempts(db, loginInput);
                 if (!isOnline()) {
-                    Toast.makeText(this,
-                            "Login failed. Check your credentials or connect to the internet to sync your account.",
-                            Toast.LENGTH_LONG).show();
+                    showLoginToast("Login failed. Your account may not be synced. Connect to the internet and try again.", true);
                 } else {
-                    Toast.makeText(this, "Invalid credentials. " + attemptsLeft + " attempts remaining.", Toast.LENGTH_SHORT).show();
+                    showLoginToast("Wrong password. Please check and try again. " + attemptsLeft + " attempt(s) left.", true);
                 }
             }
         } catch (Exception e) {
@@ -349,5 +349,18 @@ public class LoginActivity extends AppCompatActivity {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private void showLoginToast(String message, boolean isError) {
+        Toast toast = Toast.makeText(this, message, Toast.LENGTH_LONG);
+        View logo = findViewById(R.id.iv_logo);
+        if (logo != null) {
+            int[] location = new int[2];
+            logo.getLocationOnScreen(location);
+            toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, location[1] - (int)(16 * getResources().getDisplayMetrics().density));
+        } else {
+            toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, (int)(400 * getResources().getDisplayMetrics().density));
+        }
+        toast.show();
     }
 }

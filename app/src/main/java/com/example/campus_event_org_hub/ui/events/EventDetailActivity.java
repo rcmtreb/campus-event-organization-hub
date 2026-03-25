@@ -1,20 +1,37 @@
 package com.example.campus_event_org_hub.ui.events;
 
+import android.Manifest;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
+import android.util.Base64;
 import android.view.ContextThemeWrapper;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
@@ -33,16 +50,42 @@ public class EventDetailActivity extends AppCompatActivity {
 
     private boolean registrationChanged = false;
 
-    /** Polls isEventActive() every minute to show the attendance card when the event starts. */
     private final Handler activeCheckHandler = new Handler(Looper.getMainLooper());
     private Runnable activeCheckRunnable;
-    private static final long ACTIVE_CHECK_INTERVAL_MS = 60_000L; // 1 minute
+    private static final long ACTIVE_CHECK_INTERVAL_MS = 60_000L;
 
-    // Held for the periodic active-check; set when student is registered.
     private MaterialCardView attendanceCardRef;
     private DatabaseHelper   dbRef;
     private Event            eventRef;
     private String           studentIdRef;
+
+    private String pendingTimeInPhoto  = null;
+    private String pendingTimeOutPhoto = null;
+    private Uri    pendingCameraUri   = null;
+    private boolean isCapturingTimeIn  = true;
+
+    private final ActivityResultLauncher<Intent> cameraLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && pendingCameraUri != null) {
+                    encodeCameraPhoto(pendingCameraUri);
+                } else {
+                    pendingCameraUri = null;
+                }
+            });
+
+    private final ActivityResultLauncher<String> permissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    if (isCapturingTimeIn) {
+                        openCameraInternal();
+                    } else {
+                        openCameraInternal();
+                    }
+                } else {
+                    Toast.makeText(this, "Camera permission is required to capture attendance photo.",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,35 +104,32 @@ public class EventDetailActivity extends AppCompatActivity {
 
         if (event != null) {
             ImageView  eventImage      = findViewById(R.id.detail_event_image);
-            TextView   title           = findViewById(R.id.detail_event_title);
-            TextView   date            = findViewById(R.id.detail_event_date);
-            TextView   timeTv          = findViewById(R.id.detail_event_time);
-            TextView   venueTv         = findViewById(R.id.detail_event_venue);
-            TextView   description     = findViewById(R.id.detail_event_description);
-            ChipGroup  tagsChipGroup   = findViewById(R.id.detail_tags_chip_group);
-            TextView   organizer       = findViewById(R.id.detail_event_organizer);
+            TextView   title          = findViewById(R.id.detail_event_title);
+            TextView   date           = findViewById(R.id.detail_event_date);
+            TextView   timeTv         = findViewById(R.id.detail_event_time);
+            TextView   venueTv        = findViewById(R.id.detail_event_venue);
+            TextView   description    = findViewById(R.id.detail_event_description);
+            ChipGroup  tagsChipGroup  = findViewById(R.id.detail_tags_chip_group);
+            TextView   organizer      = findViewById(R.id.detail_event_organizer);
             TextView   organizerContact = findViewById(R.id.detail_organizer_contact);
             ImageButton bookmarkButton = findViewById(R.id.btn_bookmark);
-            ImageButton shareButton    = findViewById(R.id.btn_share);
+            ImageButton shareButton   = findViewById(R.id.btn_share);
             Button      registerButton = findViewById(R.id.btn_register);
-            MaterialCardView postponedBanner  = findViewById(R.id.card_postponed_banner);
-            MaterialCardView attendanceCard   = findViewById(R.id.card_attendance);
+            MaterialCardView postponedBanner = findViewById(R.id.card_postponed_banner);
+            MaterialCardView attendanceCard = findViewById(R.id.card_attendance);
 
-            // Banner image
             int fallbackBanner = ImageUtils.getDefaultBannerForCategory(event.getCategory());
             ImageUtils.load(this, eventImage, event.getImagePath(), fallbackBanner);
 
             title.setText(event.getTitle());
             date.setText(event.getDate());
 
-            // Time (shown only if non-empty)
             String timeStr = event.getEventTime();
             if (timeStr != null && !timeStr.isEmpty()) {
                 timeTv.setText(timeStr);
                 timeTv.setVisibility(View.VISIBLE);
             }
 
-            // Venue (shown only if non-empty)
             String venueStr = event.getVenue();
             if (venueStr != null && !venueStr.isEmpty()) {
                 venueTv.setText(venueStr);
@@ -118,7 +158,6 @@ public class EventDetailActivity extends AppCompatActivity {
             shareButton.setOnClickListener(v ->
                     Toast.makeText(this, "Sharing event: " + event.getTitle(), Toast.LENGTH_SHORT).show());
 
-            // ── Registration state ────────────────────────────────────────────
             DatabaseHelper db = DatabaseHelper.getInstance(this);
             final String finalStudentId = studentId;
             final String finalUserRole  = userRole;
@@ -137,7 +176,6 @@ public class EventDetailActivity extends AppCompatActivity {
                 registerButton.setText("Register for Event");
             } else if (db.isRegistered(finalStudentId, eventId)) {
                 setRegisteredState(registerButton);
-                // Student is registered — show attendance card and start polling
                 scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
                 bindAttendanceCard(attendanceCard, db, event, finalStudentId);
             } else {
@@ -149,7 +187,6 @@ public class EventDetailActivity extends AppCompatActivity {
                         registrationChanged = true;
                         setRegisteredState(registerButton);
                         Toast.makeText(this, "Successfully registered!", Toast.LENGTH_LONG).show();
-                        // Now show attendance card and start polling
                         scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
                         bindAttendanceCard(attendanceCard, db, event, finalStudentId);
                     } else {
@@ -163,11 +200,6 @@ public class EventDetailActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Stores card/db/event/studentId refs and schedules a repeating check that shows
-     * the attendance card as soon as the event becomes active while the screen is open.
-     * Called immediately after the student is confirmed registered.
-     */
     private void scheduleActiveCheck(MaterialCardView card, DatabaseHelper db,
                                      Event event, String studentId) {
         attendanceCardRef = card;
@@ -183,7 +215,6 @@ public class EventDetailActivity extends AppCompatActivity {
             public void run() {
                 if (attendanceCardRef != null && eventRef != null &&
                         dbRef != null && studentIdRef != null) {
-                    // Re-check whether event is now active; if so, refresh the card.
                     bindAttendanceCard(attendanceCardRef, dbRef, eventRef, studentIdRef);
                 }
                 activeCheckHandler.postDelayed(this, ACTIVE_CHECK_INTERVAL_MS);
@@ -195,7 +226,6 @@ public class EventDetailActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Stop polling while screen is not visible.
         if (activeCheckRunnable != null) {
             activeCheckHandler.removeCallbacks(activeCheckRunnable);
         }
@@ -204,20 +234,11 @@ public class EventDetailActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Restart polling when screen returns to foreground (covers app-switch back).
         if (activeCheckRunnable != null) {
             activeCheckHandler.postDelayed(activeCheckRunnable, ACTIVE_CHECK_INTERVAL_MS);
         }
     }
 
-    /**
-     * Checks if the event is currently active (within start/end time on event date).
-     *
-     * Uses UTC-normalized date comparison to avoid phone timezone/locale manipulation.
-     * Time-of-day comparison uses minutes-since-midnight to avoid the epoch-date bug
-     * where SimpleDateFormat("HH:mm").parse() returns a Date at Jan 1 1970 which
-     * would always compare as "in the past" against the real current Date.
-     */
     private boolean isEventActive(Event event) {
         String startTime = event.getStartTime();
         String endTime   = event.getEndTime();
@@ -227,14 +248,11 @@ public class EventDetailActivity extends AppCompatActivity {
             return false;
         }
 
-        // Also show attendance for explicitly HAPPENING events even without a time window
         if ("HAPPENING".equals(event.getStatus())) {
-            // If time window is set, still validate it; otherwise allow access
             if (startTime.isEmpty() || endTime.isEmpty()) return true;
         }
 
         try {
-            // Use server-corrected date to prevent device clock manipulation.
             String eventDate = event.getDate();
             String today     = ServerTimeUtil.todayString();
 
@@ -242,7 +260,6 @@ public class EventDetailActivity extends AppCompatActivity {
                 return false;
             }
 
-            // Compare time-of-day using minutes-since-midnight to avoid epoch-date bug
             int nowMinutes   = minutesSinceMidnight(ServerTimeUtil.now());
             int startMinutes = parseTimeToMinutes(startTime);
             int endMinutes   = parseTimeToMinutes(endTime);
@@ -255,14 +272,55 @@ public class EventDetailActivity extends AppCompatActivity {
         }
     }
 
-    /** Returns current time as minutes since midnight (0–1439). */
+    private boolean isAttendanceWindowOpen(Event event) {
+        String startTime = event.getStartTime();
+        String endTime   = event.getEndTime();
+
+        if (startTime == null || startTime.isEmpty() ||
+            endTime   == null || endTime.isEmpty()) {
+            return false;
+        }
+
+        String status = event.getStatus();
+        if (!"APPROVED".equals(status) && !"HAPPENING".equals(status)) {
+            return false;
+        }
+
+        try {
+            String eventDate = event.getDate();
+            String today     = ServerTimeUtil.todayString();
+
+            if (eventDate.compareTo(today) > 0) {
+                return false;
+            }
+
+            Calendar nowCal = Calendar.getInstance();
+            nowCal.setTime(ServerTimeUtil.now());
+            int nowMinutes = nowCal.get(Calendar.HOUR_OF_DAY) * 60 + nowCal.get(Calendar.MINUTE);
+            int startMinutes = parseTimeToMinutes(startTime);
+            int endMinutes   = parseTimeToMinutes(endTime);
+
+            if (startMinutes < 0 || endMinutes < 0) return false;
+
+            boolean afterStart = eventDate.equals(today)
+                    ? nowMinutes >= startMinutes - 10
+                    : eventDate.compareTo(today) < 0;
+            boolean beforeTimeout = eventDate.equals(today)
+                    ? nowMinutes <= endMinutes + 30
+                    : true;
+
+            return afterStart && beforeTimeout;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private int minutesSinceMidnight(Date now) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(now);
         return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE);
     }
 
-    /** Parses "HH:mm" string to minutes since midnight. Returns -1 on failure. */
     private int parseTimeToMinutes(String time) {
         try {
             String[] parts = time.split(":");
@@ -272,41 +330,54 @@ public class EventDetailActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Sets up and shows the attendance card for a registered student.
-     * Only shows attendance during active event time.
-     */
     private void bindAttendanceCard(MaterialCardView card, DatabaseHelper db,
                                     Event event, String studentId) {
-        if (!isEventActive(event)) {
+        if (!isAttendanceWindowOpen(event)) {
             card.setVisibility(View.GONE);
             return;
         }
 
         card.setVisibility(View.VISIBLE);
 
-        TextView tvStatus    = card.findViewById(R.id.tv_attendance_status);
-        View     layoutTimeIn  = card.findViewById(R.id.layout_time_in);
-        View     layoutTimeOut = card.findViewById(R.id.layout_time_out);
+        TextView tvStatus          = card.findViewById(R.id.tv_attendance_status);
+        View     layoutTimeIn      = card.findViewById(R.id.layout_time_in);
+        View     layoutTimeOut     = card.findViewById(R.id.layout_time_out);
         TextInputEditText etTimeIn  = card.findViewById(R.id.et_time_in_code);
         TextInputEditText etTimeOut = card.findViewById(R.id.et_time_out_code);
-        Button   btnTimeIn  = card.findViewById(R.id.btn_time_in);
-        Button   btnTimeOut = card.findViewById(R.id.btn_time_out);
+        Button   btnTimeIn         = card.findViewById(R.id.btn_time_in);
+        Button   btnTimeOut        = card.findViewById(R.id.btn_time_out);
+        LinearLayout layoutPhoto   = card.findViewById(R.id.layout_attendance_photo);
+        TextView tvPhotoRequired   = card.findViewById(R.id.tv_photo_required);
+        ImageView ivPhotoPreview   = card.findViewById(R.id.iv_attendance_photo_preview);
+        LinearLayout layoutPlaceholder = card.findViewById(R.id.layout_photo_placeholder);
+        Button btnCapturePhoto      = card.findViewById(R.id.btn_capture_attendance_photo);
 
         refreshAttendanceState(db, event.getId(), studentId,
-                tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+                tvStatus, layoutTimeIn, layoutTimeOut,
+                etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
+                layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
+
+        btnCapturePhoto.setOnClickListener(v -> {
+            isCapturingTimeIn = !isAlreadyTimedIn(db, event.getId(), studentId);
+            requestCameraPermission();
+        });
 
         btnTimeIn.setOnClickListener(v -> {
+            if (pendingTimeInPhoto == null || pendingTimeInPhoto.isEmpty()) {
+                Toast.makeText(this, "Please capture your photo first.", Toast.LENGTH_SHORT).show();
+                return;
+            }
             String code = etTimeIn.getText() != null ? etTimeIn.getText().toString().trim() : "";
             if (code.isEmpty()) {
                 Toast.makeText(this, "Enter the Time-In code shown by the officer.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            int result = db.submitTimeIn(event.getId(), studentId, code);
+            int result = db.submitTimeIn(event.getId(), studentId, code, "", "", pendingTimeInPhoto);
             switch (result) {
                 case 0:
                     Toast.makeText(this, "Time-In recorded!", Toast.LENGTH_SHORT).show();
                     etTimeIn.setText("");
+                    pendingTimeInPhoto = null;
                     break;
                 case 1:
                     Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
@@ -319,20 +390,27 @@ public class EventDetailActivity extends AppCompatActivity {
                     break;
             }
             refreshAttendanceState(db, event.getId(), studentId,
-                    tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+                    tvStatus, layoutTimeIn, layoutTimeOut,
+                    etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
+                    layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
         });
 
         btnTimeOut.setOnClickListener(v -> {
+            if (pendingTimeOutPhoto == null || pendingTimeOutPhoto.isEmpty()) {
+                Toast.makeText(this, "Please capture your Time-Out photo first.", Toast.LENGTH_SHORT).show();
+                return;
+            }
             String code = etTimeOut.getText() != null ? etTimeOut.getText().toString().trim() : "";
             if (code.isEmpty()) {
                 Toast.makeText(this, "Enter the Time-Out code shown by the officer.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            int result = db.submitTimeOut(event.getId(), studentId, code);
+            int result = db.submitTimeOut(event.getId(), studentId, code, "", "", pendingTimeOutPhoto);
             switch (result) {
                 case 0:
                     Toast.makeText(this, "Time-Out recorded!", Toast.LENGTH_SHORT).show();
                     etTimeOut.setText("");
+                    pendingTimeOutPhoto = null;
                     break;
                 case 1:
                     Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
@@ -348,33 +426,169 @@ public class EventDetailActivity extends AppCompatActivity {
                     break;
             }
             refreshAttendanceState(db, event.getId(), studentId,
-                    tvStatus, layoutTimeIn, layoutTimeOut, etTimeIn, etTimeOut, btnTimeIn, btnTimeOut);
+                    tvStatus, layoutTimeIn, layoutTimeOut,
+                    etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
+                    layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
         });
+    }
+
+    private boolean isAlreadyTimedIn(DatabaseHelper db, int eventId, String studentId) {
+        String[] rec = db.getAttendanceRecord(eventId, studentId);
+        return rec != null && rec[0] != null && !rec[0].isEmpty();
     }
 
     private void refreshAttendanceState(DatabaseHelper db, int eventId, String studentId,
                                         TextView tvStatus,
                                         View layoutTimeIn, View layoutTimeOut,
                                         TextInputEditText etTimeIn, TextInputEditText etTimeOut,
-                                        Button btnTimeIn, Button btnTimeOut) {
+                                        Button btnTimeIn, Button btnTimeOut,
+                                        LinearLayout layoutPhoto,
+                                        TextView tvPhotoRequired,
+                                        ImageView ivPhotoPreview,
+                                        LinearLayout layoutPlaceholder,
+                                        String pendingPhoto) {
         String[] rec = db.getAttendanceRecord(eventId, studentId);
         boolean hasTimeIn  = rec != null && rec[0] != null && !rec[0].isEmpty();
         boolean hasTimeOut = rec != null && rec[1] != null && !rec[1].isEmpty();
+        String savedTimeInPhoto  = (rec != null && rec.length > 2) ? rec[2] : null;
+        String savedTimeOutPhoto = (rec != null && rec.length > 3) ? rec[3] : null;
+        String displayPhoto = pendingPhoto;
+
+        if (displayPhoto == null || displayPhoto.isEmpty()) {
+            if (!hasTimeOut && savedTimeInPhoto != null && !savedTimeInPhoto.isEmpty()) {
+                displayPhoto = savedTimeInPhoto;
+            } else if (hasTimeOut && savedTimeOutPhoto != null && !savedTimeOutPhoto.isEmpty()) {
+                displayPhoto = savedTimeOutPhoto;
+            }
+        }
+
+        if (displayPhoto != null && !displayPhoto.isEmpty()) {
+            ivPhotoPreview.setVisibility(View.VISIBLE);
+            layoutPlaceholder.setVisibility(View.GONE);
+            loadPhotoPreview(ivPhotoPreview, displayPhoto);
+        } else {
+            ivPhotoPreview.setVisibility(View.GONE);
+            layoutPlaceholder.setVisibility(View.VISIBLE);
+        }
 
         if (hasTimeOut) {
             tvStatus.setText("Attendance complete.\nTime In: " + rec[0] + "\nTime Out: " + rec[1]);
             layoutTimeIn.setVisibility(View.GONE);
             layoutTimeOut.setVisibility(View.GONE);
+            layoutPhoto.setVisibility(View.GONE);
         } else if (hasTimeIn) {
             String status = "Timed in at " + rec[0] + ". Submit Time-Out code when you leave.";
             tvStatus.setText(status);
             layoutTimeIn.setVisibility(View.GONE);
             layoutTimeOut.setVisibility(View.VISIBLE);
+            tvPhotoRequired.setText("Capture your Time-Out photo before submitting.");
         } else {
             tvStatus.setText("Waiting for officer's attendance code.");
             layoutTimeIn.setVisibility(View.VISIBLE);
             layoutTimeOut.setVisibility(View.GONE);
+            tvPhotoRequired.setText("Take a photo to verify your attendance.");
         }
+    }
+
+    private void loadPhotoPreview(ImageView iv, String base64Data) {
+        new Thread(() -> {
+            try {
+                int commaIndex = base64Data.indexOf(',');
+                if (commaIndex < 0) return;
+                byte[] bytes = Base64.decode(base64Data.substring(commaIndex + 1), Base64.DEFAULT);
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bmp != null) {
+                    final Bitmap finalBmp = bmp;
+                    Handler main = new Handler(Looper.getMainLooper());
+                    main.post(() -> {
+                        iv.setImageBitmap(finalBmp);
+                        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    });
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        }).start();
+    }
+
+    private void requestCameraPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            openCameraInternal();
+        } else {
+            permissionLauncher.launch(Manifest.permission.CAMERA);
+        }
+    }
+
+    private void openCameraInternal() {
+        try {
+            File photoFile = createImageFile();
+            pendingCameraUri = FileProvider.getUriForFile(this,
+                    getPackageName() + ".fileprovider", photoFile);
+            Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
+            if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+                cameraLauncher.launch(takePictureIntent);
+            } else {
+                Toast.makeText(this, "No camera app available.", Toast.LENGTH_SHORT).show();
+            }
+        } catch (IOException e) {
+            Toast.makeText(this, "Could not create photo file.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+        String fileName = "ATTENDANCE_" + timeStamp;
+        File storageDir = getCacheDir();
+        return File.createTempFile(fileName, ".jpg", storageDir);
+    }
+
+    private void encodeCameraPhoto(Uri uri) {
+        new Thread(() -> {
+            try {
+                Bitmap bmp = BitmapFactory.decodeStream(getContentResolver().openInputStream(uri));
+                if (bmp == null) return;
+
+                int maxDim = 800;
+                float scale = Math.min((float) maxDim / bmp.getWidth(), (float) maxDim / bmp.getHeight());
+                if (scale < 1f) {
+                    bmp = Bitmap.createScaledBitmap(bmp,
+                            Math.round(bmp.getWidth() * scale),
+                            Math.round(bmp.getHeight() * scale), true);
+                }
+                final Bitmap finalBmp = bmp;
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
+                String base64 = "data:image/png;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+
+                Handler main = new Handler(Looper.getMainLooper());
+                main.post(() -> {
+                    if (isCapturingTimeIn) {
+                        pendingTimeInPhoto = base64;
+                    } else {
+                        pendingTimeOutPhoto = base64;
+                    }
+
+                    ImageView ivPreview = findViewById(R.id.iv_attendance_photo_preview);
+                    LinearLayout placeholder = findViewById(R.id.layout_photo_placeholder);
+                    if (ivPreview != null) {
+                        ivPreview.setVisibility(View.VISIBLE);
+                        ivPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        ivPreview.setImageBitmap(finalBmp);
+                    }
+                    if (placeholder != null) placeholder.setVisibility(View.GONE);
+
+                    Toast.makeText(this, "Photo captured. You can now submit your code.",
+                            Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception e) {
+                Handler main = new Handler(Looper.getMainLooper());
+                main.post(() ->
+                        Toast.makeText(this, "Failed to process photo.", Toast.LENGTH_SHORT).show());
+            }
+        }).start();
     }
 
     private void setRegisteredState(Button btn) {

@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.model.Event;
 import com.google.android.material.button.MaterialButton;
 
@@ -72,6 +73,22 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
         rv.setAdapter(adapter);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isFinishing()) return;
+        SyncManager.sync(this, () -> {
+            if (isFinishing()) return;
+            runOnUiThread(() -> {
+                if (events != null && adapter != null) {
+                    events.clear();
+                    events.addAll(db.getAllEventsForAdmin());
+                    adapter.notifyDataSetChanged();
+                }
+            });
+        });
+    }
+
     // ── Adapter ──────────────────────────────────────────────────────────────
 
     class EventControlAdapter extends RecyclerView.Adapter<EventControlAdapter.VH> {
@@ -105,11 +122,15 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
                     h.tvStatus.setBackgroundResource(R.color.primary_blue);
             }
 
-            // Timeline badge: UPCOMING / ENDED / POSTPONED (based on date + status)
+            // Timeline badge: UPCOMING / ENDED / POSTPONED / HAPPENING (based on date + status)
             String status = e.getStatus();
             if ("POSTPONED".equals(status)) {
                 h.tvTimelineBadge.setText("POSTPONED");
                 h.tvTimelineBadge.setBackgroundResource(android.R.color.holo_purple);
+                h.tvTimelineBadge.setVisibility(View.VISIBLE);
+            } else if ("HAPPENING".equals(status)) {
+                h.tvTimelineBadge.setText("HAPPENING");
+                h.tvTimelineBadge.setBackgroundResource(android.R.color.holo_orange_light);
                 h.tvTimelineBadge.setVisibility(View.VISIBLE);
             } else if ("APPROVED".equals(status)) {
                 boolean isEnded = false;

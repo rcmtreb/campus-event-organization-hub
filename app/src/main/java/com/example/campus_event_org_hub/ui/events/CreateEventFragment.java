@@ -330,9 +330,9 @@ public class CreateEventFragment extends Fragment {
         String upper = userDept.toUpperCase(Locale.getDefault());
 
         int[] chipIds  = {R.id.chip_dept_cba, R.id.chip_dept_ccje, R.id.chip_dept_coed,
-                          R.id.chip_dept_coe, R.id.chip_dept_col, R.id.chip_dept_clas,
+                          R.id.chip_dept_coe, R.id.chip_dept_clas, R.id.chip_dept_col,
                           R.id.chip_dept_gs};
-        String[] abbrs = {"CBA", "CCJE", "COED", "COE", "COL", "CLAS", "GS"};
+        String[] abbrs = {"CBA", "CCJE", "COED", "COE", "CLAS", "COL", "GS"};
 
         for (int i = 0; i < abbrs.length; i++) {
             if (upper.contains(abbrs[i])) {

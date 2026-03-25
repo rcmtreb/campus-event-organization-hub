@@ -8,47 +8,37 @@
     tools:context=".ui.auth.LoginActivity">
 
     <!--
-        Percentage guideline: header occupies the top 32% of the screen on any device.
-        The login card is anchored to a slightly lower guideline (28%) so it overlaps
-        the header, preserving the layered visual effect at all aspect ratios.
+        Layout strategy: fixed-height gradient header (consistent across all screen sizes)
+        with the welcome text and logo vertically centered inside it.
+        The login card overlaps the header by a fixed negative margin, giving
+        the same layered visual on any screen proportion.
     -->
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline_header_bottom"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.32" />
 
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline_card_top"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.26" />
-
-    <!-- Header with Gradient Background -->
+    <!-- Header background — fixed 160dp height, no drawable corner radius -->
     <View
         android:id="@+id/header_background"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_width="0dp"
+        android:layout_height="160dp"
         android:background="@drawable/bg_login_header"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="@id/guideline_header_bottom" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Welcome text — vertically centered in the header -->
     <TextView
         android:id="@+id/tv_welcome"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="@dimen/space_8"
-        android:layout_marginTop="@dimen/space_12"
         android:text="Welcome\nBack!"
         android:textColor="@color/white"
         android:textSize="32sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintBottom_toBottomOf="@id/header_background"
+        app:layout_constraintTop_toTopOf="@id/header_background" />
 
-    <!-- UCC logo top-right of header, vertically aligned to Welcome text -->
+    <!-- UCC logo — vertically centered in the header, right side -->
     <ImageView
         android:id="@+id/iv_ucc_logo"
         android:layout_width="90dp"
@@ -58,19 +48,20 @@
         android:scaleType="fitCenter"
         android:src="@drawable/ucc"
         android:contentDescription="UCC Logo"
-        app:layout_constraintTop_toTopOf="@+id/tv_welcome"
-        app:layout_constraintBottom_toBottomOf="@+id/tv_welcome"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/header_background"
+        app:layout_constraintBottom_toBottomOf="@id/header_background" />
 
-    <!-- Login Card — overlaps header via guideline_card_top -->
+    <!-- Login Card — overlaps the gradient header by a fixed amount -->
     <androidx.cardview.widget.CardView
         android:id="@+id/login_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="@dimen/space_6"
+        android:layout_marginTop="-20dp"
         app:cardCornerRadius="@dimen/radius_xl"
         app:cardElevation="@dimen/elevation_high"
-        app:layout_constraintTop_toBottomOf="@id/guideline_card_top"
+        app:layout_constraintTop_toBottomOf="@id/header_background"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -157,16 +148,37 @@
                 android:textSize="16sp"
                 app:cornerRadius="@dimen/radius_medium" />
 
+            <!-- Register link -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="@dimen/space_4"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Don't have an account? "
+                    android:textColor="@color/text_hint" />
+
+                <TextView
+                    android:id="@+id/tv_go_to_register"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Register"
+                    android:textColor="@color/primary_blue"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Logo, social icons, and bottom actions are grouped into a vertical chain
-         so they never overlap each other on any screen size. The chain sits
-         between the bottom of the login card and the bottom of the screen. -->
+    <!-- Bottom section: logo, social icons -->
     <LinearLayout
         android:id="@+id/bottom_section"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
         android:paddingBottom="@dimen/space_4"
@@ -218,27 +230,6 @@
                 android:contentDescription="TikTok"
                 android:scaleType="fitCenter" />
 
-        </LinearLayout>
-
-        <!-- Bottom Actions -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Don't have an account? "
-                android:textColor="@color/text_hint" />
-
-            <TextView
-                android:id="@+id/tv_go_to_register"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Register"
-                android:textColor="@color/primary_blue"
-                android:textStyle="bold" />
         </LinearLayout>
 
     </LinearLayout>
