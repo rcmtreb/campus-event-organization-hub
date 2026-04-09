@@ -13,7 +13,7 @@ const nodemailer = require('nodemailer');
 
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
-const SMTP_USER = process.env.SMTP_USER || 'ronangatmaitan02@gmail.com';
+const SMTP_USER = process.env.SMTP_USER || 'campuseventorganizationhub@gmail.com';
 const SMTP_PASS = process.env.SMTP_PASS || 'eozu ggdx atvy jdsy';
 const FROM_NAME = process.env.FROM_NAME || 'Campus Event Org Hub';
 const FROM_EMAIL = process.env.FROM_EMAIL || 'ceoh-noreply@ucc.edu.ph';

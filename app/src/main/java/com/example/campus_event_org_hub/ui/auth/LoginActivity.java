@@ -99,35 +99,66 @@ public class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            if (loginInput.equalsIgnoreCase("admin@ucc.edu.ph") && password.equals("admin123")) {
-                Log.d(TAG, "Admin credentials detected.");
-                session.saveSession("Admin", "Admin", "Administration",
-                        "admin@ucc.edu.ph", "admin");
-                uploadPendingFcmToken("admin");
-                Intent intent = new Intent(LoginActivity.this, AdminActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-                finish();
-                return;
-            }
-
             btnLogin.setEnabled(false);
 
-            if (isOnline()) {
-                showLoginToast("Syncing your account...", false);
-                SyncManager.sync(this, () -> {
-                    btnLogin.setEnabled(true);
-                    attemptLocalLogin(db, session, loginInput, password);
-                });
+            if (loginInput.contains("@") && isOnline()) {
+                showLoginToast("Signing in...", false);
+                FirebaseAuth.getInstance().signInWithEmailAndPassword(loginInput, password)
+                        .addOnSuccessListener(authResult -> {
+                            FirebaseUser firebaseUser = authResult.getUser();
+                            if (firebaseUser != null) {
+                                firebaseUser.getIdToken(false)
+                                        .addOnSuccessListener(tokenResult -> {
+                                            Object adminClaim = tokenResult.getClaims().get("admin");
+                                            if (Boolean.TRUE.equals(adminClaim)) {
+                                                Log.d(TAG, "Admin custom claim detected — launching AdminActivity");
+                                                FirebaseAuth.getInstance().signOut();
+                                                session.saveSession("Admin", "Admin", "Administration", loginInput, "admin");
+                                                uploadPendingFcmToken("admin");
+                                                Intent intent = new Intent(LoginActivity.this, AdminActivity.class);
+                                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                                startActivity(intent);
+                                                finish();
+                                            } else {
+                                                FirebaseAuth.getInstance().signOut();
+                                                proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                                            }
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.w(TAG, "getIdToken failed", e);
+                                            FirebaseAuth.getInstance().signOut();
+                                            proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                                        });
+                            } else {
+                                proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.w(TAG, "Firebase Auth for claims check failed", e);
+                            proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                        });
             } else {
-                btnLogin.setEnabled(true);
-                showLoginToast("No internet connection — logging in with saved data.", false);
-                attemptLocalLogin(db, session, loginInput, password);
+                proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
             }
         });
 
         tvGoToRegister.setOnClickListener(v ->
                 startActivity(new Intent(LoginActivity.this, RegisterActivity.class)));
+    }
+
+    private void proceedWithNormalLogin(DatabaseHelper db, SessionManager session,
+                                         String loginInput, String password, Button btnLogin) {
+        if (isOnline()) {
+            showLoginToast("Syncing your account...", false);
+            SyncManager.sync(this, () -> {
+                btnLogin.setEnabled(true);
+                attemptLocalLogin(db, session, loginInput, password);
+            });
+        } else {
+            btnLogin.setEnabled(true);
+            showLoginToast("No internet connection — logging in with saved data.", false);
+            attemptLocalLogin(db, session, loginInput, password);
+        }
     }
 
     /**
