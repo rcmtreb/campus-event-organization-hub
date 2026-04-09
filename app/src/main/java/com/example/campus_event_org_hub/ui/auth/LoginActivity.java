@@ -56,7 +56,7 @@ public class LoginActivity extends AppCompatActivity {
         SessionManager session = new SessionManager(this);
         if (session.isLoggedIn()) {
             Log.d(TAG, "Valid session found, auto-logging in as: " + session.getRole());
-            uploadPendingFcmToken(session.getStudentId());
+            uploadPendingFcmToken(session.getFirebaseUid());
             launchHome(session.getName(), session.getRole(), session.getDept(),
                     session.getEmail(), session.getStudentId());
             return;
@@ -113,20 +113,22 @@ public class LoginActivity extends AppCompatActivity {
                                             if (Boolean.TRUE.equals(adminClaim)) {
                                                 Log.d(TAG, "Admin custom claim detected — launching AdminActivity");
                                                 // Keep admin signed into Firebase Auth so Firestore writes/deletes succeed.
-                                                session.saveSession("Admin", "Admin", "Administration", loginInput, "admin");
-                                                uploadPendingFcmToken("admin");
+                                                String adminUid = firebaseUser.getUid();
+                                                session.saveSession("Admin", "Admin", "Administration", loginInput, "admin", adminUid);
+                                                uploadPendingFcmToken(adminUid);
                                                 Intent intent = new Intent(LoginActivity.this, AdminActivity.class);
                                                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                                                 startActivity(intent);
                                                 finish();
                                             } else {
-                                                FirebaseAuth.getInstance().signOut();
+                                                // Keep Firebase Auth signed in for this non-admin user
+                                                // so their Firestore writes (profile image, etc.) succeed.
                                                 proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
                                             }
                                         })
                                         .addOnFailureListener(e -> {
                                             Log.w(TAG, "getIdToken failed", e);
-                                            FirebaseAuth.getInstance().signOut();
+                                            // Firebase Auth may still be valid; keep session and proceed.
                                             proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
                                         });
                             } else {
@@ -176,8 +178,13 @@ public class LoginActivity extends AppCompatActivity {
         FirebaseAuth.getInstance().signInWithEmailAndPassword(firebaseEmail, password)
                 .addOnSuccessListener(authResult -> {
                     Log.d(TAG, "Firebase Auth confirmed correct password — restoring hash");
-                    FirebaseAuth.getInstance().signOut();
-                    // Re-hash on background thread (BCrypt is slow)
+                    // Keep Firebase Auth signed in; the user will proceed to MainActivity
+                    // and their Firestore writes need an authenticated session.
+                    // Store the Firebase UID in SQLite for this user.
+                    FirebaseUser healedUser = authResult.getUser();
+                    if (healedUser != null) {
+                        db.setFirebaseUid(loginInput, healedUser.getUid());
+                    }
                     new Thread(() -> {
                         db.restorePassword(loginInput, password);
                         runOnUiThread(() -> {
@@ -235,14 +242,17 @@ public class LoginActivity extends AppCompatActivity {
                             .addOnSuccessListener(authResult -> {
                                 FirebaseUser firebaseUser = authResult.getUser();
                                 if (firebaseUser != null) {
+                                    // Store/update Firebase UID
+                                    String uid = firebaseUser.getUid();
+                                    db.setFirebaseUid(fSid, uid);
                                     firebaseUser.reload().addOnCompleteListener(reloadTask -> {
                                         FirebaseUser refreshed = FirebaseAuth.getInstance().getCurrentUser();
                                         if (refreshed != null && refreshed.isEmailVerified()) {
-                                            // Verified! Update local DB and proceed
+                                            // Verified! Update local DB and proceed.
+                                            // Keep Firebase Auth signed in so Firestore writes succeed.
                                             db.setEmailVerified(fSid, true);
-                                            FirebaseAuth.getInstance().signOut();
-                                            session.saveSession(fName, fRole, fDept, fEmail, fSid);
-                                            uploadPendingFcmToken(fSid);
+                                            session.saveSession(fName, fRole, fDept, fEmail, fSid, uid);
+                                            uploadPendingFcmToken(uid);
                                             launchHome(fName, fRole, fDept, fEmail, fSid);
                                         } else {
                                             // Still not verified — keep Firebase Auth signed in
@@ -272,14 +282,38 @@ public class LoginActivity extends AppCompatActivity {
                     return;
                 }
 
-                session.saveSession(name, role, dept, email, sid);
-                uploadPendingFcmToken(sid);
+                // Look up Firebase UID from SQLite (may have been stored during registration)
+                String firebaseUid = db.getFirebaseUid(sid);
+
+                session.saveSession(name, role, dept, email, sid, firebaseUid);
+                uploadPendingFcmToken(firebaseUid);
                 
                 if (legacyUpgrade) {
                     showLoginToast("Welcome back! Your password has been upgraded for security.", false);
                 }
-                
-                launchHome(name, role, dept, email, sid);
+
+                // Ensure the user has a live Firebase Auth session so their Firestore
+                // writes (profile image, etc.) succeed.  When login was done by email
+                // the session is already open; when login was done by Student ID it
+                // was never opened, so we sign in silently here before launching.
+                final String fName2 = name, fRole2 = role, fDept2 = dept, fEmail2 = email, fSid2 = sid;
+                if (FirebaseAuth.getInstance().getCurrentUser() == null
+                        && fEmail2 != null && !fEmail2.isEmpty() && isOnline()) {
+                    FirebaseAuth.getInstance().signInWithEmailAndPassword(fEmail2, password)
+                            .addOnCompleteListener(task -> {
+                                // After silent sign-in, store/update the Firebase UID
+                                FirebaseUser silentUser = FirebaseAuth.getInstance().getCurrentUser();
+                                if (silentUser != null) {
+                                    String uid = silentUser.getUid();
+                                    db.setFirebaseUid(fSid2, uid);
+                                    session.saveSession(fName2, fRole2, fDept2, fEmail2, fSid2, uid);
+                                    uploadPendingFcmToken(uid);
+                                }
+                                launchHome(fName2, fRole2, fDept2, fEmail2, fSid2);
+                            });
+                } else {
+                    launchHome(name, role, dept, email, sid);
+                }
 
             } else {
                 if (cursor != null) cursor.close();
@@ -334,18 +368,18 @@ public class LoginActivity extends AppCompatActivity {
         return 0;
     }
 
-    private void uploadPendingFcmToken(String sid) {
-        if (sid == null || sid.isEmpty()) return;
+    private void uploadPendingFcmToken(String firebaseUid) {
+        if (firebaseUid == null || firebaseUid.isEmpty()) return;
         FirestoreHelper fsh = new FirestoreHelper();
         SharedPreferences prefs = getSharedPreferences("ceoh_fcm", MODE_PRIVATE);
         String cached = prefs.getString("pending_token", null);
         if (cached != null && !cached.isEmpty()) {
-            fsh.saveFcmToken(sid, cached);
+            fsh.saveFcmToken(firebaseUid, cached);
         } else {
             FirebaseMessaging.getInstance().getToken()
                     .addOnSuccessListener(token -> {
                         if (token != null && !token.isEmpty()) {
-                            fsh.saveFcmToken(sid, token);
+                            fsh.saveFcmToken(firebaseUid, token);
                             prefs.edit().putString("pending_token", token).apply();
                         }
                     })

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Base64;
 import android.util.Log;
 
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import org.json.JSONObject;
@@ -62,16 +63,19 @@ public class FcmSender {
         if (recipientSid == null || recipientSid.isEmpty()) return;
 
         sExecutor.execute(() -> {
-            // 1. Look up FCM token from Firestore
+            // 1. Look up FCM token from Firestore — users are keyed by Firebase Auth UID,
+            //    so we query by the student_id field to find the recipient's document.
             FirebaseFirestore.getInstance()
                     .collection("users")
-                    .document(recipientSid)
+                    .whereEqualTo("student_id", recipientSid)
+                    .limit(1)
                     .get()
-                    .addOnSuccessListener(snap -> {
-                        if (!snap.exists()) {
+                    .addOnSuccessListener(querySnap -> {
+                        if (querySnap.isEmpty()) {
                             Log.w(TAG, "No user doc for sid=" + recipientSid);
                             return;
                         }
+                        DocumentSnapshot snap = querySnap.getDocuments().get(0);
                         String fcmToken = snap.getString("fcm_token");
                         if (fcmToken == null || fcmToken.isEmpty()) {
                             Log.w(TAG, "No fcm_token for sid=" + recipientSid);

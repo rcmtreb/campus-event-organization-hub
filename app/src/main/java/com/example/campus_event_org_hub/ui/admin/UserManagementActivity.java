@@ -23,6 +23,7 @@ import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.ui.base.BaseActivity;
 import com.example.campus_event_org_hub.util.ImageUtils;
+import com.example.campus_event_org_hub.util.RealtimeSyncManager;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.imageview.ShapeableImageView;
@@ -36,6 +37,7 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
     private RecyclerView rv;
     private UserAdapter adapter;
     private TextView tvCount;
+    private RealtimeSyncManager realtimeSync;
 
     // masterList = all users from DB; displayList = filtered subset shown in the RecyclerView
     private final List<User> masterList  = new ArrayList<>();
@@ -87,6 +89,24 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
         });
 
         loadUsers();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Start real-time listener — reload the user list whenever Firestore pushes a change
+        // (e.g. an officer updates their profile photo on another device).
+        realtimeSync = new RealtimeSyncManager(this, this::loadUsers);
+        realtimeSync.start();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (realtimeSync != null) {
+            realtimeSync.stop();
+            realtimeSync = null;
+        }
     }
 
     // ── Data ──────────────────────────────────────────────────────────────────

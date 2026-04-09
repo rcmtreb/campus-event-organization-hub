@@ -49,9 +49,9 @@ public class CEOHFirebaseMessagingService extends FirebaseMessagingService {
         // a session already exists (e.g. token rotated while the user is logged in).
         SessionManager session = new SessionManager(this);
         if (session.isLoggedIn()) {
-            String sid = session.getStudentId();
-            if (sid != null && !sid.isEmpty()) {
-                new FirestoreHelper().saveFcmToken(sid, token);
+            String uid = session.getFirebaseUid();
+            if (uid != null && !uid.isEmpty()) {
+                new FirestoreHelper().saveFcmToken(uid, token);
             }
         }
         // Always save locally so the next login can upload it

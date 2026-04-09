@@ -108,6 +108,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_USER_VERIFICATION_TOKEN = "verification_token";
     public static final String COLUMN_USER_LOGIN_ATTEMPTS = "login_attempts";
     public static final String COLUMN_USER_LOCKED_UNTIL = "locked_until";
+    public static final String COLUMN_USER_FIREBASE_UID = "firebase_uid";
 
     // Table: Login Rate Limiting
     public static final String TABLE_LOGIN_RATE_LIMIT = "login_rate_limit";
@@ -220,7 +221,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_USER_EMAIL_VERIFIED + " INTEGER DEFAULT 1, " +
             COLUMN_USER_VERIFICATION_TOKEN + " TEXT DEFAULT '', " +
             COLUMN_USER_LOGIN_ATTEMPTS + " INTEGER DEFAULT 0, " +
-            COLUMN_USER_LOCKED_UNTIL + " TEXT DEFAULT '')";
+            COLUMN_USER_LOCKED_UNTIL + " TEXT DEFAULT '', " +
+            COLUMN_USER_FIREBASE_UID + " TEXT DEFAULT '')";
 
     private static final String CREATE_TABLE_REGISTRATIONS =
             "CREATE TABLE " + TABLE_REGISTRATIONS + " (" +
@@ -452,6 +454,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_LOGIN_ATTEMPTS + " INTEGER DEFAULT 0");
             if (!cols.contains(COLUMN_USER_LOCKED_UNTIL))
                 db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_LOCKED_UNTIL + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_USER_FIREBASE_UID))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_FIREBASE_UID + " TEXT DEFAULT ''");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureUsersTableColumns failed", e);
         } finally {
@@ -610,7 +614,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // ── User Operations ───────────────────────────────────────────────────────
 
     public long registerUser(String name, String studentId, String email,
-                             String password, String role, String department) {
+                             String password, String role, String department,
+                             String firebaseUid) {
         SQLiteDatabase db = this.getWritableDatabase();
         String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
         String verificationToken = java.util.UUID.randomUUID().toString();
@@ -623,11 +628,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_USER_DEPARTMENT, department);
         v.put(COLUMN_USER_EMAIL_VERIFIED, 0);
         v.put(COLUMN_USER_VERIFICATION_TOKEN, verificationToken);
+        v.put(COLUMN_USER_FIREBASE_UID, firebaseUid != null ? firebaseUid : "");
         long id = db.insert(TABLE_USERS, null, v);
         db.close();
-        if (id != -1) {
+        if (id != -1 && firebaseUid != null && !firebaseUid.isEmpty()) {
             // Mirror to Firestore — include the BCrypt hash so sync can restore it on other devices
-            new FirestoreHelper().upsertUserWithVerification(studentId, name, email, role, department,
+            new FirestoreHelper().upsertUserWithVerification(firebaseUid, studentId, name, email, role, department,
                     "", "", "", "All Events", false, verificationToken, hashedPassword);
         }
         return id;
@@ -704,14 +710,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             Log.d("DatabaseHelper", "Password restored for: " + loginInput);
             // Also push the hash back to Firestore so future syncs carry it
             Cursor c = this.getReadableDatabase().rawQuery(
-                    "SELECT " + COLUMN_USER_STUDENT_ID + " FROM " + TABLE_USERS +
+                    "SELECT " + COLUMN_USER_STUDENT_ID + ", " + COLUMN_USER_FIREBASE_UID +
+                    " FROM " + TABLE_USERS +
                     " WHERE (" + COLUMN_USER_EMAIL + "=? OR " + COLUMN_USER_STUDENT_ID + "=?) LIMIT 1",
                     new String[]{loginInput, loginInput});
             if (c != null && c.moveToFirst()) {
                 String sid = c.getString(0);
+                String uid = c.getString(1);
                 c.close();
-                if (sid != null && !sid.isEmpty()) {
-                    new FirestoreHelper().updateUserField(sid, "password", hash);
+                if (uid != null && !uid.isEmpty()) {
+                    new FirestoreHelper().updateUserField(uid, "password", hash);
+                } else {
+                    Log.w("DatabaseHelper", "restorePassword: no firebase_uid for sid=" + sid + ", Firestore sync skipped");
                 }
             } else if (c != null) c.close();
         } catch (Exception e) {
@@ -820,7 +830,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_USER_ROLE, newRole);
         db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
         db.close();
-        new FirestoreHelper().updateUserField(studentId, "role", newRole);
+        String uid = getFirebaseUid(studentId);
+        if (!uid.isEmpty()) {
+            new FirestoreHelper().updateUserField(uid, "role", newRole);
+        }
     }
 
     public boolean updateUserProfile(String studentId, String gender, String mobile, String profileImagePath) {
@@ -833,10 +846,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int rows = db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
             db.close();
             if (rows > 0) {
-                FirestoreHelper fsh = new FirestoreHelper();
-                if (gender != null)           fsh.updateUserField(studentId, "gender",        gender);
-                if (mobile != null)           fsh.updateUserField(studentId, "mobile",        mobile);
-                if (profileImagePath != null) fsh.updateUserField(studentId, "profile_image", profileImagePath);
+                String uid = getFirebaseUid(studentId);
+                if (!uid.isEmpty()) {
+                    FirestoreHelper fsh = new FirestoreHelper();
+                    if (gender != null)           fsh.updateUserField(uid, "gender",        gender);
+                    if (mobile != null)           fsh.updateUserField(uid, "mobile",        mobile);
+                    if (profileImagePath != null) {
+                        // Use sentinel "DELETED" for explicit image removal so other devices
+                        // can distinguish "never had a photo" (Firestore field missing → "")
+                        // from "user explicitly removed the photo" → "DELETED".
+                        String firestoreImageValue = profileImagePath.isEmpty() ? "DELETED" : profileImagePath;
+                        fsh.updateUserField(uid, "profile_image", firestoreImageValue);
+                    }
+                }
             }
             return rows > 0;
         } catch (Exception e) {
@@ -859,7 +881,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_USER_PASSWORD, hashedNew);
             db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
             db.close();
-            new FirestoreHelper().updatePassword(studentId, hashedNew);
+            String uid = getFirebaseUid(studentId);
+            if (!uid.isEmpty()) {
+                new FirestoreHelper().updatePassword(uid, hashedNew);
+            }
             return true;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "changePassword failed", e);
@@ -874,9 +899,49 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_USER_NOTIF_PREF, pref);
             db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
             db.close();
-            new FirestoreHelper().updateUserField(studentId, "notif_pref", pref);
+            String uid = getFirebaseUid(studentId);
+            if (!uid.isEmpty()) {
+                new FirestoreHelper().updateUserField(uid, "notif_pref", pref);
+            }
         } catch (Exception e) {
             Log.e("DatabaseHelper", "updateNotifPref failed", e);
+        }
+    }
+
+    // ── Firebase UID helpers ─────────────────────────────────────────────────
+
+    /** Returns the stored Firebase Auth UID for a student_id, or "" if not found. */
+    public String getFirebaseUid(String studentId) {
+        if (studentId == null || studentId.isEmpty()) return "";
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT " + COLUMN_USER_FIREBASE_UID + " FROM " + TABLE_USERS +
+                    " WHERE " + COLUMN_USER_STUDENT_ID + "=? LIMIT 1",
+                    new String[]{studentId});
+            if (c != null && c.moveToFirst()) {
+                String uid = c.getString(0);
+                c.close();
+                return uid != null ? uid : "";
+            }
+            if (c != null) c.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getFirebaseUid failed", e);
+        }
+        return "";
+    }
+
+    /** Stores the Firebase Auth UID for a student_id. */
+    public void setFirebaseUid(String studentId, String firebaseUid) {
+        if (studentId == null || studentId.isEmpty()) return;
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_USER_FIREBASE_UID, firebaseUid != null ? firebaseUid : "");
+            db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "setFirebaseUid failed", e);
         }
     }
 
@@ -904,7 +969,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_USER_VERIFICATION_TOKEN, "");
         db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
         db.close();
-        new FirestoreHelper().updateUserField(studentId, "email_verified", verified ? 1 : 0);
+        String uid = getFirebaseUid(studentId);
+        if (!uid.isEmpty()) {
+            new FirestoreHelper().updateUserField(uid, "email_verified", verified ? 1 : 0);
+        }
     }
 
     public String getVerificationToken(String studentId) {
@@ -1904,7 +1972,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                 String role, String department,
                                 String gender, String mobile,
                                 String profileImage, String notifPref,
-                                String firestorePassword, boolean emailVerified) {
+                                String firestorePassword, boolean emailVerified,
+                                String firebaseUid) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
 
@@ -1929,10 +1998,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 v.put(COLUMN_USER_GENDER,     gender    != null ? gender    : "");
                 v.put(COLUMN_USER_MOBILE,     mobile    != null ? mobile    : "");
                 v.put(COLUMN_USER_NOTIF_PREF, notifPref != null ? notifPref : "All Events");
+                // Store/update the Firebase UID if we received one
+                if (firebaseUid != null && !firebaseUid.isEmpty()) {
+                    v.put(COLUMN_USER_FIREBASE_UID, firebaseUid);
+                }
                 // Only update profile_image from Firestore when Firestore has a real value.
                 // For data:image/ Base64 URIs and https:// URLs: always accept — device-independent.
+                // "DELETED" is a sentinel meaning the user explicitly removed their photo.
                 // For legacy local absolute paths: only use them if the file still exists on this device.
-                if (profileImage != null && !profileImage.isEmpty()) {
+                if ("DELETED".equals(profileImage)) {
+                    // Explicit delete — clear the image on this device too
+                    v.put(COLUMN_USER_PROFILE_IMG, "");
+                } else if (profileImage != null && !profileImage.isEmpty()) {
                     if (profileImage.startsWith("data:image/")
                             || profileImage.startsWith("http://")
                             || profileImage.startsWith("https://")) {
@@ -1961,6 +2038,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 v.put(COLUMN_USER_PROFILE_IMG,    profileImage != null ? profileImage : "");
                 v.put(COLUMN_USER_NOTIF_PREF,     notifPref    != null ? notifPref    : "All Events");
                 v.put(COLUMN_USER_EMAIL_VERIFIED, localEmailVerified ? 1 : 0);
+                v.put(COLUMN_USER_FIREBASE_UID,   firebaseUid  != null ? firebaseUid  : "");
                 db.insertWithOnConflict(TABLE_USERS, null, v, SQLiteDatabase.CONFLICT_IGNORE);
             }
             db.close();
@@ -3274,7 +3352,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                     cols[7], cols[8],
                                     cols.length > 9 ? cols[9] : "",
                                     cols.length > 10 ? cols[10] : "All Events",
-                                    "", true);
+                                    "", true, "");
                             count++;
                         } catch (Exception ignored) {}
                     }
@@ -3298,6 +3376,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      */
     public void deleteUserAccount(String studentId) {
         if (studentId == null || studentId.isEmpty()) return;
+        // Look up firebase_uid BEFORE deleting the SQLite row
+        String firebaseUid = getFirebaseUid(studentId);
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
         try {
@@ -3318,10 +3398,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         // client SDK; it will remain as an orphaned Auth entry but is harmless since the
         // Firestore user doc is gone and the app uses Firestore as source of truth.
         FirestoreHelper firestoreHelper = new FirestoreHelper();
-        firestoreHelper.deleteUser(studentId);
+        if (!firebaseUid.isEmpty()) {
+            firestoreHelper.deleteUser(firebaseUid);
+        }
         firestoreHelper.deleteUserRegistrations(studentId);
         firestoreHelper.deleteUserNotifications(studentId);
-        Log.i("DatabaseHelper", "deleteUserAccount: Firestore deletion initiated for " + studentId);
+        Log.i("DatabaseHelper", "deleteUserAccount: Firestore deletion initiated for " + studentId + " (uid=" + firebaseUid + ")");
     }
 
     /**

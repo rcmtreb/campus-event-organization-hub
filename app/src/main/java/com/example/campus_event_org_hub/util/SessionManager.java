@@ -20,6 +20,7 @@ public class SessionManager {
     private static final String KEY_DEPT        = "user_dept";
     private static final String KEY_EMAIL       = "user_email";
     private static final String KEY_STUDENT_ID  = "user_student_id";
+    private static final String KEY_FIREBASE_UID = "firebase_uid";
 
     private final SharedPreferences prefs;
 
@@ -41,6 +42,20 @@ public class SessionManager {
                 .apply();
     }
 
+    /** Save session with Firebase UID. */
+    public void saveSession(String name, String role, String dept,
+                            String email, String studentId, String firebaseUid) {
+        prefs.edit()
+                .putBoolean(KEY_LOGGED_IN,   true)
+                .putString(KEY_NAME,         name        != null ? name        : "")
+                .putString(KEY_ROLE,         role        != null ? role        : "Student")
+                .putString(KEY_DEPT,         dept        != null ? dept        : "")
+                .putString(KEY_EMAIL,        email       != null ? email       : "")
+                .putString(KEY_STUDENT_ID,   studentId   != null ? studentId   : "")
+                .putString(KEY_FIREBASE_UID, firebaseUid != null ? firebaseUid : "")
+                .apply();
+    }
+
     /** Clear session on logout. */
     public void clearSession() {
         prefs.edit().clear().apply();
@@ -51,9 +66,10 @@ public class SessionManager {
         return prefs.getBoolean(KEY_LOGGED_IN, false);
     }
 
-    public String getName()      { return prefs.getString(KEY_NAME,       "User");    }
-    public String getRole()      { return prefs.getString(KEY_ROLE,       "Student"); }
-    public String getDept()      { return prefs.getString(KEY_DEPT,       "");        }
-    public String getEmail()     { return prefs.getString(KEY_EMAIL,      "");        }
-    public String getStudentId() { return prefs.getString(KEY_STUDENT_ID, "");        }
+    public String getName()       { return prefs.getString(KEY_NAME,         "User");    }
+    public String getRole()       { return prefs.getString(KEY_ROLE,         "Student"); }
+    public String getDept()       { return prefs.getString(KEY_DEPT,         "");        }
+    public String getEmail()      { return prefs.getString(KEY_EMAIL,        "");        }
+    public String getStudentId()  { return prefs.getString(KEY_STUDENT_ID,   "");        }
+    public String getFirebaseUid(){ return prefs.getString(KEY_FIREBASE_UID, "");        }
 }

@@ -224,6 +224,9 @@ public class RegisterActivity extends AppCompatActivity {
                                           String name, String studentId, String email,
                                           String password, String role, String department,
                                           Button btnRegister) {
+        // Extract Firebase Auth UID — this becomes the Firestore document ID for users/
+        String firebaseUid = (firebaseUser != null) ? firebaseUser.getUid() : "";
+
         if (firebaseUser != null) {
             firebaseUser.sendEmailVerification()
                     .addOnSuccessListener(unused -> Log.d(TAG, "Verification email sent to " + email))
@@ -231,8 +234,9 @@ public class RegisterActivity extends AppCompatActivity {
         }
 
         // BCrypt hashing is slow (~1s) — must NOT run on the main thread
+        final String uid = firebaseUid;
         new Thread(() -> {
-            long id = db.registerUser(name, studentId, email, password, role, department);
+            long id = db.registerUser(name, studentId, email, password, role, department, uid);
             runOnUiThread(() -> {
                 if (id != -1) {
                     Toast.makeText(this, "Registration successful! Check your email to verify.", Toast.LENGTH_LONG).show();
@@ -314,7 +318,8 @@ public class RegisterActivity extends AppCompatActivity {
                                   String email, String password, String role,
                                   String department, Button btnRegister) {
         new Thread(() -> {
-            long id = db.registerUser(name, studentId, email, password, role, department);
+            // No Firebase Auth user available — UID will be filled on next login
+            long id = db.registerUser(name, studentId, email, password, role, department, "");
             runOnUiThread(() -> {
                 if (id != -1) {
                     Toast.makeText(this,

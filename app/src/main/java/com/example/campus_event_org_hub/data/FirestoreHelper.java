@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
  * Thin wrapper around Firestore.
  *
  * Collection layout (mirrors the SQLite tables):
- *   users/          — doc id = student_id
+ *   users/          — doc id = Firebase Auth UID (student_id stored as a field)
  *   events/         — doc id = String.valueOf(local SQLite id)
  *   registrations/  — doc id = student_id + "_" + event_id
  *   notifications/  — doc id = String.valueOf(local notif_id)
@@ -45,10 +45,14 @@ public class FirestoreHelper {
 
     // ── Users ─────────────────────────────────────────────────────────────────
 
-    public void upsertUser(String studentId, String name, String email,
+    public void upsertUser(String firebaseUid, String studentId, String name, String email,
                            String role, String department,
                            String gender, String mobile, String profileImage,
                            String notifPref) {
+        if (firebaseUid == null || firebaseUid.isEmpty()) {
+            Log.w(TAG, "upsertUser skipped: no firebaseUid for studentId=" + studentId);
+            return;
+        }
         Map<String, Object> data = new HashMap<>();
         data.put("student_id",    studentId);
         data.put("name",          name);
@@ -59,16 +63,20 @@ public class FirestoreHelper {
         data.put("mobile",        mobile   != null ? mobile      : "");
         data.put("profile_image", profileImage != null ? profileImage : "");
         data.put("notif_pref",    notifPref != null ? notifPref   : "All Events");
-        db.collection(COL_USERS).document(studentId)
+        db.collection(COL_USERS).document(firebaseUid)
                 .set(data, SetOptions.merge())
-                .addOnFailureListener(e -> Log.e(TAG, "upsertUser failed: " + studentId, e));
+                .addOnFailureListener(e -> Log.e(TAG, "upsertUser failed: uid=" + firebaseUid + " sid=" + studentId, e));
     }
 
-    public void upsertUserWithVerification(String studentId, String name, String email,
-                                           String role, String department,
-                                           String gender, String mobile, String profileImage,
-                                           String notifPref, boolean emailVerified,
-                                           String verificationToken, String hashedPassword) {
+    public void upsertUserWithVerification(String firebaseUid, String studentId, String name, String email,
+                                            String role, String department,
+                                            String gender, String mobile, String profileImage,
+                                            String notifPref, boolean emailVerified,
+                                            String verificationToken, String hashedPassword) {
+        if (firebaseUid == null || firebaseUid.isEmpty()) {
+            Log.w(TAG, "upsertUserWithVerification skipped: no firebaseUid for studentId=" + studentId);
+            return;
+        }
         Map<String, Object> data = new HashMap<>();
         data.put("student_id",              studentId);
         data.put("name",                    name);
@@ -84,48 +92,81 @@ public class FirestoreHelper {
         if (hashedPassword != null && !hashedPassword.isEmpty()) {
             data.put("password", hashedPassword);
         }
-        db.collection(COL_USERS).document(studentId)
+        db.collection(COL_USERS).document(firebaseUid)
                 .set(data, SetOptions.merge())
-                .addOnFailureListener(e -> Log.e(TAG, "upsertUserWithVerification failed: " + studentId, e));
+                .addOnFailureListener(e -> Log.e(TAG, "upsertUserWithVerification failed: uid=" + firebaseUid + " sid=" + studentId, e));
     }
 
-    public void updateUserField(String studentId, String field, Object value) {
-        db.collection(COL_USERS).document(studentId)
-                .update(field, value)
-                .addOnFailureListener(e -> Log.e(TAG, "updateUserField failed", e));
+    public void updateUserField(String firebaseUid, String field, Object value) {
+        // Use set(merge) instead of update() so this succeeds even if the field
+        // never existed on the document (e.g. profile_image on older user docs).
+        java.util.Map<String, Object> patch = new java.util.HashMap<>();
+        patch.put(field, value);
+
+        // Guard: if the user is not signed into Firebase Auth the write will be
+        // rejected by security rules (request.auth == null).  Log a clear warning
+        // so this is easy to spot in Logcat.
+        com.google.firebase.auth.FirebaseUser currentUser =
+                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Log.w(TAG, "updateUserField: NO Firebase Auth session — write will likely fail"
+                    + " (field=" + field + ", firebaseUid=" + firebaseUid + ")");
+        }
+
+        if (firebaseUid == null || firebaseUid.isEmpty()) {
+            Log.w(TAG, "updateUserField skipped: no firebaseUid (field=" + field + ")");
+            return;
+        }
+
+        String preview = (value instanceof String && ((String) value).length() > 60)
+                ? ((String) value).substring(0, 60) + "..." : String.valueOf(value);
+        db.collection(COL_USERS).document(firebaseUid)
+                .set(patch, SetOptions.merge())
+                .addOnSuccessListener(v -> Log.d(TAG,
+                        "updateUserField OK: " + field + "=" + preview + " for uid=" + firebaseUid))
+                .addOnFailureListener(e -> Log.e(TAG,
+                        "updateUserField FAILED: " + field + " for uid=" + firebaseUid, e));
     }
 
     /**
      * Store the device's FCM registration token in the user's Firestore document.
      * The Cloud Function reads this token to address push notifications to the correct device.
      */
-    public void saveFcmToken(String studentId, String token) {
-        if (studentId == null || studentId.isEmpty() || token == null || token.isEmpty()) return;
-        db.collection(COL_USERS).document(studentId)
+    public void saveFcmToken(String firebaseUid, String token) {
+        if (firebaseUid == null || firebaseUid.isEmpty() || token == null || token.isEmpty()) return;
+        db.collection(COL_USERS).document(firebaseUid)
                 .update("fcm_token", token)
                 .addOnFailureListener(e ->
                         // Document may not exist yet — use set(merge) as fallback
-                        db.collection(COL_USERS).document(studentId)
+                        db.collection(COL_USERS).document(firebaseUid)
                                 .set(java.util.Collections.singletonMap("fcm_token", token),
                                         SetOptions.merge())
                                 .addOnFailureListener(e2 ->
-                                        Log.e(TAG, "saveFcmToken failed: " + studentId, e2)));
+                                        Log.e(TAG, "saveFcmToken failed: uid=" + firebaseUid, e2)));
     }
 
     /**
      * Sync a changed password to Firestore so other devices can pull it on next login sync.
      * The password is stored in the users document under the "password" field.
      */
-    public void updatePassword(String studentId, String newPassword) {
-        db.collection(COL_USERS).document(studentId)
+    public void updatePassword(String firebaseUid, String newPassword) {
+        if (firebaseUid == null || firebaseUid.isEmpty()) {
+            Log.w(TAG, "updatePassword skipped: no firebaseUid");
+            return;
+        }
+        db.collection(COL_USERS).document(firebaseUid)
                 .update("password", newPassword)
-                .addOnFailureListener(e -> Log.e(TAG, "updatePassword failed: " + studentId, e));
+                .addOnFailureListener(e -> Log.e(TAG, "updatePassword failed: uid=" + firebaseUid, e));
     }
 
-    public void deleteUser(String studentId) {
-        db.collection(COL_USERS).document(studentId)
+    public void deleteUser(String firebaseUid) {
+        if (firebaseUid == null || firebaseUid.isEmpty()) {
+            Log.w(TAG, "deleteUser skipped: no firebaseUid");
+            return;
+        }
+        db.collection(COL_USERS).document(firebaseUid)
                 .delete()
-                .addOnFailureListener(e -> Log.e(TAG, "deleteUser failed: " + studentId, e));
+                .addOnFailureListener(e -> Log.e(TAG, "deleteUser failed: uid=" + firebaseUid, e));
     }
 
     /**

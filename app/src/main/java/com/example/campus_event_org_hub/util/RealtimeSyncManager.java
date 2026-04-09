@@ -183,6 +183,7 @@ public class RealtimeSyncManager {
                     for (DocumentChange dc : snapshots.getDocumentChanges()) {
                         if (dc.getType() == DocumentChange.Type.REMOVED) continue;
                         com.google.firebase.firestore.DocumentSnapshot d = dc.getDocument();
+                        String firebaseUid = d.getId(); // Doc ID = Firebase Auth UID
                         String sid        = str(d, "student_id");
                         String name       = str(d, "name");
                         String email      = str(d, "email");
@@ -196,7 +197,7 @@ public class RealtimeSyncManager {
                         boolean emailVerified = intVal(d, "email_verified") == 1;
                         if (sid == null || sid.isEmpty()) continue;
                         dbHelper.syncUpsertUser(sid, name, email, role, dept,
-                                gender, mobile, profileImg, notifPref, null, emailVerified);
+                                gender, mobile, profileImg, notifPref, null, emailVerified, firebaseUid);
                     }
                     notifyChange();
                 });

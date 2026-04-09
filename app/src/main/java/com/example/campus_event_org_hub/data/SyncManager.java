@@ -62,6 +62,7 @@ public class SyncManager {
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
             List<DocumentSnapshot> docs = snap.getDocuments();
             for (DocumentSnapshot d : docs) {
+                String firebaseUid = d.getId(); // Doc ID = Firebase Auth UID
                 String sid         = str(d, "student_id");
                 String name        = str(d, "name");
                 String email       = str(d, "email");
@@ -75,7 +76,7 @@ public class SyncManager {
                 boolean emailVerified = intVal(d, "email_verified") == 1;
                 if (sid == null || sid.isEmpty()) continue;
                 db.syncUpsertUser(sid, name, email, role, dept,
-                        gender, mobile, profileImg, notifPref, password, emailVerified);
+                        gender, mobile, profileImg, notifPref, password, emailVerified, firebaseUid);
             }
             Log.d(TAG, "Synced " + docs.size() + " users");
         } catch (Exception e) {
