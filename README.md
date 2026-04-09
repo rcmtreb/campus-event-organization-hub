@@ -1,6 +1,6 @@
 # Campus Event & Organization Hub (CEOH)
 
-CEOH is a specialized Android application designed for University of the Cordilleras (UCC) students and organizations. It serves as a centralized platform for event management, registration, and attendance tracking, ensuring students are always updated with campus activities.
+CEOH is a specialized Android application designed for University of the Caloocan City (UCC) students and organizations. It serves as a centralized platform for event management, registration, and attendance tracking, ensuring students are always updated with campus activities.
 
 ##  Key Features
 
