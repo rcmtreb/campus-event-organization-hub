@@ -2186,9 +2186,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     public void deleteEvent(int eventId) {
         SQLiteDatabase db = this.getWritableDatabase();
-        db.delete(TABLE_EVENTS, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
-        db.close();
-        new FirestoreHelper().deleteEvent(eventId);
+        db.beginTransaction();
+        try {
+            // Cascade-delete registrations and notifications tied to this event
+            db.delete(TABLE_REGISTRATIONS, COLUMN_REG_EVENT_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.delete(TABLE_NOTIFICATIONS, COLUMN_NOTIF_EVENT_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.delete(TABLE_EVENTS, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "deleteEvent SQLite failed", e);
+        } finally {
+            db.endTransaction();
+        }
+        // Mirror all three deletions to Firestore
+        FirestoreHelper fs = new FirestoreHelper();
+        fs.deleteEventRegistrations(eventId);
+        fs.deleteEventNotifications(eventId);
+        fs.deleteEvent(eventId);
     }
 
     public void cancelEvent(int eventId) {
@@ -3299,19 +3313,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         } finally {
             db.endTransaction();
         }
-        // Call Cloud Function to delete Firebase Auth credential + Firestore documents.
-        // The Cloud Function handles: Auth deletion, Firestore user doc, registrations,
-        // and notifications — all in one atomic server-side operation.
-        java.util.Map<String, Object> payload = new java.util.HashMap<>();
-        payload.put("studentId", studentId);
-        com.google.firebase.functions.FirebaseFunctions.getInstance()
-                .getHttpsCallable("deleteUserAccount")
-                .call(payload)
-                .addOnSuccessListener(result ->
-                        Log.i("DatabaseHelper", "deleteUserAccount CF: Auth deleted for " + studentId))
-                .addOnFailureListener(e ->
-                        Log.e("DatabaseHelper", "deleteUserAccount CF failed for " + studentId
-                                + " — Firestore/Auth may need manual cleanup", e));
+        // Directly delete from Firestore (Cloud Function is not deployed on Spark plan).
+        // Note: Firebase Auth credential for the deleted user cannot be removed from the
+        // client SDK; it will remain as an orphaned Auth entry but is harmless since the
+        // Firestore user doc is gone and the app uses Firestore as source of truth.
+        FirestoreHelper firestoreHelper = new FirestoreHelper();
+        firestoreHelper.deleteUser(studentId);
+        firestoreHelper.deleteUserRegistrations(studentId);
+        firestoreHelper.deleteUserNotifications(studentId);
+        Log.i("DatabaseHelper", "deleteUserAccount: Firestore deletion initiated for " + studentId);
     }
 
     /**

@@ -112,7 +112,7 @@ public class LoginActivity extends AppCompatActivity {
                                             Object adminClaim = tokenResult.getClaims().get("admin");
                                             if (Boolean.TRUE.equals(adminClaim)) {
                                                 Log.d(TAG, "Admin custom claim detected — launching AdminActivity");
-                                                FirebaseAuth.getInstance().signOut();
+                                                // Keep admin signed into Firebase Auth so Firestore writes/deletes succeed.
                                                 session.saveSession("Admin", "Admin", "Administration", loginInput, "admin");
                                                 uploadPendingFcmToken("admin");
                                                 Intent intent = new Intent(LoginActivity.this, AdminActivity.class);

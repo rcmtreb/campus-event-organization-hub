@@ -414,13 +414,41 @@ public class FirestoreHelper {
                 .addOnFailureListener(e -> Log.e(TAG, "deleteEvent failed", e));
     }
 
+    /** Delete all Firestore registrations whose event_id matches the given local event ID. */
+    public void deleteEventRegistrations(int eventId) {
+        db.collection(COL_REGISTRATIONS)
+                .whereEqualTo("event_id", (long) eventId)
+                .get()
+                .addOnSuccessListener(snap -> {
+                    for (DocumentSnapshot doc : snap.getDocuments()) {
+                        doc.getReference().delete()
+                                .addOnFailureListener(e -> Log.e(TAG, "deleteEventRegistration doc failed", e));
+                    }
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "deleteEventRegistrations query failed: " + eventId, e));
+    }
+
+    /** Delete all Firestore notifications whose event_id matches the given local event ID. */
+    public void deleteEventNotifications(int eventId) {
+        db.collection(COL_NOTIFICATIONS)
+                .whereEqualTo("event_id", (long) eventId)
+                .get()
+                .addOnSuccessListener(snap -> {
+                    for (DocumentSnapshot doc : snap.getDocuments()) {
+                        doc.getReference().delete()
+                                .addOnFailureListener(e -> Log.e(TAG, "deleteEventNotification doc failed", e));
+                    }
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "deleteEventNotifications query failed: " + eventId, e));
+    }
+
     // ── Registrations ─────────────────────────────────────────────────────────
 
     public void upsertRegistration(String studentId, int eventId, String timestamp) {
         String docId = studentId + "_" + eventId;
         Map<String, Object> data = new HashMap<>();
         data.put("student_id",  studentId);
-        data.put("event_id",    eventId);
+        data.put("event_id",    (long) eventId);
         data.put("timestamp",   timestamp);
         db.collection(COL_REGISTRATIONS).document(docId)
                 .set(data, SetOptions.merge())
@@ -437,7 +465,7 @@ public class FirestoreHelper {
         Map<String, Object> data = new HashMap<>();
         data.put("local_notif_id",  localNotifId);
         data.put("recipient_sid",   recipientSid);
-        data.put("event_id",        eventId);
+        data.put("event_id",        (long) eventId);
         data.put("type",            type);
         data.put("message",         message);
         data.put("reason",          reason        != null ? reason        : "");

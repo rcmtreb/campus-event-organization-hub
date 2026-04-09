@@ -60,6 +60,7 @@ public class AdminActivity extends BaseActivity {
 
         cardLogout.setOnClickListener(v -> {
             new SessionManager(this).clearSession();
+            com.google.firebase.auth.FirebaseAuth.getInstance().signOut();
             Toast.makeText(this, "Admin Logged Out", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(AdminActivity.this, LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
