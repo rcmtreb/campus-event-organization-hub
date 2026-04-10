@@ -178,10 +178,27 @@ public class EventDetailActivity extends AppCompatActivity {
                 setRegisteredState(registerButton);
                 scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
                 bindAttendanceCard(attendanceCard, db, event, finalStudentId);
+            } else if (!isRegistrationOpen(event)) {
+                // Registration closed — 1-hour window after start time has passed
+                registerButton.setEnabled(false);
+                registerButton.setText("Registration Closed");
+                registerButton.setBackgroundTintList(
+                        ContextCompat.getColorStateList(this, android.R.color.darker_gray));
             } else {
                 registerButton.setEnabled(true);
                 registerButton.setText("Register for Event");
                 registerButton.setOnClickListener(v -> {
+                    // Re-check window at click time in case the minute just ticked over
+                    if (!isRegistrationOpen(event)) {
+                        registerButton.setEnabled(false);
+                        registerButton.setText("Registration Closed");
+                        registerButton.setBackgroundTintList(
+                                ContextCompat.getColorStateList(this, android.R.color.darker_gray));
+                        Toast.makeText(this,
+                                "Registration is now closed. The 1-hour window after start time has passed.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
                     boolean success = db.registerForEvent(finalStudentId, eventId);
                     if (success) {
                         registrationChanged = true;
@@ -330,6 +347,38 @@ public class EventDetailActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Registration is open as long as now < start + 60 minutes (same cutoff as Time-In).
+     * If the event has no start time set, or the event date hasn't arrived yet, registration
+     * is considered open (no cutoff to apply).
+     */
+    private boolean isRegistrationOpen(Event event) {
+        try {
+            String eventDate = event.getDate();
+            String today     = ServerTimeUtil.todayString();
+            // Future date — registration always open
+            if (eventDate == null || eventDate.compareTo(today) > 0) return true;
+            // Past date — registration closed
+            if (eventDate.compareTo(today) < 0) return false;
+
+            // Today — check time
+            String startTime = event.getStartTime();
+            if (startTime == null || startTime.isEmpty()) return true; // no time set, leave open
+
+            int startMinutes = parseTimeToMinutes(startTime);
+            if (startMinutes < 0) return true;
+
+            Calendar nowCal = Calendar.getInstance();
+            nowCal.setTime(ServerTimeUtil.now());
+            int nowMinutes = nowCal.get(Calendar.HOUR_OF_DAY) * 60 + nowCal.get(Calendar.MINUTE);
+
+            // Closes at start + 60 minutes (same as Time-In cutoff)
+            return nowMinutes < startMinutes + 60;
+        } catch (Exception e) {
+            return true; // fail open
+        }
+    }
+
     private void bindAttendanceCard(MaterialCardView card, DatabaseHelper db,
                                     Event event, String studentId) {
         if (!isAttendanceWindowOpen(event)) {
@@ -385,14 +434,23 @@ public class EventDetailActivity extends AppCompatActivity {
                 case 2:
                     Toast.makeText(this, "You have already timed in.", Toast.LENGTH_SHORT).show();
                     break;
-                default:
-                    Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();
-                    break;
-            }
-            refreshAttendanceState(db, event.getId(), studentId,
-                    tvStatus, layoutTimeIn, layoutTimeOut,
-                    etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
-                    layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
+                 case 3:
+                     Toast.makeText(this, "Time-In is no longer available for this event. The 1-hour window after start time has passed.", Toast.LENGTH_LONG).show();
+                     break;
+                 case 5:
+                     Toast.makeText(this, "You must register for this event before timing in.", Toast.LENGTH_LONG).show();
+                     break;
+                 case -4:
+                     Toast.makeText(this, "Too many incorrect attempts. Please wait 15 minutes.", Toast.LENGTH_LONG).show();
+                     break;
+                 default:
+                     Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();
+                     break;
+             }
+             refreshAttendanceState(db, event.getId(), studentId,
+                     tvStatus, layoutTimeIn, layoutTimeOut,
+                     etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
+                     layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
         });
 
         btnTimeOut.setOnClickListener(v -> {
@@ -420,6 +478,12 @@ public class EventDetailActivity extends AppCompatActivity {
                     break;
                 case 3:
                     Toast.makeText(this, "You have already timed out.", Toast.LENGTH_SHORT).show();
+                    break;
+                case 4:
+                    Toast.makeText(this, "Time-Out window has closed. You can no longer time out for this event.", Toast.LENGTH_LONG).show();
+                    break;
+                case -4:
+                    Toast.makeText(this, "Too many incorrect attempts. Please wait 15 minutes.", Toast.LENGTH_LONG).show();
                     break;
                 default:
                     Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();

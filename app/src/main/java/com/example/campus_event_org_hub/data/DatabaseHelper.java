@@ -79,6 +79,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_ATT_TIME_OUT_AT    = "time_out_at";
     public static final String COLUMN_ATT_TIME_IN_PHOTO  = "time_in_photo";
     public static final String COLUMN_ATT_TIME_OUT_PHOTO = "time_out_photo";
+    // Window columns — record the open/close times of the attendance window at submission time
+    public static final String COLUMN_ATT_TIME_IN_WINDOW_OPEN  = "time_in_window_open";
+    public static final String COLUMN_ATT_TIME_IN_WINDOW_CLOSE = "time_in_window_close";
+    public static final String COLUMN_ATT_TIME_OUT_WINDOW_OPEN  = "time_out_window_open";
+    public static final String COLUMN_ATT_TIME_OUT_WINDOW_CLOSE = "time_out_window_close";
 
     // Table: Attendance Codes (per student)
     public static final String TABLE_ATTENDANCE_CODES        = "attendance_codes";
@@ -191,6 +196,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_ATT_TIME_OUT_AT + " TEXT DEFAULT '', " +
             COLUMN_ATT_TIME_IN_PHOTO  + " TEXT DEFAULT '', " +
             COLUMN_ATT_TIME_OUT_PHOTO + " TEXT DEFAULT '', " +
+            COLUMN_ATT_TIME_IN_WINDOW_OPEN   + " TEXT DEFAULT '', " +
+            COLUMN_ATT_TIME_IN_WINDOW_CLOSE  + " TEXT DEFAULT '', " +
+            COLUMN_ATT_TIME_OUT_WINDOW_OPEN  + " TEXT DEFAULT '', " +
+            COLUMN_ATT_TIME_OUT_WINDOW_CLOSE + " TEXT DEFAULT '', " +
             "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))";
 
     private static final String CREATE_TABLE_ATTENDANCE_CODES =
@@ -310,6 +319,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureAttendanceAuditTable(db);
         ensureLoginRateLimitTable(db);
         migrateAttendancePhotoColumns(db);
+        migrateAttendanceWindowColumns(db);
     }
 
     @Override
@@ -507,7 +517,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     COLUMN_ATT_TIME_OUT_AT + " TEXT DEFAULT '', " +
                     COLUMN_ATT_TIME_IN_PHOTO  + " TEXT DEFAULT '', " +
                     COLUMN_ATT_TIME_OUT_PHOTO + " TEXT DEFAULT '', " +
+                    COLUMN_ATT_TIME_IN_WINDOW_OPEN   + " TEXT DEFAULT '', " +
+                    COLUMN_ATT_TIME_IN_WINDOW_CLOSE  + " TEXT DEFAULT '', " +
+                    COLUMN_ATT_TIME_OUT_WINDOW_OPEN  + " TEXT DEFAULT '', " +
+                    COLUMN_ATT_TIME_OUT_WINDOW_CLOSE + " TEXT DEFAULT '', " +
                     "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))");
+            // Add window columns to existing tables (safe no-op if already present)
+            migrateAttendanceWindowColumns(db);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureAttendanceTable failed", e);
         }
@@ -522,6 +538,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             // Columns may already exist (CREATE TABLE IF NOT EXISTS handles it)
             Log.d("DatabaseHelper", "migrateAttendancePhotoColumns: " + e.getMessage());
+        }
+    }
+
+    /** v16: add time_in/out window open/close columns to record the allowed window at submission. */
+    private void migrateAttendanceWindowColumns(SQLiteDatabase db) {
+        String[] cols = {
+                COLUMN_ATT_TIME_IN_WINDOW_OPEN,
+                COLUMN_ATT_TIME_IN_WINDOW_CLOSE,
+                COLUMN_ATT_TIME_OUT_WINDOW_OPEN,
+                COLUMN_ATT_TIME_OUT_WINDOW_CLOSE
+        };
+        for (String col : cols) {
+            try {
+                db.execSQL("ALTER TABLE " + TABLE_ATTENDANCE + " ADD COLUMN " + col + " TEXT DEFAULT ''");
+            } catch (Exception e) {
+                // Already exists — safe to ignore
+                Log.d("DatabaseHelper", "migrateAttendanceWindowColumns " + col + ": " + e.getMessage());
+            }
         }
     }
 
@@ -1611,13 +1645,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             }
 
             if ("IN".equals(type)) {
-                // Allow Time In from 10 minutes before start
+                // Allow Time-In from 10 minutes before start up to 1 hour after start.
+                // e.g. 7:00 AM event → window is 6:50 AM – 7:59 AM (start+60min exclusive).
                 int allowedStart = startMinutes - 10;
+                int allowedEnd   = startMinutes + 60; // 1 hour after start, exclusive
                 if (nowMinutes < allowedStart) {
                     return 2; // too early
                 }
-                if (nowMinutes > endMinutes - 5) {
-                    return 3; // too late
+                if (nowMinutes >= allowedEnd) {
+                    return 3; // too late — Time-In closed 1 hour after event start
                 }
             } else if ("OUT".equals(type)) {
                 // Allow Time Out up to 30 minutes after end
@@ -1652,18 +1688,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    /** Convert minutes-since-midnight to "HH:mm", clamping to [00:00, 23:59]. */
+    private String minutesToHHmm(int totalMinutes) {
+        // Clamp to a valid 24-hour range
+        totalMinutes = Math.max(0, Math.min(totalMinutes, 23 * 60 + 59));
+        int h = totalMinutes / 60;
+        int m = totalMinutes % 60;
+        return String.format(Locale.US, "%02d:%02d", h, m);
+    }
+
     /**
      * Record a Time-In for a student: validates the submitted code against the per-student
      * attendance code (preferred) or legacy event code, inserts/updates the attendance row,
      * and marks the used code as consumed.
      *
-     * Returns:
-     *   0  = success (time-in recorded)
-     *   1  = wrong code
-     *   2  = already timed in
-     *   3  = invalid time window (device clock or event not active)
-     *   -1 = error
-     */
+      * Returns:
+      *   0  = success (time-in recorded)
+      *   1  = wrong code
+      *   2  = already timed in
+      *   3  = invalid time window (device clock or event not active)
+      *   5  = not registered for the event
+      *   -1 = error
+      */
     public int submitTimeIn(int eventId, String studentId, String submittedCode) {
         return submitTimeIn(eventId, studentId, submittedCode, "", "");
     }
@@ -1685,6 +1731,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             if (timeCheck != 0) {
                 logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 3, deviceInfo, ipAddress);
                 return 3;
+            }
+
+            // Must be registered for the event before timing in
+            if (!isRegistered(studentId, eventId)) {
+                logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 5, deviceInfo, ipAddress);
+                return 5; // not registered
             }
 
             SQLiteDatabase db = this.getWritableDatabase();
@@ -1727,11 +1779,32 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Use server-corrected time to prevent phone clock manipulation.
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
                     .format(new java.util.Date(ServerTimeUtil.nowMillis()));
+
+            // Compute and record the time-in window that was active at submission time.
+            // Window: (start - 10min) to (start + 60min), e.g. 7:00AM → 6:50AM–7:59AM.
+            String winOpen  = "";
+            String winClose = "";
+            try {
+                Cursor wc = db.rawQuery("SELECT " + COLUMN_START_TIME + " FROM " + TABLE_EVENTS +
+                        " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+                if (wc != null && wc.moveToFirst()) {
+                    String st = wc.getString(0);
+                    wc.close();
+                    int sm = parseTimeToMinutes(st, -1);
+                    if (sm >= 0) {
+                        winOpen  = minutesToHHmm(sm - 10);
+                        winClose = minutesToHHmm(sm + 60);
+                    }
+                } else { if (wc != null) wc.close(); }
+            } catch (Exception ignored) {}
+
             ContentValues av = new ContentValues();
             av.put(COLUMN_ATT_EVENT_ID,   eventId);
             av.put(COLUMN_ATT_STUDENT_ID, studentId);
             av.put(COLUMN_ATT_TIME_IN_AT, timestamp);
             av.put(COLUMN_ATT_TIME_OUT_AT, "");
+            av.put(COLUMN_ATT_TIME_IN_WINDOW_OPEN,  winOpen);
+            av.put(COLUMN_ATT_TIME_IN_WINDOW_CLOSE, winClose);
             db.insertWithOnConflict(TABLE_ATTENDANCE, null, av, SQLiteDatabase.CONFLICT_IGNORE);
 
             if (activeCode != null && activeCode.equals(submittedCode)) {
@@ -1781,7 +1854,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      *   0  = success (time-out recorded)
      *   1  = wrong code
      *   2  = not yet timed in
-     *   3  = already timed out or invalid time window
+     *   3  = already timed out
+     *   4  = time window violation (too early or window closed)
      *   -1 = error
      *   -4 = rate limited
      */
@@ -1804,8 +1878,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         try {
             int timeCheck = checkEventTimeWindow(eventId, "OUT");
             if (timeCheck != 0) {
-                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 3, deviceInfo, ipAddress);
-                return 3;
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 4, deviceInfo, ipAddress);
+                return 4; // time window violation (distinct from 3 = already timed out)
             }
 
             SQLiteDatabase db = this.getWritableDatabase();
@@ -1860,8 +1934,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Use server-corrected time to prevent phone clock manipulation.
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
                     .format(new java.util.Date(ServerTimeUtil.nowMillis()));
+
+            // Compute and record the time-out window that was active at submission time.
+            // Window: start_time to (end_time + 30min).
+            String winOpen  = "";
+            String winClose = "";
+            try {
+                Cursor wc = db.rawQuery(
+                        "SELECT " + COLUMN_START_TIME + ", " + COLUMN_END_TIME +
+                        " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?",
+                        new String[]{String.valueOf(eventId)});
+                if (wc != null && wc.moveToFirst()) {
+                    String st = wc.getString(0);
+                    String et = wc.getString(1);
+                    wc.close();
+                    int sm = parseTimeToMinutes(st, -1);
+                    int em = parseTimeToMinutes(et, -1);
+                    if (sm >= 0) winOpen  = minutesToHHmm(sm);
+                    if (em >= 0) winClose = minutesToHHmm(em + 30);
+                } else { if (wc != null) wc.close(); }
+            } catch (Exception ignored) {}
+
             ContentValues av = new ContentValues();
             av.put(COLUMN_ATT_TIME_OUT_AT, timestamp);
+            av.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN,  winOpen);
+            av.put(COLUMN_ATT_TIME_OUT_WINDOW_CLOSE, winClose);
             db.update(TABLE_ATTENDANCE, av,
                     COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
                     new String[]{String.valueOf(eventId), studentId});
