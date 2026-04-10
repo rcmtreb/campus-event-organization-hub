@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
+import android.net.Uri;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
@@ -75,6 +76,17 @@ public class LoginActivity extends AppCompatActivity {
         tvForgotPassword.setOnClickListener(v -> {
             startActivity(new Intent(LoginActivity.this, ForgotPasswordActivity.class));
         });
+
+        // Social media links
+        findViewById(R.id.iv_social_facebook).setOnClickListener(v ->
+                startActivity(new Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://web.facebook.com/univofcaloocanofficial"))));
+        findViewById(R.id.iv_social_instagram).setOnClickListener(v ->
+                startActivity(new Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://www.instagram.com/"))));
+        findViewById(R.id.iv_social_tiktok).setOnClickListener(v ->
+                startActivity(new Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://www.tiktok.com/"))));
 
         btnLogin.setOnClickListener(v -> {
             String loginInput = etEmail.getText().toString().trim();
