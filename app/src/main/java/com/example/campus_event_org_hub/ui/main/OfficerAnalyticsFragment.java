@@ -68,6 +68,8 @@ public class OfficerAnalyticsFragment extends Fragment {
         TextView tvTitle = cardView.findViewById(R.id.tv_breakdown_title);
         TextView tvDateStatus = cardView.findViewById(R.id.tv_breakdown_date_status);
         TextView tvTotal = cardView.findViewById(R.id.tv_breakdown_total);
+        TextView tvTimeIn = cardView.findViewById(R.id.tv_breakdown_time_in);
+        TextView tvTimeOut = cardView.findViewById(R.id.tv_breakdown_time_out);
         LinearLayout containerDepts = cardView.findViewById(R.id.container_breakdown_depts);
 
         tvTitle.setText(e.getTitle());
@@ -79,7 +81,12 @@ public class OfficerAnalyticsFragment extends Fragment {
         int eventTotal = 0;
         for (int cnt : stats.values()) eventTotal += cnt;
 
-        tvTotal.setText("Total Registrations: " + eventTotal);
+        int timeInCount  = db.getAttendanceCount(e.getId());
+        int timeOutCount = db.getTimeOutCount(e.getId());
+
+        tvTotal.setText("Registered: " + eventTotal);
+        tvTimeIn.setText("Timed In: " + timeInCount);
+        tvTimeOut.setText("Timed Out: " + timeOutCount);
 
         if (!stats.isEmpty()) {
             for (Map.Entry<String, Integer> entry : stats.entrySet()) {

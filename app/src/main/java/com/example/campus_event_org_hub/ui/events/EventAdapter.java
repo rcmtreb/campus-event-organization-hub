@@ -20,12 +20,8 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import com.example.campus_event_org_hub.util.ServerTimeUtil;
 
@@ -150,15 +146,22 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     boolean hasEnded = false;
                     if (endTime != null && !endTime.isEmpty()) {
                         try {
-                            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                            Date now = ServerTimeUtil.now();
-                            String currentTimeStr = timeFormat.format(now);
-                            Date currentTime = timeFormat.parse(currentTimeStr);
-                            Date endTimeDate = timeFormat.parse(endTime);
-                            if (currentTime != null && endTimeDate != null && endTimeDate.before(currentTime)) {
+                            // Parse end time stored as "HH:mm" into total minutes since midnight
+                            String[] parts = endTime.split(":");
+                            int endHour   = Integer.parseInt(parts[0].trim());
+                            int endMinute = Integer.parseInt(parts[1].trim());
+                            int endMinutes = endHour * 60 + endMinute;
+
+                            // Current local time in minutes since midnight (timezone-safe)
+                            java.util.Calendar nowCal = java.util.Calendar.getInstance();
+                            nowCal.setTime(ServerTimeUtil.now());
+                            int nowMinutes = nowCal.get(java.util.Calendar.HOUR_OF_DAY) * 60
+                                           + nowCal.get(java.util.Calendar.MINUTE);
+
+                            if (nowMinutes >= endMinutes) {
                                 hasEnded = true;
                             }
-                        } catch (ParseException ignored) { }
+                        } catch (Exception ignored) { }
                     }
                     if (hasEnded) {
                         holder.timelineBadge.setText("ENDED");

@@ -45,6 +45,7 @@
 
     <!-- ── Header Colors ───────────────────────────────────────────────── -->
     <color name="header_text">@color/text_on_primary</color>
+    <color name="header_subtitle">#C8E6C9</color>
     <color name="badge_text">@color/text_on_primary</color>
 
     <!-- ── Basic Colors ───────────────────────────────────────────────── -->

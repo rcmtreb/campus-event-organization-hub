@@ -1623,8 +1623,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 return 1; // date mismatch - but allow on event date
             }
 
-            long nowMs = ServerTimeUtil.nowMillis();
-            int nowMinutes = (int) ((nowMs / 60000) % (24 * 60));
+            // Use Calendar so minutes-since-midnight is in the device's local timezone (not UTC)
+            java.util.Calendar nowCal = java.util.Calendar.getInstance();
+            nowCal.setTimeInMillis(ServerTimeUtil.nowMillis());
+            int nowMinutes = nowCal.get(java.util.Calendar.HOUR_OF_DAY) * 60
+                           + nowCal.get(java.util.Calendar.MINUTE);
             int startMinutes = 0;
             int endMinutes = 24 * 60 - 1;
 
@@ -2046,6 +2049,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             return cnt;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "getAttendanceCount failed", e);
+            return 0;
+        }
+    }
+
+    /** Returns the number of students who have timed out for the given event. */
+    public int getTimeOutCount(int eventId) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT COUNT(*) FROM " + TABLE_ATTENDANCE +
+                    " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " +
+                    COLUMN_ATT_TIME_OUT_AT + " != ''",
+                    new String[]{String.valueOf(eventId)});
+            int cnt = 0;
+            if (c != null && c.moveToFirst()) { cnt = c.getInt(0); c.close(); }
+            return cnt;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getTimeOutCount failed", e);
             return 0;
         }
     }
@@ -2505,8 +2526,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      * Does NOT change status or creator_sid.
      */
     public boolean updateEvent(int eventId, String title, String description,
-                               String date, String time, String tags,
-                               String organizer, String category, String venue) {
+                               String date, String time, String startTime, String endTime,
+                               String tags, String organizer, String category, String venue) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
             ContentValues v = new ContentValues();
@@ -2514,6 +2535,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_DESC,       description);
             v.put(COLUMN_DATE,       date);
             v.put(COLUMN_EVENT_TIME, time);
+            v.put(COLUMN_START_TIME, startTime != null ? startTime : "");
+            v.put(COLUMN_END_TIME,   endTime   != null ? endTime   : "");
             v.put(COLUMN_TAGS,       tags);
             v.put(COLUMN_ORGANIZER,  organizer);
             v.put(COLUMN_CATEGORY,   category);
@@ -2521,10 +2544,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                     new String[]{String.valueOf(eventId)});
             db.close();
-            if (rows > 0) {
-                new FirestoreHelper().updateEventFields(eventId, title, description,
-                        date, time, tags, organizer, category);
-            }
             return rows > 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "updateEvent failed", e);
@@ -3082,7 +3101,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         try {
             SQLiteDatabase db = this.getReadableDatabase();
             Cursor c;
-            if ("ALL".equalsIgnoreCase(abbr)) {
+            if ("ALL".equalsIgnoreCase(abbr)
+                    || "CAMPUS".equalsIgnoreCase(abbr)
+                    || "UCC".equalsIgnoreCase(abbr)
+                    || "UNIVERSITY".equalsIgnoreCase(abbr)) {
+                // campus-wide tag — notify all students
                 c = db.rawQuery(
                         "SELECT " + COLUMN_USER_STUDENT_ID + ", " + COLUMN_USER_NOTIF_PREF +
                         " FROM " + TABLE_USERS +
@@ -3119,7 +3142,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         try {
             SQLiteDatabase db = this.getReadableDatabase();
             Cursor c;
-            if ("ALL".equalsIgnoreCase(abbr)) {
+            if ("ALL".equalsIgnoreCase(abbr)
+                    || "CAMPUS".equalsIgnoreCase(abbr)
+                    || "UCC".equalsIgnoreCase(abbr)
+                    || "UNIVERSITY".equalsIgnoreCase(abbr)) {
+                // campus-wide tag — notify all students
                 c = db.rawQuery(
                         "SELECT " + COLUMN_USER_STUDENT_ID + " FROM " + TABLE_USERS +
                         " WHERE " + COLUMN_USER_ROLE + " = 'Student'", null);

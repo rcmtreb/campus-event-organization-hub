@@ -217,8 +217,8 @@ public class ApproveEventsActivity extends BaseActivity {
                 h.description.setVisibility(View.VISIBLE);
             }
 
-            ImageUtils.load(h.img.getContext(), h.img, e.getImagePath(),
-                    R.drawable.ic_image_placeholder);
+            int fallback = ImageUtils.getDefaultBannerForCategory(e.getCategory());
+            ImageUtils.load(h.img.getContext(), h.img, e.getImagePath(), fallback);
 
             // Tap card to view full event details
             h.itemView.setOnClickListener(v -> {

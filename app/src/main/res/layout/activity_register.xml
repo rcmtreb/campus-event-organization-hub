@@ -60,24 +60,52 @@
                 android:orientation="vertical"
                 android:padding="@dimen/space_6">
 
-                <!-- Name -->
-                <com.google.android.material.textfield.TextInputLayout
+                <!-- First Name / Last Name -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:boxBackgroundMode="none"
-                    app:hintEnabled="false">
-                    <EditText
-                        android:id="@+id/et_reg_name"
-                        android:layout_width="match_parent"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_edit_text_rounded"
-                        android:hint="Full Name"
-                        android:textColor="@color/text_primary"
-                        android:textColorHint="@color/text_hint"
-                        android:inputType="textPersonName"
-                        android:maxLength="20"
-                        android:padding="@dimen/space_4" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_weight="1"
+                        android:layout_marginEnd="@dimen/space_2"
+                        app:boxBackgroundMode="none"
+                        app:hintEnabled="false">
+                        <EditText
+                            android:id="@+id/et_reg_first_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_edit_text_rounded"
+                            android:hint="First Name"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
+                            android:inputType="textPersonName|textCapWords"
+                            android:maxLength="20"
+                            android:padding="@dimen/space_4" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        app:boxBackgroundMode="none"
+                        app:hintEnabled="false">
+                        <EditText
+                            android:id="@+id/et_reg_last_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_edit_text_rounded"
+                            android:hint="Last Name"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
+                            android:inputType="textPersonName|textCapWords"
+                            android:maxLength="20"
+                            android:padding="@dimen/space_4" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
 
                 <!-- Student ID -->
                 <com.google.android.material.textfield.TextInputLayout

@@ -332,6 +332,31 @@ public class EventDetailActivity extends AppCompatActivity {
         }
     }
 
+    /** Returns true only during the Time-In window: (start - 10min) to (start + 60min). */
+    private boolean isTimeInWindowOpen(Event event) {
+        String startTime = event.getStartTime();
+        if (startTime == null || startTime.isEmpty()) return false;
+
+        String status = event.getStatus();
+        if (!"APPROVED".equals(status) && !"HAPPENING".equals(status)) return false;
+
+        try {
+            String eventDate = event.getDate();
+            String today     = ServerTimeUtil.todayString();
+            if (!eventDate.equals(today)) return false;
+
+            Calendar nowCal = Calendar.getInstance();
+            nowCal.setTime(ServerTimeUtil.now());
+            int nowMinutes   = nowCal.get(Calendar.HOUR_OF_DAY) * 60 + nowCal.get(Calendar.MINUTE);
+            int startMinutes = parseTimeToMinutes(startTime);
+            if (startMinutes < 0) return false;
+
+            return nowMinutes >= startMinutes - 10 && nowMinutes <= startMinutes + 60;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private int minutesSinceMidnight(Date now) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(now);
@@ -381,11 +406,7 @@ public class EventDetailActivity extends AppCompatActivity {
 
     private void bindAttendanceCard(MaterialCardView card, DatabaseHelper db,
                                     Event event, String studentId) {
-        if (!isAttendanceWindowOpen(event)) {
-            card.setVisibility(View.GONE);
-            return;
-        }
-
+        // Always show the card to registered students so they can see their attendance status.
         card.setVisibility(View.VISIBLE);
 
         TextView tvStatus          = card.findViewById(R.id.tv_attendance_status);
@@ -401,13 +422,144 @@ public class EventDetailActivity extends AppCompatActivity {
         LinearLayout layoutPlaceholder = card.findViewById(R.id.layout_photo_placeholder);
         Button btnCapturePhoto      = card.findViewById(R.id.btn_capture_attendance_photo);
 
-        refreshAttendanceState(db, event.getId(), studentId,
-                tvStatus, layoutTimeIn, layoutTimeOut,
-                etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
-                layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
+        // Re-fetch the event from DB so startTime/endTime are always current (not stale from Intent).
+        Event freshEvent = db.getEventById(event.getId());
+        if (freshEvent == null) freshEvent = event;
+        final Event ev = freshEvent;
+
+        // Check attendance record first — this drives the display regardless of window state.
+        String[] rec = db.getAttendanceRecord(ev.getId(), studentId);
+        boolean hasTimeIn  = rec != null && rec[0] != null && !rec[0].isEmpty();
+        boolean hasTimeOut = rec != null && rec[1] != null && !rec[1].isEmpty();
+
+        boolean windowOpen = isAttendanceWindowOpen(ev);
+
+        if (hasTimeOut) {
+            // Attendance fully complete — show summary, hide everything else.
+            tvStatus.setText("Attendance complete.\nTime In: " + rec[0] + "\nTime Out: " + rec[1]);
+            layoutTimeIn.setVisibility(View.GONE);
+            layoutTimeOut.setVisibility(View.GONE);
+            layoutPhoto.setVisibility(View.GONE);
+            return;
+        }
+
+        if (hasTimeIn) {
+            // Already timed in — show time-out form if window is still open, else show status only.
+            tvStatus.setText("Timed in at " + rec[0] + (windowOpen
+                    ? ". Submit Time-Out code when you leave."
+                    : ". Attendance window is currently closed."));
+            layoutTimeIn.setVisibility(View.GONE);
+            layoutPhoto.setVisibility(windowOpen ? View.VISIBLE : View.GONE);
+            layoutTimeOut.setVisibility(windowOpen ? View.VISIBLE : View.GONE);
+            if (windowOpen) {
+                tvPhotoRequired.setText("Capture your Time-Out photo before submitting.");
+                // Prefer the pending time-out photo (just captured) over the stored time-in photo,
+                // so that a 60s rebind doesn't erase the user's newly captured time-out photo.
+                if (pendingTimeOutPhoto != null && !pendingTimeOutPhoto.isEmpty()) {
+                    ivPhotoPreview.setVisibility(View.VISIBLE);
+                    layoutPlaceholder.setVisibility(View.GONE);
+                    loadPhotoPreview(ivPhotoPreview, pendingTimeOutPhoto);
+                } else {
+                    // No time-out photo yet — show the time-in photo as reference, or placeholder.
+                    String savedTimeInPhoto = rec.length > 2 ? rec[2] : null;
+                    if (savedTimeInPhoto != null && !savedTimeInPhoto.isEmpty()) {
+                        ivPhotoPreview.setVisibility(View.VISIBLE);
+                        layoutPlaceholder.setVisibility(View.GONE);
+                        loadPhotoPreview(ivPhotoPreview, savedTimeInPhoto);
+                    } else {
+                        ivPhotoPreview.setVisibility(View.GONE);
+                        layoutPlaceholder.setVisibility(View.VISIBLE);
+                    }
+                }
+                btnCapturePhoto.setOnClickListener(v -> {
+                    isCapturingTimeIn = false;
+                    requestCameraPermission();
+                });
+                btnTimeOut.setOnClickListener(v -> {
+                    if (pendingTimeOutPhoto == null || pendingTimeOutPhoto.isEmpty()) {
+                        Toast.makeText(this, "Please capture your Time-Out photo first.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    String code = etTimeOut.getText() != null ? etTimeOut.getText().toString().trim() : "";
+                    if (code.isEmpty()) {
+                        Toast.makeText(this, "Enter the Time-Out code shown by the officer.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    // Disable immediately to prevent double-submission
+                    btnTimeOut.setEnabled(false);
+                    int result = db.submitTimeOut(ev.getId(), studentId, code, "", "", pendingTimeOutPhoto);
+                    switch (result) {
+                        case 0:
+                            Toast.makeText(this, "Time-Out recorded!", Toast.LENGTH_SHORT).show();
+                            etTimeOut.setText("");
+                            pendingTimeOutPhoto = null;
+                            break;
+                        case 1:
+                            Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
+                            btnTimeOut.setEnabled(true);
+                            break;
+                        case 2:
+                            Toast.makeText(this, "You must Time-In first.", Toast.LENGTH_SHORT).show();
+                            btnTimeOut.setEnabled(true);
+                            break;
+                        case 3:
+                            Toast.makeText(this, "You have already timed out.", Toast.LENGTH_SHORT).show();
+                            break;
+                        case 4:
+                            Toast.makeText(this, "Time-Out window has closed.", Toast.LENGTH_LONG).show();
+                            break;
+                        case -4:
+                            Toast.makeText(this, "Too many incorrect attempts. Please wait 15 minutes.", Toast.LENGTH_LONG).show();
+                            btnTimeOut.setEnabled(true);
+                            break;
+                        default:
+                            Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();
+                            btnTimeOut.setEnabled(true);
+                            break;
+                    }
+                    bindAttendanceCard(card, db, event, studentId);
+                });
+            }
+            return;
+        }
+
+        // Not yet timed in.
+        if (!windowOpen) {
+            // The entire attendance window (time-in + time-out) is closed.
+            tvStatus.setText("You did not time in for this event.");
+            layoutTimeIn.setVisibility(View.GONE);
+            layoutTimeOut.setVisibility(View.GONE);
+            layoutPhoto.setVisibility(View.GONE);
+            return;
+        }
+
+        if (!isTimeInWindowOpen(ev)) {
+            // Overall window is open (time-out still possible) but time-in cutoff has passed.
+            tvStatus.setText("Time-In window has closed. You were not able to time in.");
+            layoutTimeIn.setVisibility(View.GONE);
+            layoutTimeOut.setVisibility(View.GONE);
+            layoutPhoto.setVisibility(View.GONE);
+            return;
+        }
+
+        // Window is open and student has not timed in yet — show Time-In form.
+        tvStatus.setText("Waiting for officer's attendance code.");
+        layoutTimeIn.setVisibility(View.VISIBLE);
+        layoutTimeOut.setVisibility(View.GONE);
+        layoutPhoto.setVisibility(View.VISIBLE);
+        tvPhotoRequired.setText("Take a photo to verify your attendance.");
+
+        if (pendingTimeInPhoto != null && !pendingTimeInPhoto.isEmpty()) {
+            ivPhotoPreview.setVisibility(View.VISIBLE);
+            layoutPlaceholder.setVisibility(View.GONE);
+            loadPhotoPreview(ivPhotoPreview, pendingTimeInPhoto);
+        } else {
+            ivPhotoPreview.setVisibility(View.GONE);
+            layoutPlaceholder.setVisibility(View.VISIBLE);
+        }
 
         btnCapturePhoto.setOnClickListener(v -> {
-            isCapturingTimeIn = !isAlreadyTimedIn(db, event.getId(), studentId);
+            isCapturingTimeIn = true;
             requestCameraPermission();
         });
 
@@ -421,7 +573,9 @@ public class EventDetailActivity extends AppCompatActivity {
                 Toast.makeText(this, "Enter the Time-In code shown by the officer.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            int result = db.submitTimeIn(event.getId(), studentId, code, "", "", pendingTimeInPhoto);
+            // Disable immediately to prevent double-submission
+            btnTimeIn.setEnabled(false);
+            int result = db.submitTimeIn(ev.getId(), studentId, code, "", "", pendingTimeInPhoto);
             switch (result) {
                 case 0:
                     Toast.makeText(this, "Time-In recorded!", Toast.LENGTH_SHORT).show();
@@ -430,128 +584,29 @@ public class EventDetailActivity extends AppCompatActivity {
                     break;
                 case 1:
                     Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
+                    btnTimeIn.setEnabled(true);
                     break;
                 case 2:
                     Toast.makeText(this, "You have already timed in.", Toast.LENGTH_SHORT).show();
                     break;
-                 case 3:
-                     Toast.makeText(this, "Time-In is no longer available for this event. The 1-hour window after start time has passed.", Toast.LENGTH_LONG).show();
-                     break;
-                 case 5:
-                     Toast.makeText(this, "You must register for this event before timing in.", Toast.LENGTH_LONG).show();
-                     break;
-                 case -4:
-                     Toast.makeText(this, "Too many incorrect attempts. Please wait 15 minutes.", Toast.LENGTH_LONG).show();
-                     break;
-                 default:
-                     Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();
-                     break;
-             }
-             refreshAttendanceState(db, event.getId(), studentId,
-                     tvStatus, layoutTimeIn, layoutTimeOut,
-                     etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
-                     layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
-        });
-
-        btnTimeOut.setOnClickListener(v -> {
-            if (pendingTimeOutPhoto == null || pendingTimeOutPhoto.isEmpty()) {
-                Toast.makeText(this, "Please capture your Time-Out photo first.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            String code = etTimeOut.getText() != null ? etTimeOut.getText().toString().trim() : "";
-            if (code.isEmpty()) {
-                Toast.makeText(this, "Enter the Time-Out code shown by the officer.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            int result = db.submitTimeOut(event.getId(), studentId, code, "", "", pendingTimeOutPhoto);
-            switch (result) {
-                case 0:
-                    Toast.makeText(this, "Time-Out recorded!", Toast.LENGTH_SHORT).show();
-                    etTimeOut.setText("");
-                    pendingTimeOutPhoto = null;
-                    break;
-                case 1:
-                    Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
-                    break;
-                case 2:
-                    Toast.makeText(this, "You must Time-In first.", Toast.LENGTH_SHORT).show();
-                    break;
                 case 3:
-                    Toast.makeText(this, "You have already timed out.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Time-In window has closed.", Toast.LENGTH_LONG).show();
                     break;
-                case 4:
-                    Toast.makeText(this, "Time-Out window has closed. You can no longer time out for this event.", Toast.LENGTH_LONG).show();
+                case 5:
+                    Toast.makeText(this, "You must register for this event before timing in.", Toast.LENGTH_LONG).show();
+                    btnTimeIn.setEnabled(true);
                     break;
                 case -4:
                     Toast.makeText(this, "Too many incorrect attempts. Please wait 15 minutes.", Toast.LENGTH_LONG).show();
+                    btnTimeIn.setEnabled(true);
                     break;
                 default:
                     Toast.makeText(this, "An error occurred. Please try again.", Toast.LENGTH_SHORT).show();
+                    btnTimeIn.setEnabled(true);
                     break;
             }
-            refreshAttendanceState(db, event.getId(), studentId,
-                    tvStatus, layoutTimeIn, layoutTimeOut,
-                    etTimeIn, etTimeOut, btnTimeIn, btnTimeOut,
-                    layoutPhoto, tvPhotoRequired, ivPhotoPreview, layoutPlaceholder, pendingTimeInPhoto);
+            bindAttendanceCard(card, db, event, studentId);
         });
-    }
-
-    private boolean isAlreadyTimedIn(DatabaseHelper db, int eventId, String studentId) {
-        String[] rec = db.getAttendanceRecord(eventId, studentId);
-        return rec != null && rec[0] != null && !rec[0].isEmpty();
-    }
-
-    private void refreshAttendanceState(DatabaseHelper db, int eventId, String studentId,
-                                        TextView tvStatus,
-                                        View layoutTimeIn, View layoutTimeOut,
-                                        TextInputEditText etTimeIn, TextInputEditText etTimeOut,
-                                        Button btnTimeIn, Button btnTimeOut,
-                                        LinearLayout layoutPhoto,
-                                        TextView tvPhotoRequired,
-                                        ImageView ivPhotoPreview,
-                                        LinearLayout layoutPlaceholder,
-                                        String pendingPhoto) {
-        String[] rec = db.getAttendanceRecord(eventId, studentId);
-        boolean hasTimeIn  = rec != null && rec[0] != null && !rec[0].isEmpty();
-        boolean hasTimeOut = rec != null && rec[1] != null && !rec[1].isEmpty();
-        String savedTimeInPhoto  = (rec != null && rec.length > 2) ? rec[2] : null;
-        String savedTimeOutPhoto = (rec != null && rec.length > 3) ? rec[3] : null;
-        String displayPhoto = pendingPhoto;
-
-        if (displayPhoto == null || displayPhoto.isEmpty()) {
-            if (!hasTimeOut && savedTimeInPhoto != null && !savedTimeInPhoto.isEmpty()) {
-                displayPhoto = savedTimeInPhoto;
-            } else if (hasTimeOut && savedTimeOutPhoto != null && !savedTimeOutPhoto.isEmpty()) {
-                displayPhoto = savedTimeOutPhoto;
-            }
-        }
-
-        if (displayPhoto != null && !displayPhoto.isEmpty()) {
-            ivPhotoPreview.setVisibility(View.VISIBLE);
-            layoutPlaceholder.setVisibility(View.GONE);
-            loadPhotoPreview(ivPhotoPreview, displayPhoto);
-        } else {
-            ivPhotoPreview.setVisibility(View.GONE);
-            layoutPlaceholder.setVisibility(View.VISIBLE);
-        }
-
-        if (hasTimeOut) {
-            tvStatus.setText("Attendance complete.\nTime In: " + rec[0] + "\nTime Out: " + rec[1]);
-            layoutTimeIn.setVisibility(View.GONE);
-            layoutTimeOut.setVisibility(View.GONE);
-            layoutPhoto.setVisibility(View.GONE);
-        } else if (hasTimeIn) {
-            String status = "Timed in at " + rec[0] + ". Submit Time-Out code when you leave.";
-            tvStatus.setText(status);
-            layoutTimeIn.setVisibility(View.GONE);
-            layoutTimeOut.setVisibility(View.VISIBLE);
-            tvPhotoRequired.setText("Capture your Time-Out photo before submitting.");
-        } else {
-            tvStatus.setText("Waiting for officer's attendance code.");
-            layoutTimeIn.setVisibility(View.VISIBLE);
-            layoutTimeOut.setVisibility(View.GONE);
-            tvPhotoRequired.setText("Take a photo to verify your attendance.");
-        }
     }
 
     private void loadPhotoPreview(ImageView iv, String base64Data) {

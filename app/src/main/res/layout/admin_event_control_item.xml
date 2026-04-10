@@ -78,12 +78,12 @@
                 android:backgroundTint="@color/primary_blue" />
         </LinearLayout>
 
-        <!-- Action buttons -->
+        <!-- Action buttons: row 1 (Edit / Delete) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:weightSum="4">
+            android:layout_marginBottom="6dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_edit_event"
@@ -93,14 +93,11 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="@dimen/space_1"
                 android:text="Edit"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 app:strokeColor="@color/primary_blue"
-                android:textColor="@color/primary_blue"
-                app:iconSize="16dp"
-                app:iconGravity="textStart"
-                app:iconPadding="2dp" />
+                android:textColor="@color/primary_blue" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_delete_event"
@@ -108,13 +105,19 @@
                 android:layout_width="0dp"
                 android:layout_height="38dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="@dimen/space_1"
                 android:text="Delete"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 app:strokeColor="@color/error_red"
                 android:textColor="@color/error_red" />
+        </LinearLayout>
+
+        <!-- Action buttons: row 2 (Cancel / Postpone) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_cancel_event"
@@ -124,7 +127,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="@dimen/space_1"
                 android:text="Cancel"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 app:strokeColor="@android:color/holo_orange_dark"
@@ -137,7 +140,7 @@
                 android:layout_height="38dp"
                 android:layout_weight="1"
                 android:text="Postpone"
-                android:textSize="10sp"
+                android:textSize="12sp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 app:strokeColor="@color/primary_blue"

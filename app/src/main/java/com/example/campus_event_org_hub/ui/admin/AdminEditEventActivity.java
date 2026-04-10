@@ -5,8 +5,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
-
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.FirestoreHelper;
@@ -37,9 +35,10 @@ public class AdminEditEventActivity extends com.example.campus_event_org_hub.ui.
     private String    originalVenue = "";
 
     /** Firestore updated_at at the time the admin opened this screen — used for conflict check. */
-    private Timestamp snapshotUpdatedAt = null;
+    private volatile Timestamp snapshotUpdatedAt = null;
 
-    private TextInputEditText etTitle, etDesc, etDate, etTime, etOrganizer, etCategory, etTags;
+    private TextInputEditText etTitle, etDesc, etDate, etStartTime, etEndTime,
+                              etOrganizer, etCategory, etTags;
 
     @Override
     protected boolean useEdgeToEdge() { return true; }
@@ -59,7 +58,8 @@ public class AdminEditEventActivity extends com.example.campus_event_org_hub.ui.
         etTitle     = findViewById(R.id.et_edit_title);
         etDesc      = findViewById(R.id.et_edit_desc);
         etDate      = findViewById(R.id.et_edit_date);
-        etTime      = findViewById(R.id.et_edit_time);
+        etStartTime = findViewById(R.id.et_edit_start_time);
+        etEndTime   = findViewById(R.id.et_edit_end_time);
         etOrganizer = findViewById(R.id.et_edit_organizer);
         etCategory  = findViewById(R.id.et_edit_category);
         etTags      = findViewById(R.id.et_edit_tags);
@@ -68,22 +68,28 @@ public class AdminEditEventActivity extends com.example.campus_event_org_hub.ui.
         etTitle.setText(getIntent().getStringExtra("EVENT_TITLE"));
         etDesc.setText(getIntent().getStringExtra("EVENT_DESC"));
         etDate.setText(getIntent().getStringExtra("EVENT_DATE"));
-        etTime.setText(getIntent().getStringExtra("EVENT_TIME"));
+        etStartTime.setText(getIntent().getStringExtra("EVENT_START_TIME"));
+        etEndTime.setText(getIntent().getStringExtra("EVENT_END_TIME"));
         etOrganizer.setText(getIntent().getStringExtra("EVENT_ORGANIZER"));
         etCategory.setText(getIntent().getStringExtra("EVENT_CATEGORY"));
         etTags.setText(getIntent().getStringExtra("EVENT_TAGS"));
 
-        // Time picker
-        TextInputLayout tilTime = findViewById(R.id.til_edit_time);
-        etTime.setOnClickListener(v -> openTimePicker());
-        tilTime.setEndIconOnClickListener(v -> openTimePicker());
+        // Start time picker
+        TextInputLayout tilStartTime = findViewById(R.id.til_edit_start_time);
+        etStartTime.setOnClickListener(v -> openTimePicker(etStartTime));
+        tilStartTime.setEndIconOnClickListener(v -> openTimePicker(etStartTime));
+
+        // End time picker
+        TextInputLayout tilEndTime = findViewById(R.id.til_edit_end_time);
+        etEndTime.setOnClickListener(v -> openTimePicker(etEndTime));
+        tilEndTime.setEndIconOnClickListener(v -> openTimePicker(etEndTime));
 
         // Save button
         MaterialButton btnSave = findViewById(R.id.btn_save_event_edit);
         btnSave.setOnClickListener(v -> saveChanges());
 
         // Read the current updated_at sentinel from Firestore in the background.
-        // This is used for optimistic-lock conflict detection when saving.
+        // volatile ensures the main-thread save sees the written value.
         if (eventId != -1) {
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
@@ -96,14 +102,25 @@ public class AdminEditEventActivity extends com.example.campus_event_org_hub.ui.
         }
     }
 
-    private void openTimePicker() {
-        Calendar cal = Calendar.getInstance();
+    private void openTimePicker(TextInputEditText target) {
+        // Pre-seed the picker with whatever is already in the field, or now.
+        int initHour, initMinute;
+        String current = target.getText() != null ? target.getText().toString().trim() : "";
+        if (current.matches("\\d{2}:\\d{2}")) {
+            String[] parts = current.split(":");
+            initHour   = Integer.parseInt(parts[0]);
+            initMinute = Integer.parseInt(parts[1]);
+        } else {
+            Calendar cal = Calendar.getInstance();
+            initHour   = cal.get(Calendar.HOUR_OF_DAY);
+            initMinute = cal.get(Calendar.MINUTE);
+        }
         new TimePickerDialog(this,
                 (view, hour, minute) -> {
                     String formatted = String.format(Locale.getDefault(), "%02d:%02d", hour, minute);
-                    etTime.setText(formatted);
+                    target.setText(formatted);
                 },
-                cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true
+                initHour, initMinute, true
         ).show();
     }
 
@@ -116,7 +133,8 @@ public class AdminEditEventActivity extends com.example.campus_event_org_hub.ui.
         String title     = etTitle.getText()     != null ? etTitle.getText().toString().trim()     : "";
         String desc      = etDesc.getText()      != null ? etDesc.getText().toString().trim()      : "";
         String date      = etDate.getText()      != null ? etDate.getText().toString().trim()      : "";
-        String time      = etTime.getText()      != null ? etTime.getText().toString().trim()      : "";
+        String startTime = etStartTime.getText() != null ? etStartTime.getText().toString().trim() : "";
+        String endTime   = etEndTime.getText()   != null ? etEndTime.getText().toString().trim()   : "";
         String organizer = etOrganizer.getText() != null ? etOrganizer.getText().toString().trim() : "";
         String category  = etCategory.getText()  != null ? etCategory.getText().toString().trim()  : "";
         String tags      = etTags.getText()      != null ? etTags.getText().toString().trim()      : "";
@@ -125,49 +143,43 @@ public class AdminEditEventActivity extends com.example.campus_event_org_hub.ui.
             Toast.makeText(this, "Title, description, and date are required.", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (startTime.isEmpty() || endTime.isEmpty()) {
+            Toast.makeText(this, "Start time and end time are required.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Build the legacy event_time display string from start+end.
+        String eventTime = startTime + " - " + endTime;
 
         // Write local SQLite first (immediate, no conflict risk since SQLite is per-device).
         DatabaseHelper db = DatabaseHelper.getInstance(this);
-        boolean localOk = db.updateEvent(eventId, title, desc, date, time, tags, organizer, category, originalVenue);
+        boolean localOk = db.updateEvent(eventId, title, desc, date,
+                eventTime, startTime, endTime,
+                tags, organizer, category, originalVenue);
 
         if (!localOk) {
             Toast.makeText(this, "Update failed. Please try again.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Now write to Firestore with conflict check.
+        // Local write succeeded — show feedback and close immediately.
+        // Firestore sync continues in the background.
+        Toast.makeText(this, "Event updated successfully.", Toast.LENGTH_SHORT).show();
+        setResult(RESULT_OK);
+        finish();
+
+        // Sync to Firestore with conflict check (runs after screen closes).
         FirestoreHelper fsh = new FirestoreHelper();
         fsh.updateEventFieldsWithConflictCheck(
-                eventId, title, desc, date, time, tags, organizer, category,
+                eventId, title, desc, date, eventTime, startTime, endTime,
+                tags, organizer, category,
                 snapshotUpdatedAt,
-                /* onSuccess */ () -> runOnUiThread(() -> {
-                    Toast.makeText(this, "Event updated successfully.", Toast.LENGTH_SHORT).show();
-                    setResult(RESULT_OK);
-                    finish();
-                }),
-                /* onConflict */ () -> runOnUiThread(() -> {
-                    // Another admin edited this event while the screen was open.
-                    new AlertDialog.Builder(this)
-                            .setTitle("Edit Conflict")
-                            .setMessage("Another admin has modified this event since you opened it.\n\n" +
-                                    "Your local changes have been saved. " +
-                                    "Tap \"Reload\" to fetch the latest version, " +
-                                    "or \"Keep Mine\" to overwrite the server with your edits.")
-                            .setPositiveButton("Keep Mine", (d, w) -> {
-                                // Force-write without the conflict check.
-                                fsh.updateEventFields(eventId, title, desc, date, time, tags, organizer, category);
-                                Toast.makeText(this, "Your changes have been saved.", Toast.LENGTH_SHORT).show();
-                                setResult(RESULT_OK);
-                                finish();
-                            })
-                            .setNegativeButton("Reload", (d, w) -> {
-                                // Discard local edits — let AdminEventControlActivity reload.
-                                setResult(RESULT_CANCELED);
-                                finish();
-                            })
-                            .setCancelable(false)
-                            .show();
-                })
+                /* onSuccess */ null,
+                /* onConflict */ () -> runOnUiThread(() ->
+                    Toast.makeText(getApplicationContext(),
+                            "Note: A conflict was detected with another admin's edit. " +
+                            "Re-open the event to verify.", Toast.LENGTH_LONG).show()
+                )
         );
     }
 }

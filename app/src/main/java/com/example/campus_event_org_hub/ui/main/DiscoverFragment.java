@@ -225,16 +225,17 @@ public class DiscoverFragment extends Fragment implements Refreshable {
     }
 
     /**
-     * Returns true if the event's tags include the given department abbreviation
-     * OR if the event is campus-wide (#CAMPUS / #UCC / #UNIVERSITY).
+     * Returns true only if the event's tags include the given department abbreviation.
+     * Campus-wide tags (#CAMPUS / #UCC / #UNIVERSITY) are intentionally excluded here
+     * so that campus-wide events appear only in the Campus tab, not in My Dept.
      * Tags are stored as space-separated tokens like "#CLAS #COE".
      */
     private boolean eventMatchesDept(String tags, String abbr) {
         if (tags == null || tags.isEmpty()) return false;
-        // Split on whitespace, strip leading '#', compare
+        if (abbr == null || abbr.isEmpty()) return false;
+        // Split on whitespace, strip leading '#', compare exact token
         for (String token : tags.trim().split("\\s+")) {
             String t = token.replace("#", "").toUpperCase();
-            if (isCampusTag(t)) return true;
             if (t.equals(abbr)) return true;
         }
         return false;
@@ -288,7 +289,8 @@ public class DiscoverFragment extends Fragment implements Refreshable {
 
             if (allEvents != null) {
                 for (Event e : allEvents) {
-                    if (!"APPROVED".equals(e.getStatus())) continue;
+                    String status = e.getStatus();
+                    if (!"APPROVED".equals(status) && !"HAPPENING".equals(status)) continue;
                     String eventDate = e.getDate();
                     if (eventDate == null) continue;
                     if (eventDate.length() > 10) eventDate = eventDate.substring(0, 10);
@@ -371,8 +373,8 @@ public class DiscoverFragment extends Fragment implements Refreshable {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
             Calendar cal = Calendar.getInstance();
-            String endOfWeek = sdf.format(cal.getTime());
             cal.add(Calendar.DAY_OF_YEAR, 6);
+            String endOfWeek = sdf.format(cal.getTime());
             cal = Calendar.getInstance();
             cal.add(Calendar.MONTH, 1);
             String endOfMonth = sdf.format(cal.getTime());

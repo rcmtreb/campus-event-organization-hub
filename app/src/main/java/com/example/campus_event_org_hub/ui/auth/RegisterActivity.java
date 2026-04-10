@@ -49,7 +49,8 @@ public class RegisterActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         DatabaseHelper db = DatabaseHelper.getInstance(this);
 
-        EditText etName = findViewById(R.id.et_reg_name);
+        EditText etFirstName = findViewById(R.id.et_reg_first_name);
+        EditText etLastName  = findViewById(R.id.et_reg_last_name);
         EditText etStudentId = findViewById(R.id.et_reg_id);
         EditText etEmail = findViewById(R.id.et_reg_email);
         EditText etPassword = findViewById(R.id.et_reg_password);
@@ -136,7 +137,15 @@ public class RegisterActivity extends AppCompatActivity {
         });
 
         btnRegister.setOnClickListener(v -> {
-            String name = etName.getText().toString().trim();
+            String firstName = etFirstName.getText().toString().trim();
+            String lastName  = etLastName.getText().toString().trim();
+
+            if (firstName.isEmpty() || lastName.isEmpty()) {
+                Toast.makeText(this, "Please enter both first name and last name", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            String name = firstName + " " + lastName;
             String studentId = etStudentId.getText().toString().trim().toUpperCase();
             String email = etEmail.getText().toString().trim();
             String password = etPassword.getText().toString().trim();
@@ -153,13 +162,13 @@ public class RegisterActivity extends AppCompatActivity {
             }
             String department = spinnerDept.getSelectedItem().toString();
 
-            if (name.isEmpty() || studentId.isEmpty() || email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
+            if (studentId.isEmpty() || email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
                 Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            if (!isValidName(name)) {
-                Toast.makeText(this, "Name must be between 2 and " + MAX_NAME_LENGTH + " characters", Toast.LENGTH_SHORT).show();
+            if (!isValidName(firstName) || !isValidName(lastName)) {
+                Toast.makeText(this, "First and last name must be between 2 and " + MAX_NAME_LENGTH + " characters each", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -341,25 +350,22 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     private void setupStudentIdField(EditText etStudentId) {
-        InputFilter[] filters = new InputFilter[] {
-            new InputFilter.LengthFilter(8) {
-                @Override
-                public CharSequence filter(CharSequence source, int start, int end,
-                                           Spanned dest, int dstart, int dend) {
-                    if (source.length() == 0) return null;
-
-                    StringBuilder result = new StringBuilder();
-                    for (int i = start; i < end; i++) {
-                        char c = source.charAt(i);
-                        if (Character.isDigit(c)) {
-                            result.append(c);
-                        }
-                    }
-                    return result.length() > 0 ? result.toString() : "";
+        // Filter 1: digits only
+        InputFilter digitFilter = (source, start, end, dest, dstart, dend) -> {
+            StringBuilder result = new StringBuilder();
+            for (int i = start; i < end; i++) {
+                char c = source.charAt(i);
+                if (Character.isDigit(c)) {
+                    result.append(c);
                 }
             }
+            // If nothing was filtered out, return null (accept as-is).
+            if (result.length() == end - start) return null;
+            return result.toString();
         };
-        etStudentId.setFilters(filters);
+        // Filter 2: max 8 characters (applied after digitFilter)
+        InputFilter lengthFilter = new InputFilter.LengthFilter(STUDENT_ID_LENGTH);
+        etStudentId.setFilters(new InputFilter[]{digitFilter, lengthFilter});
     }
 
     private boolean isValidName(String name) {

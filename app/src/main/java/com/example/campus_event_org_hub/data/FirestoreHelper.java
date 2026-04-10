@@ -321,14 +321,16 @@ public class FirestoreHelper {
     }
 
     public void updateEventFields(int localId, String title, String description,
-                                  String date, String time, String tags,
-                                  String organizer, String category) {
+                                  String date, String time, String startTime, String endTime,
+                                  String tags, String organizer, String category) {
         Map<String, Object> data = new HashMap<>();
         data.put("title",       title);
         data.put("description", description);
         data.put("date",        date);
-        data.put("event_time",  time     != null ? time     : "");
-        data.put("tags",        tags     != null ? tags     : "");
+        data.put("event_time",  time      != null ? time      : "");
+        data.put("start_time",  startTime != null ? startTime : "");
+        data.put("end_time",    endTime   != null ? endTime   : "");
+        data.put("tags",        tags      != null ? tags      : "");
         data.put("organizer",   organizer);
         data.put("category",    category);
         data.put("updated_at",  FieldValue.serverTimestamp()); // optimistic-lock sentinel
@@ -404,6 +406,7 @@ public class FirestoreHelper {
     public void updateEventFieldsWithConflictCheck(
             int localId,
             String title, String description, String date, String time,
+            String startTime, String endTime,
             String tags, String organizer, String category,
             com.google.firebase.Timestamp expectedUpdatedAt,
             Runnable onSuccess, Runnable onConflict) {
@@ -427,8 +430,10 @@ public class FirestoreHelper {
             data.put("title",       title);
             data.put("description", description);
             data.put("date",        date);
-            data.put("event_time",  time     != null ? time     : "");
-            data.put("tags",        tags     != null ? tags     : "");
+            data.put("event_time",  time      != null ? time      : "");
+            data.put("start_time",  startTime != null ? startTime : "");
+            data.put("end_time",    endTime   != null ? endTime   : "");
+            data.put("tags",        tags      != null ? tags      : "");
             data.put("organizer",   organizer);
             data.put("category",    category);
             data.put("updated_at",  FieldValue.serverTimestamp());

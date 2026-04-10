@@ -54,6 +54,7 @@
     <!-- Bottom navigation -->
     <dimen name="bottom_nav_height">60dp</dimen>
     <dimen name="top_bar_height">56dp</dimen>
+    <dimen name="top_bar_height_main">48dp</dimen>
 
     <!-- System bars -->
     <dimen name="status_bar_height">24dp</dimen>

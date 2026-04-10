@@ -79,6 +79,14 @@ public class MainActivity extends BaseActivity
 
         setContentView(R.layout.activity_main);
 
+        // Apply real status bar height as top padding on the top bar
+        LinearLayout topAppBar = findViewById(R.id.top_app_bar);
+        ViewCompat.setOnApplyWindowInsetsListener(topAppBar, (v, insets) -> {
+            int statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
+            v.setPadding(v.getPaddingLeft(), statusBarHeight + 8, v.getPaddingRight(), v.getPaddingBottom());
+            return insets;
+        });
+
         // Read user info from login intent
             if (getIntent() != null) {
                 userName      = getIntent().getStringExtra("USER_NAME");

@@ -43,6 +43,26 @@
             android:textColor="@color/primary_blue"
             android:textSize="13sp"
             android:textStyle="bold"
+            android:layout_marginBottom="@dimen/space_1" />
+
+        <!-- Timed-In count -->
+        <TextView
+            android:id="@+id/tv_breakdown_time_in"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/primary_green"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="@dimen/space_1" />
+
+        <!-- Timed-Out count -->
+        <TextView
+            android:id="@+id/tv_breakdown_time_out"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:textStyle="bold"
             android:layout_marginBottom="@dimen/space_2" />
 
         <!-- Per-department stats container -->

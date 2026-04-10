@@ -171,6 +171,8 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
                 intent.putExtra("EVENT_DESC",        ev.getDescription());
                 intent.putExtra("EVENT_DATE",        ev.getDate());
                 intent.putExtra("EVENT_TIME",        ev.getTime());
+                intent.putExtra("EVENT_START_TIME",  ev.getStartTime());
+                intent.putExtra("EVENT_END_TIME",    ev.getEndTime());
                 intent.putExtra("EVENT_TAGS",        ev.getTags());
                 intent.putExtra("EVENT_ORGANIZER",   ev.getOrganizer());
                 intent.putExtra("EVENT_CATEGORY",    ev.getCategory());

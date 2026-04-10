@@ -32,7 +32,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="@dimen/top_bar_height"
-            android:background="@drawable/bg_header"
+            android:background="@drawable/bg_header_admin"
             android:gravity="center_vertical"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
@@ -48,7 +48,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="System Management"
-                android:textColor="@color/primary_light"
+                android:textColor="@color/header_subtitle"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -529,42 +529,11 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Bottom Info Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="@color/primary_light"
-                app:strokeWidth="0dp">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="16dp"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="CEOH System Admin"
-                        android:textStyle="bold"
-                        android:textSize="14sp"
-                        android:textColor="@color/primary_dark"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="UCC Campus Management Hub v1.0"
-                        android:textSize="12sp"
-                        android:textColor="@color/primary_dark"/>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
             <!-- Logout Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="8dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp">
                 <LinearLayout
@@ -600,6 +569,37 @@
                             android:textSize="12sp"
                             android:textColor="@color/text_hint" />
                     </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Bottom Info Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/primary_light"
+                app:strokeWidth="0dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:gravity="center"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="CEOH System Admin"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:textColor="@color/primary_dark"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="UCC Campus Management Hub v1.0"
+                        android:textSize="12sp"
+                        android:textColor="@color/primary_dark"/>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
