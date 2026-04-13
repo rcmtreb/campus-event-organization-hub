@@ -2071,6 +2071,84 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Returns the full per-attendee detail list for an event, for use in the officer
+     * attendee list screen.  The result contains ALL registered students, each with
+     * their attendance status (TIMED_OUT / TIMED_IN / ABSENT) and any stored
+     * timestamps + Base64 photos.
+     *
+     * JOIN strategy:
+     *   registrations  (all registered students, guaranteed to be in the set)
+     *   LEFT JOIN users       (to get name / email / department / profile_image)
+     *   LEFT JOIN attendance  (to get time_in, time_out, photos — NULL when absent)
+     *
+     * Ordered: TIMED_OUT first, then TIMED_IN, then ABSENT; alphabetically within groups.
+     */
+    public List<com.example.campus_event_org_hub.model.AttendeeRecord> getAttendeeDetailsForEvent(int eventId) {
+        List<com.example.campus_event_org_hub.model.AttendeeRecord> result = new ArrayList<>();
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            String query =
+                    "SELECT " +
+                    "  r." + COLUMN_REG_STUDENT_ID + ", " +
+                    "  r." + COLUMN_REG_TIMESTAMP  + ", " +
+                    "  u." + COLUMN_USER_NAME        + ", " +
+                    "  u." + COLUMN_USER_EMAIL       + ", " +
+                    "  u." + COLUMN_USER_DEPARTMENT  + ", " +
+                    "  u." + COLUMN_USER_PROFILE_IMG + ", " +
+                    "  a." + COLUMN_ATT_TIME_IN_AT   + ", " +
+                    "  a." + COLUMN_ATT_TIME_OUT_AT  + ", " +
+                    "  a." + COLUMN_ATT_TIME_IN_PHOTO  + ", " +
+                    "  a." + COLUMN_ATT_TIME_OUT_PHOTO +
+                    " FROM " + TABLE_REGISTRATIONS + " r" +
+                    " LEFT JOIN " + TABLE_USERS      + " u ON u." + COLUMN_USER_STUDENT_ID + " = r." + COLUMN_REG_STUDENT_ID +
+                    " LEFT JOIN " + TABLE_ATTENDANCE + " a ON a." + COLUMN_ATT_EVENT_ID    + " = r." + COLUMN_REG_EVENT_ID   +
+                    "                                      AND a." + COLUMN_ATT_STUDENT_ID + " = r." + COLUMN_REG_STUDENT_ID +
+                    " WHERE r." + COLUMN_REG_EVENT_ID + " = ?" +
+                    " ORDER BY" +
+                    "   CASE" +
+                    "     WHEN a." + COLUMN_ATT_TIME_OUT_AT + " IS NOT NULL AND a." + COLUMN_ATT_TIME_OUT_AT + " != '' THEN 0" +
+                    "     WHEN a." + COLUMN_ATT_TIME_IN_AT  + " IS NOT NULL AND a." + COLUMN_ATT_TIME_IN_AT  + " != '' THEN 1" +
+                    "     ELSE 2" +
+                    "   END," +
+                    "   COALESCE(u." + COLUMN_USER_NAME + ", r." + COLUMN_REG_STUDENT_ID + ") ASC";
+            c = db.rawQuery(query, new String[]{String.valueOf(eventId)});
+            if (c != null && c.moveToFirst()) {
+                do {
+                    String studentId    = c.getString(0);
+                    String registeredAt = c.isNull(1) ? "" : c.getString(1);
+                    String name         = c.isNull(2) ? studentId : c.getString(2);
+                    String email        = c.isNull(3) ? "" : c.getString(3);
+                    String department   = c.isNull(4) ? "" : c.getString(4);
+                    String profilePhoto = c.isNull(5) ? "" : c.getString(5);
+                    String timeIn       = c.isNull(6) ? "" : c.getString(6);
+                    String timeOut      = c.isNull(7) ? "" : c.getString(7);
+                    String timeInPhoto  = c.isNull(8) ? "" : c.getString(8);
+                    String timeOutPhoto = c.isNull(9) ? "" : c.getString(9);
+
+                    com.example.campus_event_org_hub.model.AttendeeRecord.Status status;
+                    if (timeOut != null && !timeOut.isEmpty()) {
+                        status = com.example.campus_event_org_hub.model.AttendeeRecord.Status.TIMED_OUT;
+                    } else if (timeIn != null && !timeIn.isEmpty()) {
+                        status = com.example.campus_event_org_hub.model.AttendeeRecord.Status.TIMED_IN;
+                    } else {
+                        status = com.example.campus_event_org_hub.model.AttendeeRecord.Status.ABSENT;
+                    }
+
+                    result.add(new com.example.campus_event_org_hub.model.AttendeeRecord(
+                            studentId, name, email, department, profilePhoto,
+                            status, timeIn, timeOut, timeInPhoto, timeOutPhoto, registeredAt));
+                } while (c.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getAttendeeDetailsForEvent failed", e);
+        } finally {
+            if (c != null) c.close();
+        }
+        return result;
+    }
+
     // ── Sync helpers (called by SyncManager to import Firestore data) ─────────
 
     /**

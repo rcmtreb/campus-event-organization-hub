@@ -72,6 +72,21 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
+        <!-- View Attendees button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_view_attendees"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_3"
+            android:text="View Attendees"
+            android:textSize="13sp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:strokeColor="@color/primary_green"
+            android:textColor="@color/primary_green"
+            app:icon="@drawable/ic_person"
+            app:iconTint="@color/primary_green"
+            app:iconSize="16dp" />
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

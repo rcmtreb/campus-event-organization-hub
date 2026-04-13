@@ -1,5 +1,6 @@
 package com.example.campus_event_org_hub.ui.main;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,6 +15,7 @@ import androidx.fragment.app.Fragment;
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
+import com.google.android.material.button.MaterialButton;
 
 import java.util.List;
 import java.util.Map;
@@ -71,6 +73,7 @@ public class OfficerAnalyticsFragment extends Fragment {
         TextView tvTimeIn = cardView.findViewById(R.id.tv_breakdown_time_in);
         TextView tvTimeOut = cardView.findViewById(R.id.tv_breakdown_time_out);
         LinearLayout containerDepts = cardView.findViewById(R.id.container_breakdown_depts);
+        MaterialButton btnViewAttendees = cardView.findViewById(R.id.btn_view_attendees);
 
         tvTitle.setText(e.getTitle());
 
@@ -97,6 +100,14 @@ public class OfficerAnalyticsFragment extends Fragment {
                 containerDepts.addView(tvDept);
             }
         }
+
+        // "View Attendees" button → OfficerAttendeeListActivity
+        btnViewAttendees.setOnClickListener(v -> {
+            Intent intent = new Intent(requireContext(), OfficerAttendeeListActivity.class);
+            intent.putExtra(OfficerAttendeeListActivity.EXTRA_EVENT_ID, e.getId());
+            intent.putExtra(OfficerAttendeeListActivity.EXTRA_EVENT_TITLE, e.getTitle());
+            startActivity(intent);
+        });
 
         parent.addView(cardView);
     }
