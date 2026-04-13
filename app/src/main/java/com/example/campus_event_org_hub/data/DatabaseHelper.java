@@ -30,7 +30,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "ceoh.db";
-    private static final int DATABASE_VERSION = 15; // v15: added email_verified, verification_token, login_attempts, locked_until columns
+    private static final int DATABASE_VERSION = 16; // v16: added courses, academic_settings, promotion_log tables; added orion columns to users
 
     // ── Singleton ─────────────────────────────────────────────────────────────
     private static volatile DatabaseHelper instance;
@@ -114,6 +114,39 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_USER_LOGIN_ATTEMPTS = "login_attempts";
     public static final String COLUMN_USER_LOCKED_UNTIL = "locked_until";
     public static final String COLUMN_USER_FIREBASE_UID = "firebase_uid";
+
+    // ── Orion: new user columns ───────────────────────────────────────────────
+    public static final String COLUMN_USER_ENROLLMENT_YEAR = "enrollment_year";
+    public static final String COLUMN_USER_CAMPUS          = "campus";
+    public static final String COLUMN_USER_YEAR_LEVEL      = "year_level";
+    public static final String COLUMN_USER_COURSE_ID       = "course_id";
+    public static final String COLUMN_USER_STUDENT_STATUS  = "student_status";
+    public static final String COLUMN_USER_SECTION         = "section";
+    public static final String COLUMN_USER_LAST_LOGIN      = "last_login";
+
+    // Table: Courses
+    public static final String TABLE_COURSES              = "courses";
+    public static final String COLUMN_COURSE_ID           = "course_id";
+    public static final String COLUMN_COURSE_CODE         = "course_code";
+    public static final String COLUMN_COURSE_NAME         = "course_name";
+    public static final String COLUMN_COURSE_DEPARTMENT   = "department";
+    public static final String COLUMN_COURSE_DURATION     = "duration_years";
+
+    // Table: Academic Settings (singleton row, id always = 1)
+    public static final String TABLE_ACADEMIC_SETTINGS             = "academic_settings";
+    public static final String COLUMN_AS_ID                        = "id";
+    public static final String COLUMN_AS_YEAR_END                  = "academic_year_end";
+    public static final String COLUMN_AS_LAST_PROMOTION            = "last_promotion_date";
+    public static final String COLUMN_AS_INACTIVITY_THRESHOLD      = "inactivity_threshold_years";
+
+    // Table: Promotion Log
+    public static final String TABLE_PROMOTION_LOG          = "promotion_log";
+    public static final String COLUMN_PL_LOG_ID             = "log_id";
+    public static final String COLUMN_PL_STUDENT_ID         = "student_id";
+    public static final String COLUMN_PL_OLD_YEAR           = "old_year_level";
+    public static final String COLUMN_PL_NEW_YEAR           = "new_year_level";
+    public static final String COLUMN_PL_PROMOTED_AT        = "promoted_at";
+    public static final String COLUMN_PL_PROMOTION_TYPE     = "promotion_type";
 
     // Table: Login Rate Limiting
     public static final String TABLE_LOGIN_RATE_LIMIT = "login_rate_limit";
@@ -278,6 +311,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_AUDIT_DEVICE_INFO + " TEXT, " +
             COLUMN_AUDIT_IP_ADDRESS + " TEXT)";
 
+    private static final String CREATE_TABLE_COURSES =
+            "CREATE TABLE " + TABLE_COURSES + " (" +
+            COLUMN_COURSE_ID         + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            COLUMN_COURSE_CODE       + " TEXT UNIQUE, " +
+            COLUMN_COURSE_NAME       + " TEXT, " +
+            COLUMN_COURSE_DEPARTMENT + " TEXT, " +
+            COLUMN_COURSE_DURATION   + " INTEGER DEFAULT 4)";
+
+    private static final String CREATE_TABLE_ACADEMIC_SETTINGS =
+            "CREATE TABLE " + TABLE_ACADEMIC_SETTINGS + " (" +
+            COLUMN_AS_ID                   + " INTEGER PRIMARY KEY CHECK (id = 1), " +
+            COLUMN_AS_YEAR_END             + " TEXT DEFAULT '04-30', " +
+            COLUMN_AS_LAST_PROMOTION       + " TEXT DEFAULT '', " +
+            COLUMN_AS_INACTIVITY_THRESHOLD + " INTEGER DEFAULT 2)";
+
+    private static final String CREATE_TABLE_PROMOTION_LOG =
+            "CREATE TABLE " + TABLE_PROMOTION_LOG + " (" +
+            COLUMN_PL_LOG_ID         + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            COLUMN_PL_STUDENT_ID     + " TEXT, " +
+            COLUMN_PL_OLD_YEAR       + " INTEGER, " +
+            COLUMN_PL_NEW_YEAR       + " INTEGER, " +
+            COLUMN_PL_PROMOTED_AT    + " TEXT, " +
+            COLUMN_PL_PROMOTION_TYPE + " TEXT)";
+
     // ── Constructor ──────────────────────────────────────────────────────────
 
     public DatabaseHelper(Context context) {
@@ -299,6 +356,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(CREATE_TABLE_ATTENDANCE_AUDIT);
         ensureLoginRateLimitTable(db);
         ensureUsersTableColumns(db);
+        ensureCoursesTable(db);
+        ensureAcademicSettingsTable(db);
+        ensurePromotionLogTable(db);
     }
 
     @Override
@@ -320,6 +380,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureLoginRateLimitTable(db);
         migrateAttendancePhotoColumns(db);
         migrateAttendanceWindowColumns(db);
+        ensureCoursesTable(db);
+        ensureAcademicSettingsTable(db);
+        ensurePromotionLogTable(db);
     }
 
     @Override
@@ -334,6 +397,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureAttendanceRateLimitTable(db);
         ensureAttendanceAuditTable(db);
         ensureLoginRateLimitTable(db);
+        ensureCoursesTable(db);
+        ensureAcademicSettingsTable(db);
+        ensurePromotionLogTable(db);
         // Remove legacy seed events that were added automatically on first launch
         removeSeedEvents(db);
         // Backfill creator_sid for events created before v11 or synced without it
@@ -466,10 +532,80 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_LOCKED_UNTIL + " TEXT DEFAULT ''");
             if (!cols.contains(COLUMN_USER_FIREBASE_UID))
                 db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_FIREBASE_UID + " TEXT DEFAULT ''");
+            // Orion columns (v16)
+            if (!cols.contains(COLUMN_USER_ENROLLMENT_YEAR))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_ENROLLMENT_YEAR + " INTEGER DEFAULT 0");
+            if (!cols.contains(COLUMN_USER_CAMPUS))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_CAMPUS + " TEXT DEFAULT 'S'");
+            if (!cols.contains(COLUMN_USER_YEAR_LEVEL))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_YEAR_LEVEL + " INTEGER DEFAULT 1");
+            if (!cols.contains(COLUMN_USER_COURSE_ID))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_COURSE_ID + " INTEGER DEFAULT NULL");
+            if (!cols.contains(COLUMN_USER_STUDENT_STATUS))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_STUDENT_STATUS + " TEXT DEFAULT 'ACTIVE'");
+            if (!cols.contains(COLUMN_USER_SECTION))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_SECTION + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_USER_LAST_LOGIN))
+                db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_USER_LAST_LOGIN + " TEXT DEFAULT ''");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureUsersTableColumns failed", e);
         } finally {
             if (cursor != null) cursor.close();
+        }
+    }
+
+    private void ensureCoursesTable(SQLiteDatabase db) {
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_COURSES + " (" +
+                    COLUMN_COURSE_ID         + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_COURSE_CODE       + " TEXT UNIQUE, " +
+                    COLUMN_COURSE_NAME       + " TEXT, " +
+                    COLUMN_COURSE_DEPARTMENT + " TEXT, " +
+                    COLUMN_COURSE_DURATION   + " INTEGER DEFAULT 4)");
+
+            // Seed default courses when the table is empty (idempotent — admin can edit/delete later)
+            android.database.Cursor count = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_COURSES, null);
+            boolean isEmpty = count.moveToFirst() && count.getInt(0) == 0;
+            count.close();
+            if (isEmpty) {
+                String clas = "College of Liberal Arts and Sciences (CLAS)";
+                db.execSQL("INSERT OR IGNORE INTO " + TABLE_COURSES +
+                        " (" + COLUMN_COURSE_CODE + "," + COLUMN_COURSE_NAME + "," +
+                        COLUMN_COURSE_DEPARTMENT + "," + COLUMN_COURSE_DURATION + ") VALUES " +
+                        "('BSCS','Bachelor of Science in Computer Science','" + clas + "',4)");
+                db.execSQL("INSERT OR IGNORE INTO " + TABLE_COURSES +
+                        " (" + COLUMN_COURSE_CODE + "," + COLUMN_COURSE_NAME + "," +
+                        COLUMN_COURSE_DEPARTMENT + "," + COLUMN_COURSE_DURATION + ") VALUES " +
+                        "('BSIT','Bachelor of Science in Information Technology','" + clas + "',4)");
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "ensureCoursesTable failed", e);
+        }
+    }
+
+    private void ensureAcademicSettingsTable(SQLiteDatabase db) {
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_ACADEMIC_SETTINGS + " (" +
+                    COLUMN_AS_ID                   + " INTEGER PRIMARY KEY CHECK (id = 1), " +
+                    COLUMN_AS_YEAR_END             + " TEXT DEFAULT '04-30', " +
+                    COLUMN_AS_LAST_PROMOTION       + " TEXT DEFAULT '', " +
+                    COLUMN_AS_INACTIVITY_THRESHOLD + " INTEGER DEFAULT 2)");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "ensureAcademicSettingsTable failed", e);
+        }
+    }
+
+    private void ensurePromotionLogTable(SQLiteDatabase db) {
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_PROMOTION_LOG + " (" +
+                    COLUMN_PL_LOG_ID         + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_PL_STUDENT_ID     + " TEXT, " +
+                    COLUMN_PL_OLD_YEAR       + " INTEGER, " +
+                    COLUMN_PL_NEW_YEAR       + " INTEGER, " +
+                    COLUMN_PL_PROMOTED_AT    + " TEXT, " +
+                    COLUMN_PL_PROMOTION_TYPE + " TEXT)");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "ensurePromotionLogTable failed", e);
         }
     }
 
@@ -650,9 +786,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public long registerUser(String name, String studentId, String email,
                              String password, String role, String department,
                              String firebaseUid) {
+        return registerUser(name, studentId, email, password, role, department, firebaseUid, -1, 1, "");
+    }
+
+    public long registerUser(String name, String studentId, String email,
+                             String password, String role, String department,
+                             String firebaseUid, int courseId, String section) {
+        return registerUser(name, studentId, email, password, role, department, firebaseUid, courseId, 1, section);
+    }
+
+    public long registerUser(String name, String studentId, String email,
+                             String password, String role, String department,
+                             String firebaseUid, int courseId, int yearLevel, String section) {
         SQLiteDatabase db = this.getWritableDatabase();
         String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
         String verificationToken = java.util.UUID.randomUUID().toString();
+        int enrollmentYear = 0;
+        try {
+            if (studentId != null && studentId.length() >= 4) {
+                enrollmentYear = Integer.parseInt(studentId.substring(0, 4));
+            }
+        } catch (NumberFormatException ignored) {}
         ContentValues v = new ContentValues();
         v.put(COLUMN_USER_NAME, name);
         v.put(COLUMN_USER_STUDENT_ID, studentId);
@@ -663,10 +817,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         v.put(COLUMN_USER_EMAIL_VERIFIED, 0);
         v.put(COLUMN_USER_VERIFICATION_TOKEN, verificationToken);
         v.put(COLUMN_USER_FIREBASE_UID, firebaseUid != null ? firebaseUid : "");
+        if ("Student".equals(role)) {
+            v.put(COLUMN_USER_ENROLLMENT_YEAR, enrollmentYear);
+            v.put(COLUMN_USER_CAMPUS, "S");
+            v.put(COLUMN_USER_YEAR_LEVEL, yearLevel);
+            v.put(COLUMN_USER_STUDENT_STATUS, "ACTIVE");
+            if (courseId > 0) v.put(COLUMN_USER_COURSE_ID, courseId);
+            if (section != null && !section.isEmpty()) v.put(COLUMN_USER_SECTION, section);
+        }
         long id = db.insert(TABLE_USERS, null, v);
         db.close();
         if (id != -1 && firebaseUid != null && !firebaseUid.isEmpty()) {
-            // Mirror to Firestore — include the BCrypt hash so sync can restore it on other devices
             new FirestoreHelper().upsertUserWithVerification(firebaseUid, studentId, name, email, role, department,
                     "", "", "", "All Events", false, verificationToken, hashedPassword);
         }
@@ -1831,21 +1992,113 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     public int submitTimeIn(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress, String photoBase64) {
-        int result = submitTimeIn(eventId, studentId, submittedCode, deviceInfo, ipAddress);
-        if (result == 0 && photoBase64 != null && !photoBase64.isEmpty()) {
-            try {
-                SQLiteDatabase db = this.getWritableDatabase();
-                ContentValues cv = new ContentValues();
-                cv.put(COLUMN_ATT_TIME_IN_PHOTO, photoBase64);
-                db.update(TABLE_ATTENDANCE, cv,
-                        COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
-                        new String[]{String.valueOf(eventId), studentId});
-                db.close();
-            } catch (Exception e) {
-                Log.e("DatabaseHelper", "submitTimeIn photo save failed", e);
-            }
+        // Validate inputs first (same guard as the non-photo version)
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || submittedCode == null || submittedCode.isEmpty()) {
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", -1, deviceInfo, ipAddress);
+            return -1;
         }
-        return result;
+        if (isRateLimited(eventId, studentId, "IN")) {
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", -4, deviceInfo, ipAddress);
+            Log.w("DatabaseHelper", "Time-in blocked due to rate limit: student=" + studentId + ", event=" + eventId);
+            return -4;
+        }
+        try {
+            int timeCheck = checkEventTimeWindow(eventId, "IN");
+            if (timeCheck != 0) {
+                logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", timeCheck, deviceInfo, ipAddress);
+                return timeCheck;
+            }
+
+            SQLiteDatabase db = this.getWritableDatabase();
+
+            // Check for duplicate attendance
+            Cursor dc = db.rawQuery(
+                    "SELECT " + COLUMN_ATT_TIME_IN_AT + " FROM " + TABLE_ATTENDANCE +
+                    " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
+                    new String[]{String.valueOf(eventId), studentId});
+            boolean alreadyIn = false;
+            if (dc != null && dc.moveToFirst()) {
+                String existing = dc.getString(0);
+                alreadyIn = existing != null && !existing.isEmpty();
+                dc.close();
+            }
+            if (alreadyIn) {
+                logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 5, deviceInfo, ipAddress);
+                db.close();
+                return 5; // already timed in
+            }
+
+            String activeCode = getActiveAttendanceCode(eventId, studentId, "IN");
+            boolean codeValid = activeCode != null && activeCode.equals(submittedCode);
+            if (!codeValid) {
+                Cursor ec = db.rawQuery(
+                        "SELECT " + COLUMN_TIME_IN_CODE + " FROM " + TABLE_EVENTS +
+                        " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+                String eventCode = "";
+                if (ec != null && ec.moveToFirst()) {
+                    eventCode = ec.getString(0);
+                    ec.close();
+                }
+                if (eventCode != null && !eventCode.isEmpty() && eventCode.equals(submittedCode)) {
+                    codeValid = true;
+                }
+            }
+            if (!codeValid) {
+                logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 1, deviceInfo, ipAddress);
+                incrementFailedAttempt(eventId, studentId, "IN");
+                db.close();
+                return 1;
+            }
+
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                    .format(new java.util.Date(ServerTimeUtil.nowMillis()));
+
+            String winOpen = "", winClose = "";
+            try {
+                Cursor wc = db.rawQuery(
+                        "SELECT " + COLUMN_START_TIME + " FROM " + TABLE_EVENTS +
+                        " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+                if (wc != null && wc.moveToFirst()) {
+                    String st = wc.getString(0);
+                    wc.close();
+                    int sm = parseTimeToMinutes(st, -1);
+                    if (sm >= 0) {
+                        winOpen = minutesToHHmm(sm - 10);
+                        winClose = minutesToHHmm(sm + 60);
+                    }
+                } else { if (wc != null) wc.close(); }
+            } catch (Exception ignored) {}
+
+            // Include photo in the INSERT — no separate UPDATE needed
+            ContentValues av = new ContentValues();
+            av.put(COLUMN_ATT_EVENT_ID, eventId);
+            av.put(COLUMN_ATT_STUDENT_ID, studentId);
+            av.put(COLUMN_ATT_TIME_IN_AT, timestamp);
+            av.put(COLUMN_ATT_TIME_OUT_AT, "");
+            av.put(COLUMN_ATT_TIME_IN_WINDOW_OPEN, winOpen);
+            av.put(COLUMN_ATT_TIME_IN_WINDOW_CLOSE, winClose);
+            av.put(COLUMN_ATT_TIME_IN_PHOTO, photoBase64 != null ? photoBase64 : "");
+            av.put(COLUMN_ATT_TIME_OUT_PHOTO, "");
+            db.insertWithOnConflict(TABLE_ATTENDANCE, null, av, SQLiteDatabase.CONFLICT_IGNORE);
+
+            if (activeCode != null && activeCode.equals(submittedCode)) {
+                consumeAttendanceCode(eventId, studentId, "IN", submittedCode);
+            } else {
+                String newCode = generateAttendanceCode();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_TIME_IN_CODE, newCode);
+                db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            }
+
+            resetFailedAttempts(eventId, studentId, "IN");
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 0, deviceInfo, ipAddress);
+            db.close();
+            return 0;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "submitTimeIn with photo failed", e);
+            logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", -1, deviceInfo, ipAddress);
+            return -1;
+        }
     }
 
     /**
@@ -1987,21 +2240,105 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     public int submitTimeOut(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress, String photoBase64) {
-        int result = submitTimeOut(eventId, studentId, submittedCode, deviceInfo, ipAddress);
-        if (result == 0 && photoBase64 != null && !photoBase64.isEmpty()) {
-            try {
-                SQLiteDatabase db = this.getWritableDatabase();
-                ContentValues cv = new ContentValues();
-                cv.put(COLUMN_ATT_TIME_OUT_PHOTO, photoBase64);
-                db.update(TABLE_ATTENDANCE, cv,
-                        COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
-                        new String[]{String.valueOf(eventId), studentId});
-                db.close();
-            } catch (Exception e) {
-                Log.e("DatabaseHelper", "submitTimeOut photo save failed", e);
-            }
+        if (eventId <= 0 || studentId == null || studentId.isEmpty() || submittedCode == null || submittedCode.isEmpty()) {
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -1, deviceInfo, ipAddress);
+            return -1;
         }
-        return result;
+        if (isRateLimited(eventId, studentId, "OUT")) {
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -4, deviceInfo, ipAddress);
+            Log.w("DatabaseHelper", "Time-out blocked due to rate limit: student=" + studentId + ", event=" + eventId);
+            return -4;
+        }
+        try {
+            int timeCheck = checkEventTimeWindow(eventId, "OUT");
+            if (timeCheck != 0) {
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", timeCheck, deviceInfo, ipAddress);
+                return timeCheck;
+            }
+
+            SQLiteDatabase db = this.getWritableDatabase();
+
+            Cursor ac = db.rawQuery(
+                    "SELECT " + COLUMN_ATT_TIME_IN_AT + ", " + COLUMN_ATT_TIME_OUT_AT +
+                    " FROM " + TABLE_ATTENDANCE +
+                    " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
+                    new String[]{String.valueOf(eventId), studentId});
+            boolean hasTimeIn = false;
+            boolean alreadyOut = false;
+            if (ac != null && ac.moveToFirst()) {
+                String ti = ac.getString(0);
+                String to = ac.getString(1);
+                hasTimeIn  = ti != null && !ti.isEmpty();
+                alreadyOut = to != null && !to.isEmpty();
+                ac.close();
+            }
+            if (!hasTimeIn)  { logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 2, deviceInfo, ipAddress); db.close(); return 2; }
+            if (alreadyOut)  { logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 3, deviceInfo, ipAddress); db.close(); return 3; }
+
+            String activeCode = getActiveAttendanceCode(eventId, studentId, "OUT");
+            boolean codeValid = activeCode != null && activeCode.equals(submittedCode);
+            if (!codeValid) {
+                Cursor ec = db.rawQuery(
+                        "SELECT " + COLUMN_TIME_OUT_CODE + " FROM " + TABLE_EVENTS +
+                        " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+                String eventCode = "";
+                if (ec != null && ec.moveToFirst()) { eventCode = ec.getString(0); ec.close(); }
+                if (eventCode != null && !eventCode.isEmpty() && eventCode.equals(submittedCode)) codeValid = true;
+            }
+            if (!codeValid) {
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 1, deviceInfo, ipAddress);
+                incrementFailedAttempt(eventId, studentId, "OUT");
+                db.close(); return 1;
+            }
+
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                    .format(new java.util.Date(ServerTimeUtil.nowMillis()));
+
+            String winOpen = "", winClose = "";
+            try {
+                Cursor wc = db.rawQuery(
+                        "SELECT " + COLUMN_START_TIME + ", " + COLUMN_END_TIME +
+                        " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?",
+                        new String[]{String.valueOf(eventId)});
+                if (wc != null && wc.moveToFirst()) {
+                    String st = wc.getString(0);
+                    String et = wc.getString(1);
+                    wc.close();
+                    int sm = parseTimeToMinutes(st, -1);
+                    int em = parseTimeToMinutes(et, -1);
+                    if (sm >= 0) winOpen = minutesToHHmm(sm);
+                    if (em >= 0) winClose = minutesToHHmm(em + 30);
+                } else { if (wc != null) wc.close(); }
+            } catch (Exception ignored) {}
+
+            // Include photo in the UPDATE — no separate UPDATE needed
+            ContentValues av = new ContentValues();
+            av.put(COLUMN_ATT_TIME_OUT_AT, timestamp);
+            av.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN, winOpen);
+            av.put(COLUMN_ATT_TIME_OUT_WINDOW_CLOSE, winClose);
+            av.put(COLUMN_ATT_TIME_OUT_PHOTO, photoBase64 != null ? photoBase64 : "");
+            db.update(TABLE_ATTENDANCE, av,
+                    COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
+                    new String[]{String.valueOf(eventId), studentId});
+
+            if (activeCode != null && activeCode.equals(submittedCode)) {
+                consumeAttendanceCode(eventId, studentId, "OUT", submittedCode);
+            } else {
+                String newCode = generateAttendanceCode();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_TIME_OUT_CODE, newCode);
+                db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            }
+
+            resetFailedAttempts(eventId, studentId, "OUT");
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 0, deviceInfo, ipAddress);
+            db.close();
+            return 0;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "submitTimeOut with photo failed", e);
+            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -1, deviceInfo, ipAddress);
+            return -1;
+        }
     }
 
     /**
@@ -2079,7 +2416,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      *
      * JOIN strategy:
      *   registrations  (all registered students, guaranteed to be in the set)
-     *   LEFT JOIN users       (to get name / email / department / profile_image)
+     *   LEFT JOIN users       (to get name / email / department / profile_image / year_level / section)
+     *   LEFT JOIN courses     (to get course_code)
      *   LEFT JOIN attendance  (to get time_in, time_out, photos — NULL when absent)
      *
      * Ordered: TIMED_OUT first, then TIMED_IN, then ABSENT; alphabetically within groups.
@@ -2100,9 +2438,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     "  a." + COLUMN_ATT_TIME_IN_AT   + ", " +
                     "  a." + COLUMN_ATT_TIME_OUT_AT  + ", " +
                     "  a." + COLUMN_ATT_TIME_IN_PHOTO  + ", " +
-                    "  a." + COLUMN_ATT_TIME_OUT_PHOTO +
+                    "  a." + COLUMN_ATT_TIME_OUT_PHOTO + ", " +
+                    "  COALESCE(c." + COLUMN_COURSE_CODE + ", '') AS stu_course_code, " +
+                    "  COALESCE(u." + COLUMN_USER_YEAR_LEVEL + ", 1) AS yr_level, " +
+                    "  COALESCE(u." + COLUMN_USER_SECTION + ", '') AS stu_section, " +
+                    "  COALESCE(u." + COLUMN_USER_STUDENT_STATUS + ", 'ACTIVE') AS stu_status" +
                     " FROM " + TABLE_REGISTRATIONS + " r" +
                     " LEFT JOIN " + TABLE_USERS      + " u ON u." + COLUMN_USER_STUDENT_ID + " = r." + COLUMN_REG_STUDENT_ID +
+                    " LEFT JOIN " + TABLE_COURSES     + " c ON c." + COLUMN_COURSE_ID + " = u." + COLUMN_USER_COURSE_ID +
                     " LEFT JOIN " + TABLE_ATTENDANCE + " a ON a." + COLUMN_ATT_EVENT_ID    + " = r." + COLUMN_REG_EVENT_ID   +
                     "                                      AND a." + COLUMN_ATT_STUDENT_ID + " = r." + COLUMN_REG_STUDENT_ID +
                     " WHERE r." + COLUMN_REG_EVENT_ID + " = ?" +
@@ -2116,16 +2459,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             c = db.rawQuery(query, new String[]{String.valueOf(eventId)});
             if (c != null && c.moveToFirst()) {
                 do {
-                    String studentId    = c.getString(0);
-                    String registeredAt = c.isNull(1) ? "" : c.getString(1);
-                    String name         = c.isNull(2) ? studentId : c.getString(2);
-                    String email        = c.isNull(3) ? "" : c.getString(3);
-                    String department   = c.isNull(4) ? "" : c.getString(4);
-                    String profilePhoto = c.isNull(5) ? "" : c.getString(5);
-                    String timeIn       = c.isNull(6) ? "" : c.getString(6);
-                    String timeOut      = c.isNull(7) ? "" : c.getString(7);
-                    String timeInPhoto  = c.isNull(8) ? "" : c.getString(8);
-                    String timeOutPhoto = c.isNull(9) ? "" : c.getString(9);
+                    String studentId     = c.getString(0);
+                    String registeredAt  = c.isNull(1) ? "" : c.getString(1);
+                    String name          = c.isNull(2) ? studentId : c.getString(2);
+                    String email         = c.isNull(3) ? "" : c.getString(3);
+                    String department    = c.isNull(4) ? "" : c.getString(4);
+                    String profilePhoto  = c.isNull(5) ? "" : c.getString(5);
+                    String timeIn        = c.isNull(6) ? "" : c.getString(6);
+                    String timeOut       = c.isNull(7) ? "" : c.getString(7);
+                    String timeInPhoto   = c.isNull(8) ? "" : c.getString(8);
+                    String timeOutPhoto  = c.isNull(9) ? "" : c.getString(9);
+                    String courseCode    = c.isNull(10) ? "" : c.getString(10);
+                    int    yearLevel    = c.isNull(11) ? 1 : c.getInt(11);
+                    String section       = c.isNull(12) ? "" : c.getString(12);
+                    String studentStatus = c.isNull(13) ? "ACTIVE" : c.getString(13);
 
                     com.example.campus_event_org_hub.model.AttendeeRecord.Status status;
                     if (timeOut != null && !timeOut.isEmpty()) {
@@ -2138,7 +2485,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
                     result.add(new com.example.campus_event_org_hub.model.AttendeeRecord(
                             studentId, name, email, department, profilePhoto,
-                            status, timeIn, timeOut, timeInPhoto, timeOutPhoto, registeredAt));
+                            status, timeIn, timeOut, timeInPhoto, timeOutPhoto, registeredAt,
+                            courseCode, yearLevel, section, studentStatus));
                 } while (c.moveToNext());
             }
         } catch (Exception e) {
@@ -2775,6 +3123,36 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return stats;
     }
 
+    /** Returns registration counts grouped by course code for a given event. */
+    public Map<String, Integer> getEventRegistrationStatsByCourse(int eventId) {
+        Map<String, Integer> stats = new HashMap<>();
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT COALESCE(c." + COLUMN_COURSE_CODE + ", 'No Course'), COUNT(*) as cnt" +
+                    " FROM " + TABLE_REGISTRATIONS + " r" +
+                    " INNER JOIN " + TABLE_USERS + " u ON r." + COLUMN_REG_STUDENT_ID +
+                    " = u." + COLUMN_USER_STUDENT_ID +
+                    " LEFT JOIN " + TABLE_COURSES + " c ON u." + COLUMN_USER_COURSE_ID +
+                    " = c." + COLUMN_COURSE_ID +
+                    " WHERE r." + COLUMN_REG_EVENT_ID + "=?" +
+                    " GROUP BY c." + COLUMN_COURSE_CODE,
+                    new String[]{String.valueOf(eventId)});
+            if (c != null && c.moveToFirst()) {
+                do {
+                    String code = c.getString(0);
+                    int cnt = c.getInt(1);
+                    if (code == null || code.isEmpty()) code = "No Course";
+                    stats.put(code, cnt);
+                } while (c.moveToNext());
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getEventRegistrationStatsByCourse failed", e);
+        }
+        return stats;
+    }
+
     public int getTotalRegistrationsForOfficer(String officerName) {
         int total = 0;
         try {
@@ -3272,7 +3650,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         "SELECT * FROM " + TABLE_EVENTS +
                         " WHERE " + COLUMN_STATUS + " != 'PENDING'" + hiddenCol + dateCol +
                         " AND UPPER(IFNULL(" + COLUMN_TAGS + ",'')) LIKE ?" +
-                        " ORDER BY " + COLUMN_DATE + " ASC",
+                    " ORDER BY " + COLUMN_DATE + " DESC",
                         new String[]{"%" + deptAbbr.toUpperCase(Locale.getDefault()) + "%"});
                 if (c != null && c.moveToFirst()) {
                     do { events.add(eventFromCursor(c)); } while (c.moveToNext());
@@ -3452,8 +3830,383 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return m;
     }
 
-    // ── Export / Import ───────────────────────────────────────────────────────
+    // ── Orion: Course CRUD ────────────────────────────────────────────────────
 
+    public long insertCourse(com.example.campus_event_org_hub.model.Course course) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_COURSE_CODE,       course.getCourseCode());
+            v.put(COLUMN_COURSE_NAME,       course.getCourseName());
+            v.put(COLUMN_COURSE_DEPARTMENT, course.getDepartment());
+            v.put(COLUMN_COURSE_DURATION,   course.getDurationYears());
+            long id = db.insertWithOnConflict(TABLE_COURSES, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.close();
+            return id;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "insertCourse failed", e);
+            return -1;
+        }
+    }
+
+    public int updateCourse(com.example.campus_event_org_hub.model.Course course) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_COURSE_CODE,       course.getCourseCode());
+            v.put(COLUMN_COURSE_NAME,       course.getCourseName());
+            v.put(COLUMN_COURSE_DEPARTMENT, course.getDepartment());
+            v.put(COLUMN_COURSE_DURATION,   course.getDurationYears());
+            int rows = db.update(TABLE_COURSES, v, COLUMN_COURSE_ID + "=?",
+                    new String[]{String.valueOf(course.getCourseId())});
+            db.close();
+            return rows;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "updateCourse failed", e);
+            return 0;
+        }
+    }
+
+    public int deleteCourse(int courseId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            int rows = db.delete(TABLE_COURSES, COLUMN_COURSE_ID + "=?",
+                    new String[]{String.valueOf(courseId)});
+            db.close();
+            return rows;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "deleteCourse failed", e);
+            return 0;
+        }
+    }
+
+    public List<com.example.campus_event_org_hub.model.Course> getAllCourses() {
+        List<com.example.campus_event_org_hub.model.Course> courses = new ArrayList<>();
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            c = db.rawQuery("SELECT * FROM " + TABLE_COURSES
+                    + " ORDER BY " + COLUMN_COURSE_CODE + " ASC", null);
+            if (c != null && c.moveToFirst()) {
+                do { courses.add(courseFromCursor(c)); } while (c.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getAllCourses failed", e);
+        } finally {
+            if (c != null) c.close();
+        }
+        return courses;
+    }
+
+    public com.example.campus_event_org_hub.model.Course getCourseById(int id) {
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            c = db.rawQuery("SELECT * FROM " + TABLE_COURSES
+                    + " WHERE " + COLUMN_COURSE_ID + "=? LIMIT 1",
+                    new String[]{String.valueOf(id)});
+            if (c != null && c.moveToFirst()) return courseFromCursor(c);
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getCourseById failed", e);
+        } finally {
+            if (c != null) c.close();
+        }
+        return null;
+    }
+
+    private com.example.campus_event_org_hub.model.Course courseFromCursor(Cursor c) {
+        return new com.example.campus_event_org_hub.model.Course(
+                c.getInt(c.getColumnIndexOrThrow(COLUMN_COURSE_ID)),
+                c.getString(c.getColumnIndexOrThrow(COLUMN_COURSE_CODE)),
+                c.getString(c.getColumnIndexOrThrow(COLUMN_COURSE_NAME)),
+                c.getString(c.getColumnIndexOrThrow(COLUMN_COURSE_DEPARTMENT)),
+                c.getInt(c.getColumnIndexOrThrow(COLUMN_COURSE_DURATION)));
+    }
+
+    // ── Orion: Academic Settings ──────────────────────────────────────────────
+
+    public com.example.campus_event_org_hub.model.AcademicSettings getAcademicSettings() {
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            c = db.rawQuery("SELECT * FROM " + TABLE_ACADEMIC_SETTINGS + " WHERE id=1 LIMIT 1", null);
+            if (c != null && c.moveToFirst()) {
+                String yearEnd    = c.getString(c.getColumnIndexOrThrow(COLUMN_AS_YEAR_END));
+                String lastPromo  = c.getString(c.getColumnIndexOrThrow(COLUMN_AS_LAST_PROMOTION));
+                int threshold     = c.getInt(c.getColumnIndexOrThrow(COLUMN_AS_INACTIVITY_THRESHOLD));
+                return new com.example.campus_event_org_hub.model.AcademicSettings(yearEnd, lastPromo, threshold);
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getAcademicSettings failed", e);
+        } finally {
+            if (c != null) c.close();
+        }
+        // No row exists yet — create and return defaults
+        com.example.campus_event_org_hub.model.AcademicSettings defaults =
+                new com.example.campus_event_org_hub.model.AcademicSettings("04-30", "", 2);
+        saveAcademicSettings(defaults);
+        return defaults;
+    }
+
+    public void saveAcademicSettings(com.example.campus_event_org_hub.model.AcademicSettings settings) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_AS_ID,                   1);
+            v.put(COLUMN_AS_YEAR_END,             settings.getAcademicYearEnd());
+            v.put(COLUMN_AS_LAST_PROMOTION,       settings.getLastPromotionDate() != null ? settings.getLastPromotionDate() : "");
+            v.put(COLUMN_AS_INACTIVITY_THRESHOLD, settings.getInactivityThresholdYears());
+            db.insertWithOnConflict(TABLE_ACADEMIC_SETTINGS, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "saveAcademicSettings failed", e);
+        }
+    }
+
+    /**
+     * Returns true if today passes the academic_year_end date and
+     * we haven't already run a promotion this academic year.
+     */
+    public boolean shouldAutoPromote() {
+        try {
+            com.example.campus_event_org_hub.model.AcademicSettings s = getAcademicSettings();
+            if (s.getAcademicYearEnd() == null || s.getAcademicYearEnd().isEmpty()) return false;
+            // today is "MM-dd" (without year)
+            java.text.SimpleDateFormat mmdd = new java.text.SimpleDateFormat("MM-dd", java.util.Locale.US);
+            String todayMmdd = mmdd.format(ServerTimeUtil.now());
+            String yearEnd   = s.getAcademicYearEnd();
+            // Check if today >= yearEnd in the same calendar year
+            if (todayMmdd.compareTo(yearEnd) < 0) return false;
+            // Check if already promoted this year
+            String lastPromo = s.getLastPromotionDate();
+            if (lastPromo != null && !lastPromo.isEmpty()) {
+                java.text.SimpleDateFormat yyyy = new java.text.SimpleDateFormat("yyyy", java.util.Locale.US);
+                String thisYear = yyyy.format(ServerTimeUtil.now());
+                if (lastPromo.startsWith(thisYear)) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "shouldAutoPromote failed", e);
+            return false;
+        }
+    }
+
+    // ── Orion: Student year-level & promotion ─────────────────────────────────
+
+    /** Updates last_login timestamp for a student. */
+    public void updateLastLogin(String studentId) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            String now = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(ServerTimeUtil.now());
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_USER_LAST_LOGIN, now);
+            db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "updateLastLogin failed", e);
+        }
+    }
+
+    /** Sets course_id and section for a student (used by registration and legacy prompt). */
+    public int updateStudentCourse(String studentId, int courseId, String section) {
+        return updateStudentAcademicInfo(studentId, courseId, -1, section);
+    }
+
+    /** Sets course_id, year_level, and section for a student. Pass yearLevel <= 0 to leave year_level unchanged. */
+    public int updateStudentAcademicInfo(String studentId, int courseId, int yearLevel, String section) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_USER_COURSE_ID, courseId > 0 ? courseId : null);
+            if (yearLevel > 0) v.put(COLUMN_USER_YEAR_LEVEL, yearLevel);
+            v.put(COLUMN_USER_SECTION,   section != null ? section : "");
+            int rows = db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+            db.close();
+            return rows;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "updateStudentAcademicInfo failed", e);
+            return 0;
+        }
+    }
+
+    /** Manual override of year_level for a student. */
+    public int updateStudentYearLevel(String studentId, int yearLevel) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_USER_YEAR_LEVEL, yearLevel);
+            int rows = db.update(TABLE_USERS, v, COLUMN_USER_STUDENT_ID + "=?", new String[]{studentId});
+            db.close();
+            return rows;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "updateStudentYearLevel failed", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Returns the count of active students eligible for promotion (year_level < duration).
+     */
+    public int getStudentsPendingPromotion() {
+        int count = 0;
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            c = db.rawQuery(
+                    "SELECT COUNT(*) FROM " + TABLE_USERS + " u" +
+                    " JOIN " + TABLE_COURSES + " co ON u." + COLUMN_USER_COURSE_ID + " = co." + COLUMN_COURSE_ID +
+                    " WHERE u." + COLUMN_USER_ROLE + " = 'Student'" +
+                    " AND u." + COLUMN_USER_STUDENT_STATUS + " = 'ACTIVE'" +
+                    " AND u." + COLUMN_USER_COURSE_ID + " IS NOT NULL" +
+                    " AND u." + COLUMN_USER_YEAR_LEVEL + " < co." + COLUMN_COURSE_DURATION, null);
+            if (c != null && c.moveToFirst()) count = c.getInt(0);
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getStudentsPendingPromotion failed", e);
+        } finally {
+            if (c != null) c.close();
+        }
+        return count;
+    }
+
+    /**
+     * Promotes all eligible active students:
+     *   - year_level < duration_years  →  year_level++
+     *   - year_level >= duration_years →  student_status = 'GRADUATED'
+     * Records each change in promotion_log and updates last_promotion_date.
+     * Returns list of promoted student IDs.
+     */
+    public List<String> promoteStudents() {
+        return promoteStudents("AUTO");
+    }
+
+    public List<String> promoteStudents(String promotionType) {
+        List<String> promoted = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor c = null;
+        try {
+            db = this.getWritableDatabase();
+            // Fetch active students with a course assigned
+            c = db.rawQuery(
+                    "SELECT u." + COLUMN_USER_STUDENT_ID + ", u." + COLUMN_USER_YEAR_LEVEL +
+                    ", co." + COLUMN_COURSE_DURATION +
+                    " FROM " + TABLE_USERS + " u" +
+                    " JOIN " + TABLE_COURSES + " co ON u." + COLUMN_USER_COURSE_ID + " = co." + COLUMN_COURSE_ID +
+                    " WHERE u." + COLUMN_USER_ROLE + " = 'Student'" +
+                    " AND u." + COLUMN_USER_STUDENT_STATUS + " = 'ACTIVE'" +
+                    " AND u." + COLUMN_USER_COURSE_ID + " IS NOT NULL", null);
+
+            String nowStr = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(ServerTimeUtil.now());
+            String todayStr = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                    .format(ServerTimeUtil.now());
+
+            if (c != null && c.moveToFirst()) {
+                db.beginTransaction();
+                try {
+                    do {
+                        String sid      = c.getString(0);
+                        int oldYear     = c.getInt(1);
+                        int duration    = c.getInt(2);
+                        int newYear;
+                        String newStatus;
+
+                        if (oldYear < duration) {
+                            newYear   = oldYear + 1;
+                            newStatus = "ACTIVE";
+                        } else {
+                            newYear   = oldYear; // stays at max
+                            newStatus = "GRADUATED";
+                        }
+
+                        ContentValues uv = new ContentValues();
+                        uv.put(COLUMN_USER_YEAR_LEVEL, newYear);
+                        uv.put(COLUMN_USER_STUDENT_STATUS, newStatus);
+                        db.update(TABLE_USERS, uv, COLUMN_USER_STUDENT_ID + "=?", new String[]{sid});
+
+                        ContentValues lv = new ContentValues();
+                        lv.put(COLUMN_PL_STUDENT_ID,     sid);
+                        lv.put(COLUMN_PL_OLD_YEAR,       oldYear);
+                        lv.put(COLUMN_PL_NEW_YEAR,       newYear);
+                        lv.put(COLUMN_PL_PROMOTED_AT,    nowStr);
+                        lv.put(COLUMN_PL_PROMOTION_TYPE, promotionType);
+                        db.insert(TABLE_PROMOTION_LOG, null, lv);
+
+                        promoted.add(sid);
+                    } while (c.moveToNext());
+                    db.setTransactionSuccessful();
+                } finally {
+                    db.endTransaction();
+                }
+            }
+
+            // Update last_promotion_date
+            com.example.campus_event_org_hub.model.AcademicSettings settings = getAcademicSettings();
+            settings.setLastPromotionDate(todayStr);
+            saveAcademicSettings(settings);
+
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "promoteStudents failed", e);
+        } finally {
+            if (c != null) c.close();
+            if (db != null) db.close();
+        }
+        return promoted;
+    }
+
+    /**
+     * Sets student_status='INACTIVE' for students whose last_login is older than
+     * inactivity_threshold_years and who are currently ACTIVE.
+     */
+    public int archiveInactiveStudents() {
+        try {
+            com.example.campus_event_org_hub.model.AcademicSettings settings = getAcademicSettings();
+            int threshold = settings.getInactivityThresholdYears();
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_USER_STUDENT_STATUS, "INACTIVE");
+            int rows = db.update(TABLE_USERS, v,
+                    COLUMN_USER_ROLE + " = 'Student'" +
+                    " AND " + COLUMN_USER_STUDENT_STATUS + " = 'ACTIVE'" +
+                    " AND " + COLUMN_USER_LAST_LOGIN + " != ''" +
+                    " AND datetime(" + COLUMN_USER_LAST_LOGIN + ") < datetime('now', '-" + threshold + " years')",
+                    null);
+            db.close();
+            return rows;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "archiveInactiveStudents failed", e);
+            return 0;
+        }
+    }
+
+    /** Returns the most recent promotion log entries, newest first. */
+    public List<com.example.campus_event_org_hub.model.PromotionLog> getPromotionLog(int limit) {
+        List<com.example.campus_event_org_hub.model.PromotionLog> list = new ArrayList<>();
+        Cursor c = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            c = db.rawQuery("SELECT * FROM " + TABLE_PROMOTION_LOG +
+                    " ORDER BY " + COLUMN_PL_LOG_ID + " DESC LIMIT " + limit, null);
+            if (c != null && c.moveToFirst()) {
+                do {
+                    list.add(new com.example.campus_event_org_hub.model.PromotionLog(
+                            c.getInt(c.getColumnIndexOrThrow(COLUMN_PL_LOG_ID)),
+                            c.getString(c.getColumnIndexOrThrow(COLUMN_PL_STUDENT_ID)),
+                            c.getInt(c.getColumnIndexOrThrow(COLUMN_PL_OLD_YEAR)),
+                            c.getInt(c.getColumnIndexOrThrow(COLUMN_PL_NEW_YEAR)),
+                            c.getString(c.getColumnIndexOrThrow(COLUMN_PL_PROMOTED_AT)),
+                            c.getString(c.getColumnIndexOrThrow(COLUMN_PL_PROMOTION_TYPE))));
+                } while (c.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getPromotionLog failed", e);
+        } finally {
+            if (c != null) c.close();
+        }
+        return list;
+    }
+
+    // ── Export / Import ───────────────────────────────────────────────────────
     /**
      * Export entire database to a CSV zip-style text file.
      * Each table is written as a CSV block separated by blank lines.
@@ -3483,13 +4236,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      */
     public String exportRegisteredStudentsCsv() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Event Title,Event Date,Student Name,Student ID,Department,Email,Registration Timestamp\n");
+        sb.append("Event Title,Event Date,Student Name,Student ID,Department,Email,Year Level,Section,Status,Registration Timestamp\n");
         SQLiteDatabase db = this.getReadableDatabase();
         try {
             String sql =
                 "SELECT e." + COLUMN_TITLE + ", e." + COLUMN_DATE +
                 ", u." + COLUMN_USER_NAME + ", u." + COLUMN_USER_STUDENT_ID +
                 ", u." + COLUMN_USER_DEPARTMENT + ", u." + COLUMN_USER_EMAIL +
+                ", COALESCE(u." + COLUMN_USER_YEAR_LEVEL + ", 1)" +
+                ", COALESCE(u." + COLUMN_USER_SECTION + ", '')" +
+                ", COALESCE(u." + COLUMN_USER_STUDENT_STATUS + ", 'ACTIVE')" +
                 ", r." + COLUMN_REG_TIMESTAMP +
                 " FROM " + TABLE_REGISTRATIONS + " r" +
                 " JOIN " + TABLE_EVENTS + " e ON e." + COLUMN_ID + " = r." + COLUMN_REG_EVENT_ID +
@@ -3501,10 +4257,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     sb.append(csvEscape(c.getString(0))).append(",");
                     sb.append(csvEscape(c.getString(1))).append(",");
                     sb.append(csvEscape(c.getString(2))).append(",");
-                    sb.append(csvEscape(c.getString(3))).append(",");
+                    // Student ID with -S suffix
+                    sb.append(csvEscape(c.getString(3) + "-S")).append(",");
                     sb.append(csvEscape(c.getString(4))).append(",");
                     sb.append(csvEscape(c.getString(5))).append(",");
-                    sb.append(csvEscape(c.getString(6))).append("\n");
+                    sb.append(csvEscape(c.getString(6))).append(","); // year level
+                    sb.append(csvEscape(c.getString(7))).append(","); // section
+                    sb.append(csvEscape(c.getString(8))).append(","); // status
+                    sb.append(csvEscape(c.getString(9))).append("\n"); // reg timestamp
                 }
                 c.close();
             }

@@ -57,6 +57,8 @@ public class AdminActivity extends BaseActivity {
         LinearLayout cardReports = findViewById(R.id.card_reports);
         LinearLayout cardExportImport = findViewById(R.id.card_export_import);
         LinearLayout cardDeleteAll = findViewById(R.id.card_delete_all);
+        LinearLayout cardCourses = findViewById(R.id.card_course_management);
+        LinearLayout cardAcademicSettings = findViewById(R.id.card_academic_settings);
 
         cardLogout.setOnClickListener(v -> {
             new SessionManager(this).clearSession();
@@ -83,6 +85,12 @@ public class AdminActivity extends BaseActivity {
             startActivity(new Intent(this, ExportImportActivity.class)));
 
         cardDeleteAll.setOnClickListener(v -> showDeleteAllStep1());
+
+        cardCourses.setOnClickListener(v ->
+            startActivity(new Intent(this, AdminCourseManagementActivity.class)));
+
+        cardAcademicSettings.setOnClickListener(v ->
+            startActivity(new Intent(this, AdminAcademicSettingsActivity.class)));
     }
 
     @Override

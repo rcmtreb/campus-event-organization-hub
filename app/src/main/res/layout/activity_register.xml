@@ -40,18 +40,20 @@
     <androidx.cardview.widget.CardView
         android:id="@+id/reg_card"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginHorizontal="@dimen/space_6"
         android:layout_marginTop="-20dp"
+        android:layout_marginBottom="@dimen/space_6"
         app:cardCornerRadius="@dimen/radius_xl"
         app:cardElevation="@dimen/elevation_high"
         app:layout_constraintTop_toBottomOf="@id/reg_header_background"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:fillViewport="true">
 
             <LinearLayout
@@ -259,6 +261,67 @@
                     android:background="@drawable/bg_edit_text_rounded"
                     android:padding="@dimen/space_3" />
 
+                <!-- Course + Year Level + Section — shown only for Student role -->
+                <LinearLayout
+                    android:id="@+id/layout_reg_course_section"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="visible">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:text="Course"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/spinner_reg_course"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_2"
+                        android:background="@drawable/bg_edit_text_rounded"
+                        android:padding="@dimen/space_3" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:text="Year Level"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/spinner_reg_year"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_2"
+                        android:background="@drawable/bg_edit_text_rounded"
+                        android:padding="@dimen/space_3" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:text="Section"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/spinner_reg_section"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_2"
+                        android:background="@drawable/bg_edit_text_rounded"
+                        android:padding="@dimen/space_3" />
+
+                </LinearLayout>
+
                 <Button
                     android:id="@+id/btn_register_submit"
                     android:layout_width="match_parent"
@@ -270,34 +333,33 @@
                     android:textSize="16sp"
                     app:cornerRadius="@dimen/radius_medium" />
 
+                <!-- Bottom Actions — inside the ScrollView so they scroll with the form -->
+                <LinearLayout
+                    android:id="@+id/reg_bottom_actions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:layout_marginBottom="@dimen/space_4"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Already have an account? "
+                        android:textColor="@color/text_hint" />
+
+                    <TextView
+                        android:id="@+id/tv_go_to_login"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Login"
+                        android:textColor="@color/primary_blue"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
             </LinearLayout>
         </ScrollView>
     </androidx.cardview.widget.CardView>
-
-    <!-- Bottom Actions -->
-    <LinearLayout
-        android:id="@+id/reg_bottom_actions"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/space_6"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Already have an account? "
-            android:textColor="@color/text_hint" />
-
-        <TextView
-            android:id="@+id/tv_go_to_login"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Login"
-            android:textColor="@color/primary_blue"
-            android:textStyle="bold" />
-    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

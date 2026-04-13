@@ -39,6 +39,8 @@ public class DiscoverFragment extends Fragment implements Refreshable {
 
     private DatabaseHelper dbHelper;
     private String userDept = "";
+    private String studentId = "";
+    private String userRole = "";
     private String currentTimeFilter = "month";
 
     private LinearLayout tabContainer;
@@ -67,7 +69,9 @@ public class DiscoverFragment extends Fragment implements Refreshable {
         dbHelper = DatabaseHelper.getInstance(requireContext());
 
         Bundle args = getArguments();
-        userDept = args != null ? args.getString("USER_DEPT", "") : "";
+        userDept   = args != null ? args.getString("USER_DEPT", "") : "";
+        studentId = args != null ? args.getString("USER_STUDENT_ID", "") : "";
+        userRole  = args != null ? args.getString("USER_ROLE", "Student") : "Student";
 
         initViews(view);
         setupTabSwitching();
@@ -269,7 +273,7 @@ public class DiscoverFragment extends Fragment implements Refreshable {
             } else {
                 tvTodayEmpty.setVisibility(View.GONE);
                 rvTodayEvents.setVisibility(View.VISIBLE);
-                todayAdapter = new EventAdapter(todayEvents);
+                todayAdapter = new EventAdapter(todayEvents, studentId, userRole);
                 rvTodayEvents.setAdapter(todayAdapter);
             }
         } catch (Exception e) {
@@ -311,7 +315,7 @@ public class DiscoverFragment extends Fragment implements Refreshable {
             } else {
                 tvCampusEmpty.setVisibility(View.GONE);
                 rvCampusEvents.setVisibility(View.VISIBLE);
-                campusAdapter = new EventAdapter(campusEvents);
+                campusAdapter = new EventAdapter(campusEvents, studentId, userRole);
                 rvCampusEvents.setAdapter(campusAdapter);
             }
         } catch (Exception e) {
@@ -350,7 +354,7 @@ public class DiscoverFragment extends Fragment implements Refreshable {
             } else {
                 tvMyDeptEmpty.setVisibility(View.GONE);
                 rvMyDeptEvents.setVisibility(View.VISIBLE);
-                deptAdapter = new EventAdapter(myDeptEvents);
+                deptAdapter = new EventAdapter(myDeptEvents, studentId, userRole);
                 rvMyDeptEvents.setAdapter(deptAdapter);
             }
         } catch (Exception e) {

@@ -149,6 +149,115 @@
 
     </HorizontalScrollView>
 
+    <!-- Year Level filter chips -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_year"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:chipSpacingHorizontal="@dimen/space_2">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_year_all"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="All Years"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_year_1"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1st Year"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_year_2"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2nd Year"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_year_3"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="3rd Year"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_year_4"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="4th Year"/>
+
+        </com.google.android.material.chip.ChipGroup>
+
+    </HorizontalScrollView>
+
+    <!-- Student Status filter chips -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:chipSpacingHorizontal="@dimen/space_2">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_status_all"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="All Status"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_status_active"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ACTIVE"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_status_inactive"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="INACTIVE"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_status_archived"
+                style="@style/PremiumChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ARCHIVED"/>
+
+        </com.google.android.material.chip.ChipGroup>
+
+    </HorizontalScrollView>
+
     <!-- Result count -->
     <TextView
         android:id="@+id/tv_user_count"

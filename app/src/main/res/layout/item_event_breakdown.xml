@@ -66,8 +66,33 @@
             android:layout_marginBottom="@dimen/space_2" />
 
         <!-- Per-department stats container -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="By Department"
+            android:textColor="@color/primary_green"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginTop="@dimen/space_2" />
+
         <LinearLayout
             android:id="@+id/container_breakdown_depts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <!-- Per-course stats container -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="By Course"
+            android:textColor="@color/primary_green"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginTop="@dimen/space_2" />
+
+        <LinearLayout
+            android:id="@+id/container_breakdown_courses"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />

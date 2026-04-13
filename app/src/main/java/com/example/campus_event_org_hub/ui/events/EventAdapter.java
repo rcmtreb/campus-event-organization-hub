@@ -54,6 +54,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         this.eventDetailLauncher = null;
     }
 
+    /** 3-arg constructor: passes studentId + userRole without dbHelper. Used by DiscoverFragment. */
+    public EventAdapter(List<Event> eventList, String studentId, String userRole) {
+        this.eventList     = eventList;
+        this.eventListFull = new ArrayList<>(eventList);
+        this.studentId     = studentId != null ? studentId : "";
+        this.userRole      = userRole  != null ? userRole  : "Student";
+        this.dbHelper      = null;
+        this.eventDetailLauncher = null;
+    }
+
     /** Full constructor used by EventsFragment — enables long-press hide for Students. */
     public EventAdapter(List<Event> eventList, String studentId, String userRole,
                         DatabaseHelper dbHelper) {

@@ -51,14 +51,20 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
     private TextInputEditText etSearch;
     private Spinner spinnerDept;
     private Spinner spinnerStatus;
+    private Spinner spinnerCourse;
+    private Spinner spinnerYearLevel;
+    private Spinner spinnerSection;
     private Chip chipTotal;
     private Chip chipTimedIn;
     private Chip chipTimedOut;
     private TextView tvEmpty;
     private RecyclerView rv;
 
-    private String filterDept   = "All Departments";
-    private String filterStatus = "All Statuses";
+    private String filterDept     = "All Departments";
+    private String filterStatus   = "All Statuses";
+    private String filterCourse   = "All Courses";
+    private int    filterYear    = 0; // 0 = All Years
+    private String filterSection = "All Sections";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +82,9 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
         etSearch      = findViewById(R.id.et_search);
         spinnerDept   = findViewById(R.id.spinner_department);
         spinnerStatus = findViewById(R.id.spinner_status);
+        spinnerCourse = findViewById(R.id.spinner_course);
+        spinnerYearLevel = findViewById(R.id.spinner_year_level);
+        spinnerSection = findViewById(R.id.spinner_section);
         chipTotal     = findViewById(R.id.chip_total);
         chipTimedIn   = findViewById(R.id.chip_timed_in);
         chipTimedOut  = findViewById(R.id.chip_timed_out);
@@ -155,6 +164,78 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
             }
             @Override public void onNothingSelected(AdapterView<?> p) {}
         });
+
+        // Course spinner — "All Courses" + unique course codes from data
+        Set<String> courseCodes = new LinkedHashSet<>();
+        courseCodes.add("All Courses");
+        for (AttendeeRecord r : allRecords) {
+            if (r.getCourseCode() != null && !r.getCourseCode().isEmpty()) {
+                courseCodes.add(r.getCourseCode());
+            }
+        }
+        ArrayAdapter<String> courseAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, new ArrayList<>(courseCodes));
+        courseAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerCourse.setAdapter(courseAdapter);
+        spinnerCourse.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                filterCourse = (String) p.getItemAtPosition(pos);
+                applyFilters();
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
+
+        // Year Level spinner — ordinal labels
+        String[] years = {"All Years", "1st Year", "2nd Year", "3rd Year", "4th Year"};
+        ArrayAdapter<String> yearAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, years);
+        yearAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerYearLevel.setAdapter(yearAdapter);
+        spinnerYearLevel.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                String selected = (String) p.getItemAtPosition(pos);
+                filterYear = "All Years".equals(selected) ? 0 : parseOrdinalYear(selected);
+                applyFilters();
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
+
+        // Section spinner — "All Sections" + A, B, C
+        String[] sections = {"All Sections", "A", "B", "C"};
+        ArrayAdapter<String> sectionAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, sections);
+        sectionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerSection.setAdapter(sectionAdapter);
+        spinnerSection.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                filterSection = (String) p.getItemAtPosition(pos);
+                applyFilters();
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    /** Convert "1st Year" / "2nd Year" / "3rd Year" / "4th Year" → int 1-4, else 0. */
+    private static int parseOrdinalYear(String label) {
+        if (label == null) return 0;
+        if (label.startsWith("1st")) return 1;
+        if (label.startsWith("2nd")) return 2;
+        if (label.startsWith("3rd")) return 3;
+        if (label.startsWith("4th")) return 4;
+        return 0;
+    }
+
+    /** Convert int year level 1-4 to "1st Year", "2nd Year", etc. */
+    private static String ordinalYear(int year) {
+        switch (year) {
+            case 1: return "1st Year";
+            case 2: return "2nd Year";
+            case 3: return "3rd Year";
+            case 4: return "4th Year";
+            default: return year + "th Year";
+        }
     }
 
     // ── Filtering ────────────────────────────────────────────────────────────────
@@ -171,6 +252,12 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
             if (!query.isEmpty() && !r.getName().toLowerCase().contains(query)) continue;
             // Dept filter
             if (!"All Departments".equals(filterDept) && !filterDept.equals(r.getDepartment())) continue;
+            // Course filter
+            if (!"All Courses".equals(filterCourse) && !filterCourse.equals(r.getCourseCode())) continue;
+            // Year Level filter
+            if (filterYear != 0 && r.getYearLevel() != filterYear) continue;
+            // Section filter
+            if (!"All Sections".equals(filterSection) && !filterSection.equals(r.getSection())) continue;
             // Status filter
             if (!"All Statuses".equals(filterStatus)) {
                 String want = filterStatus; // "Timed Out" / "Timed In" / "Absent"
@@ -220,7 +307,7 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
 
         class VH extends RecyclerView.ViewHolder {
             ImageView ivProfile;
-            TextView  tvName, tvDept, tvEmail;
+            TextView  tvName, tvDept, tvEmail, tvAcademicInfo;
             Chip      chipStatus;
             TextView  tvTimeIn, tvTimeOut;
             View      rowPhotos;
@@ -233,6 +320,7 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
                 tvName          = v.findViewById(R.id.tv_name);
                 tvDept          = v.findViewById(R.id.tv_department);
                 tvEmail         = v.findViewById(R.id.tv_email);
+                tvAcademicInfo  = v.findViewById(R.id.tv_academic_info);
                 chipStatus      = v.findViewById(R.id.chip_status);
                 tvTimeIn        = v.findViewById(R.id.tv_time_in);
                 tvTimeOut       = v.findViewById(R.id.tv_time_out);
@@ -244,9 +332,25 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
             }
 
             void bind(AttendeeRecord r) {
-                tvName.setText(r.getName().isEmpty() ? r.getStudentId() : r.getName());
+                tvName.setText(r.getName().isEmpty() ? r.getStudentId() + "-S" : r.getName());
                 tvDept.setText(r.getDepartment().isEmpty() ? "Unknown dept." : r.getDepartment());
-                tvEmail.setText(r.getEmail().isEmpty() ? r.getStudentId() : r.getEmail());
+                tvEmail.setText(r.getEmail().isEmpty() ? r.getStudentId() + "-S" : r.getEmail());
+
+                // Academic info: course code + ordinal year + section letter
+                String courseCode = r.getCourseCode();
+                int yearLevel = r.getYearLevel();
+                String section = r.getSection();
+                if (courseCode != null && !courseCode.isEmpty()) {
+                    String yr = yearLevel > 0 ? ordinalYear(yearLevel) : "";
+                    String sec = (section != null && !section.isEmpty()) ? " | Section " + section : "";
+                    tvAcademicInfo.setText(courseCode + (yr.isEmpty() ? "" : " | " + yr) + sec);
+                    tvAcademicInfo.setVisibility(View.VISIBLE);
+                } else {
+                    tvAcademicInfo.setVisibility(View.GONE);
+                }
+
+                // Profile photo — use tag guard to prevent recycled-view flicker
+                loadBase64Image(r.getProfilePhoto(), ivProfile, R.drawable.ic_person_placeholder);
 
                 // Profile photo
                 loadBase64Image(r.getProfilePhoto(), ivProfile, R.drawable.ic_person_placeholder);
@@ -280,8 +384,17 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
                 rowPhotos.setVisibility(hasAttendance ? View.VISIBLE : View.GONE);
 
                 if (hasAttendance) {
-                    bindPhoto(r.getTimeInPhoto(),  ivTimeInPhoto,  tvNoTimeInPhoto);
-                    bindPhoto(r.getTimeOutPhoto(), ivTimeOutPhoto, tvNoTimeOutPhoto);
+                    // Tag each ImageView with the current bind call ID so stale
+                    // async decodes don't overwrite recycled views
+                    long bindTag = System.currentTimeMillis();
+                    ivTimeInPhoto.setTag(bindTag);
+                    ivTimeOutPhoto.setTag(bindTag);
+                    bindPhotoWithTag(r.getTimeInPhoto(),  ivTimeInPhoto,  tvNoTimeInPhoto,  bindTag);
+                    bindPhotoWithTag(r.getTimeOutPhoto(), ivTimeOutPhoto, tvNoTimeOutPhoto, bindTag);
+                } else {
+                    // Clear any previous photo
+                    ivTimeInPhoto.setImageDrawable(null);
+                    ivTimeOutPhoto.setImageDrawable(null);
                 }
 
                 // Tap on either photo → open full-screen dialog
@@ -291,9 +404,10 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
                         showFullScreenPhoto(r.getTimeOutPhoto(), r.getName() + " – Time Out"));
             }
 
-            private void bindPhoto(String base64, ImageView iv, TextView noPhotoTv) {
+            /** Binds a photo with a tag guard to prevent recycled-view flicker. */
+            private void bindPhotoWithTag(String base64, ImageView iv, TextView noPhotoTv, long tag) {
                 if (base64 != null && !base64.isEmpty()) {
-                    loadBase64Image(base64, iv, 0);
+                    loadBase64ImageTagged(base64, iv, tag);
                     iv.setVisibility(View.VISIBLE);
                     noPhotoTv.setVisibility(View.GONE);
                 } else {
@@ -307,14 +421,17 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
     /**
-     * Decode a Base64 string (with or without "data:image/...;base64," prefix)
-     * and display it into the given ImageView. Falls back to fallbackResId on failure.
+     * Decode a Base64 string and display it in the ImageView.
+     * Uses setTag/getTag to guard against RecyclerView view recycling.
+     * Falls back to fallbackResId on failure.
      */
     private void loadBase64Image(String base64, ImageView iv, int fallbackResId) {
         if (base64 == null || base64.isEmpty()) {
             if (fallbackResId != 0) iv.setImageResource(fallbackResId);
             return;
         }
+        final long tag = System.currentTimeMillis();
+        iv.setTag(tag);
         new AsyncTask<String, Void, Bitmap>() {
             @Override
             protected Bitmap doInBackground(String... params) {
@@ -330,10 +447,42 @@ public class OfficerAttendeeListActivity extends AppCompatActivity {
 
             @Override
             protected void onPostExecute(Bitmap bmp) {
+                if (iv == null) return;
+                // Only apply if this ImageView hasn't been recycled for another item
+                if ((long) iv.getTag() != tag) return;
                 if (bmp != null) {
                     iv.setImageBitmap(bmp);
                 } else if (fallbackResId != 0) {
                     iv.setImageResource(fallbackResId);
+                }
+            }
+        }.execute(base64);
+    }
+
+    /**
+     * Same as loadBase64Image but accepts an explicit tag to guard against recycling.
+     */
+    private void loadBase64ImageTagged(String base64, ImageView iv, long expectedTag) {
+        if (base64 == null || base64.isEmpty()) return;
+        new AsyncTask<String, Void, Bitmap>() {
+            @Override
+            protected Bitmap doInBackground(String... params) {
+                try {
+                    String data = params[0];
+                    if (data.contains(",")) data = data.substring(data.indexOf(',') + 1);
+                    byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+                    return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                } catch (Exception e) {
+                    return null;
+                }
+            }
+
+            @Override
+            protected void onPostExecute(Bitmap bmp) {
+                if (iv == null) return;
+                if ((long) iv.getTag() != expectedTag) return;
+                if (bmp != null) {
+                    iv.setImageBitmap(bmp);
                 }
             }
         }.execute(base64);

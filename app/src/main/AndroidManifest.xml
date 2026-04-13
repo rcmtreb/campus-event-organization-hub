@@ -85,6 +85,14 @@
             android:name=".ui.admin.ExportImportActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.admin.AdminCourseManagementActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.admin.AdminAcademicSettingsActivity"
+            android:exported="false" />
+
         <!-- FCM: receives push notifications and handles token refresh -->
         <service
             android:name=".service.CEOHFirebaseMessagingService"

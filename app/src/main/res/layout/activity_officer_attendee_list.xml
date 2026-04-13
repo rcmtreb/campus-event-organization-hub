@@ -108,6 +108,52 @@
 
             </LinearLayout>
 
+            <!-- Course + Year Level spinners -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="@dimen/space_2">
+
+                <Spinner
+                    android:id="@+id/spinner_course"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_small"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="@dimen/space_2"
+                    android:background="@drawable/bg_spinner"
+                    android:paddingStart="@dimen/space_3"
+                    android:paddingEnd="@dimen/space_3" />
+
+                <Spinner
+                    android:id="@+id/spinner_year_level"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_small"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_spinner"
+                    android:paddingStart="@dimen/space_3"
+                    android:paddingEnd="@dimen/space_3" />
+
+            </LinearLayout>
+
+            <!-- Section spinner -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="@dimen/space_2">
+
+                <Spinner
+                    android:id="@+id/spinner_section"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_small"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_spinner"
+                    android:paddingStart="@dimen/space_3"
+                    android:paddingEnd="@dimen/space_3" />
+
+            </LinearLayout>
+
         </LinearLayout>
 
         <!-- Summary chips row -->

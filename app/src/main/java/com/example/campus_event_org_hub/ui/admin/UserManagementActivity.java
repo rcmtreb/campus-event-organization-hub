@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.model.User;
 import com.example.campus_event_org_hub.ui.base.BaseActivity;
 import com.example.campus_event_org_hub.util.ImageUtils;
 import com.example.campus_event_org_hub.util.RealtimeSyncManager;
@@ -43,8 +44,10 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
     private final List<User> masterList  = new ArrayList<>();
     private final List<User> displayList = new ArrayList<>();
 
-    private String currentQuery = "";
-    private String currentDept  = "All"; // chip text: "All","CBA","CCJE","COED","COE","COL","CLAS","GS"
+    private String currentQuery  = "";
+    private String currentDept   = "All"; // chip text: "All","CBA","CCJE","COED","COE","COL","CLAS","GS"
+    private int    currentYear   = 0;     // 0 = All Years, 1-4 = specific year
+    private String currentStatus = "All"; // "All", "ACTIVE", "INACTIVE", "ARCHIVED"
 
     @Override
     protected boolean useEdgeToEdge() { return true; }
@@ -88,6 +91,33 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
             applyFilter();
         });
 
+        // Year Level chip filter
+        ChipGroup chipGroupYear = findViewById(R.id.chip_group_year);
+        chipGroupYear.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            if (checkedIds.isEmpty()) return;
+            Chip chip = group.findViewById(checkedIds.get(0));
+            if (chip == null) { currentYear = 0; applyFilter(); return; }
+            String text = chip.getText().toString();
+            if ("All Years".equals(text)) {
+                currentYear = 0;
+            } else {
+                // "1st Year" → 1, "2nd Year" → 2, "3rd Year" → 3, "4th Year" → 4
+                currentYear = parseOrdinalYear(text);
+            }
+            applyFilter();
+        });
+
+        // Student Status chip filter
+        ChipGroup chipGroupStatus = findViewById(R.id.chip_group_status);
+        chipGroupStatus.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            if (checkedIds.isEmpty()) return;
+            Chip chip = group.findViewById(checkedIds.get(0));
+            if (chip == null) { currentStatus = "All"; applyFilter(); return; }
+            String text = chip.getText().toString();
+            currentStatus = "All Status".equals(text) ? "All" : text;
+            applyFilter();
+        });
+
         loadUsers();
     }
 
@@ -109,6 +139,18 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
         }
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Convert "1st Year" / "2nd Year" / "3rd Year" / "4th Year" → int 1-4, else 0. */
+    private static int parseOrdinalYear(String label) {
+        if (label == null) return 0;
+        if (label.startsWith("1st")) return 1;
+        if (label.startsWith("2nd")) return 2;
+        if (label.startsWith("3rd")) return 3;
+        if (label.startsWith("4th")) return 4;
+        return 0;
+    }
+
     // ── Data ──────────────────────────────────────────────────────────────────
 
     private void loadUsers() {
@@ -118,13 +160,24 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
             do {
                 int imgIdx = cursor.getColumnIndex(DatabaseHelper.COLUMN_USER_PROFILE_IMG);
                 String imgPath = imgIdx >= 0 ? cursor.getString(imgIdx) : "";
-                masterList.add(new User(
+
+                User u = new User(
                         cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_USER_NAME)),
                         cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_USER_STUDENT_ID)),
                         cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_USER_ROLE)),
                         cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_USER_DEPARTMENT)),
                         imgPath != null ? imgPath : ""
-                ));
+                );
+
+                int yearIdx   = cursor.getColumnIndex(DatabaseHelper.COLUMN_USER_YEAR_LEVEL);
+                int statusIdx = cursor.getColumnIndex(DatabaseHelper.COLUMN_USER_STUDENT_STATUS);
+                if (yearIdx   >= 0) u.yearLevel     = cursor.getInt(yearIdx);
+                if (statusIdx >= 0) {
+                    String s = cursor.getString(statusIdx);
+                    u.studentStatus = s != null ? s : "ACTIVE";
+                }
+
+                masterList.add(u);
             } while (cursor.moveToNext());
             cursor.close();
         }
@@ -132,8 +185,9 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
     }
 
     /**
-     * Filters masterList by the active search query AND selected department chip,
-     * pushes results into displayList, and refreshes the adapter + count label.
+     * Filters masterList by the active search query, selected department chip,
+     * year level chip, and student status chip; pushes results into displayList,
+     * and refreshes the adapter + count label.
      */
     private void applyFilter() {
         displayList.clear();
@@ -146,20 +200,19 @@ public class UserManagementActivity extends com.example.campus_event_org_hub.ui.
             boolean matchesDept = "All".equals(currentDept)
                     || (u.dept != null && u.dept.contains("(" + currentDept + ")"));
 
-            if (matchesSearch && matchesDept) displayList.add(u);
+            // Year level filter — only applies to Students (Officers have no year level)
+            boolean matchesYear = currentYear == 0
+                    || ("Student".equalsIgnoreCase(u.role) && u.yearLevel == currentYear);
+
+            // Status filter — only applies to Students
+            boolean matchesStatus = "All".equals(currentStatus)
+                    || ("Student".equalsIgnoreCase(u.role) && currentStatus.equalsIgnoreCase(u.studentStatus));
+
+            if (matchesSearch && matchesDept && matchesYear && matchesStatus) displayList.add(u);
         }
         adapter.notifyDataSetChanged();
         int n = displayList.size();
         tvCount.setText(n + " user" + (n == 1 ? "" : "s"));
-    }
-
-    // ── Model ─────────────────────────────────────────────────────────────────
-
-    static class User {
-        String name, id, role, dept, profileImg;
-        User(String n, String i, String r, String d, String img) {
-            name = n; id = i; role = r; dept = d; profileImg = img;
-        }
     }
 
     // ── Adapter ───────────────────────────────────────────────────────────────

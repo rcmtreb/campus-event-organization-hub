@@ -32,6 +32,8 @@ import com.google.android.material.button.MaterialButton;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+
+import com.example.campus_event_org_hub.util.ServerTimeUtil;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -133,23 +135,16 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
                 h.tvTimelineBadge.setBackgroundResource(android.R.color.holo_orange_light);
                 h.tvTimelineBadge.setVisibility(View.VISIBLE);
             } else if ("APPROVED".equals(status)) {
-                boolean isEnded = false;
-                try {
-                    Date eventDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                            .parse(e.getDate());
-                    // Strip time from today so we compare date only
-                    Calendar todayCal = Calendar.getInstance();
-                    todayCal.set(Calendar.HOUR_OF_DAY, 0);
-                    todayCal.set(Calendar.MINUTE, 0);
-                    todayCal.set(Calendar.SECOND, 0);
-                    todayCal.set(Calendar.MILLISECOND, 0);
-                    if (eventDate != null && eventDate.before(todayCal.getTime())) {
-                        isEnded = true;
-                    }
-                } catch (ParseException ignored) { }
-                if (isEnded) {
+                String today = ServerTimeUtil.todayString();
+                String eventDateStr = e.getDate();
+                if (eventDateStr == null || eventDateStr.isEmpty()) {
+                    h.tvTimelineBadge.setVisibility(View.GONE);
+                } else if (eventDateStr.compareTo(today) < 0) {
                     h.tvTimelineBadge.setText("ENDED");
                     h.tvTimelineBadge.setBackgroundResource(android.R.color.darker_gray);
+                } else if (eventDateStr.compareTo(today) == 0) {
+                    h.tvTimelineBadge.setText("HAPPENING");
+                    h.tvTimelineBadge.setBackgroundResource(android.R.color.holo_orange_light);
                 } else {
                     h.tvTimelineBadge.setText("UPCOMING");
                     h.tvTimelineBadge.setBackgroundResource(android.R.color.holo_green_dark);

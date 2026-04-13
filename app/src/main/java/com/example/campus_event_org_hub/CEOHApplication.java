@@ -6,6 +6,7 @@ import android.util.Log;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
+import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreSettings;
 
@@ -34,6 +35,19 @@ public class CEOHApplication extends Application {
         } catch (Exception e) {
             Log.e("CEOHApplication", "Failed to configure Firestore settings", e);
         }
+
+        // Auto-promote students if academic year end date has passed
+        new Thread(() -> {
+            try {
+                DatabaseHelper db = DatabaseHelper.getInstance(this);
+                if (db.shouldAutoPromote()) {
+                    db.promoteStudents("AUTO");
+                    Log.i("CEOHApplication", "Auto-promotion completed successfully.");
+                }
+            } catch (Exception e) {
+                Log.e("CEOHApplication", "Auto-promotion check failed", e);
+            }
+        }).start();
     }
 
     private void restoreTheme() {

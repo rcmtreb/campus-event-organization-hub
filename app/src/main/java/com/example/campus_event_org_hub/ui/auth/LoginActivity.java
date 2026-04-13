@@ -299,7 +299,13 @@ public class LoginActivity extends AppCompatActivity {
 
                 session.saveSession(name, role, dept, email, sid, firebaseUid);
                 uploadPendingFcmToken(firebaseUid);
-                
+
+                // Orion: record last login for students (background thread — no UI impact)
+                if ("Student".equals(role)) {
+                    final String finalSid = sid;
+                    new Thread(() -> db.updateLastLogin(finalSid)).start();
+                }
+
                 if (legacyUpgrade) {
                     showLoginToast("Welcome back! Your password has been upgraded for security.", false);
                 }

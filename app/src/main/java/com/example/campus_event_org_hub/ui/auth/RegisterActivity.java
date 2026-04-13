@@ -9,6 +9,7 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.util.Patterns;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -25,6 +26,7 @@ import androidx.core.content.ContextCompat;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.model.Course;
 import com.example.campus_event_org_hub.util.PasswordStrengthUtil;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -40,6 +42,10 @@ public class RegisterActivity extends AppCompatActivity {
     private static final int STUDENT_ID_LENGTH = 8;
 
     private FirebaseAuth mAuth;
+
+    // Course/Section state
+    private List<Course> courseList = new ArrayList<>();
+    private int selectedCourseId = -1;   // -1 = none selected
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +63,10 @@ public class RegisterActivity extends AppCompatActivity {
         EditText etConfirmPassword = findViewById(R.id.et_reg_confirm_password);
         RadioGroup rgRole = findViewById(R.id.rg_reg_role);
         Spinner spinnerDept = findViewById(R.id.spinner_reg_department);
+        Spinner spinnerCourse = findViewById(R.id.spinner_reg_course);
+        Spinner spinnerYear = findViewById(R.id.spinner_reg_year);
+        Spinner spinnerSection = findViewById(R.id.spinner_reg_section);
+        LinearLayout layoutCourseSection = findViewById(R.id.layout_reg_course_section);
         Button btnRegister = findViewById(R.id.btn_register_submit);
         TextView tvGoToLogin = findViewById(R.id.tv_go_to_login);
         LinearLayout layoutPasswordStrength = findViewById(R.id.layout_password_strength);
@@ -90,6 +100,66 @@ public class RegisterActivity extends AppCompatActivity {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerDept.setAdapter(adapter);
         spinnerDept.setSelection(0); // show placeholder by default
+
+        // ── Course spinner ─────────────────────────────────────────────────────
+        new Thread(() -> {
+            List<Course> courses = db.getAllCourses();
+            runOnUiThread(() -> {
+                courseList.clear();
+                courseList.addAll(courses);
+                List<String> courseNames = new ArrayList<>();
+                courseNames.add("Select Course");
+                for (Course c : courseList) courseNames.add(c.getCourseCode() + " – " + c.getCourseName());
+                ArrayAdapter<String> courseAdapter = new ArrayAdapter<>(this,
+                        R.layout.spinner_item, courseNames) {
+                    @Override
+                    public boolean isEnabled(int position) {
+                        return position != 0;
+                    }
+                    @Override
+                    public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                        View view = super.getDropDownView(position, convertView, parent);
+                        TextView tv = (TextView) view;
+                        tv.setTextColor(position == 0
+                                ? ContextCompat.getColor(RegisterActivity.this, R.color.text_hint)
+                                : ContextCompat.getColor(RegisterActivity.this, R.color.text_primary));
+                        return view;
+                    }
+                };
+                courseAdapter.setDropDownViewResource(R.layout.spinner_item);
+                spinnerCourse.setAdapter(courseAdapter);
+                spinnerCourse.setSelection(0);
+            });
+        }).start();
+
+        // ── Year Level spinner — shows ordinal years; reset when course changes ─
+        populateYearSpinner(spinnerYear);
+
+        // ── Section spinner — A / B / C; rebuilt when course changes ──────────
+        spinnerCourse.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position == 0) {
+                    selectedCourseId = -1;
+                    spinnerYear.setSelection(0);
+                    populateSectionSpinner(spinnerSection);
+                } else {
+                    Course chosen = courseList.get(position - 1);
+                    selectedCourseId = chosen.getCourseId();
+                    populateSectionSpinner(spinnerSection);
+                }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { selectedCourseId = -1; }
+        });
+
+        // ── Show/hide course+section based on role ─────────────────────────────
+        rgRole.setOnCheckedChangeListener((group, checkedId) -> {
+            boolean isStudent = (checkedId == R.id.rb_role_student);
+            layoutCourseSection.setVisibility(isStudent ? View.VISIBLE : View.GONE);
+        });
+        // Initial state: Student is checked by default
+        layoutCourseSection.setVisibility(View.VISIBLE);
 
         setupStudentIdField(etStudentId);
 
@@ -192,12 +262,44 @@ public class RegisterActivity extends AppCompatActivity {
                 return;
             }
 
+            // ── Validate Student academic fields (required) ─────────────────────
+            if ("Student".equals(role)) {
+                if (spinnerCourse.getSelectedItemPosition() == 0) {
+                    Toast.makeText(this, "Please select your course", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (spinnerYear.getSelectedItemPosition() == 0) {
+                    Toast.makeText(this, "Please select your year level", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (spinnerSection.getSelectedItemPosition() == 0) {
+                    Toast.makeText(this, "Please select your section", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+
             btnRegister.setEnabled(false);
             btnRegister.setText("Registering...");
 
+            // ── Collect course / year level / section (students only) ────────────
+            final int finalCourseId;
+            final int finalYearLevel;
+            final String finalSection;
+            if ("Student".equals(role)) {
+                finalCourseId  = selectedCourseId;
+                finalYearLevel = spinnerYear.getSelectedItemPosition(); // placeholder at 0 → 1st Year at 1
+                Object secItem = spinnerSection.getSelectedItem();
+                finalSection  = (secItem != null && spinnerSection.getSelectedItemPosition() > 0)
+                        ? secItem.toString() : "";
+            } else {
+                finalCourseId  = -1;
+                finalYearLevel = 1;
+                finalSection  = "";
+            }
+
             // ── Step 1: Create Firebase Auth account (for email verification only) ──
             mAuth.createUserWithEmailAndPassword(email, password)
-                    .addOnSuccessListener(authResult -> proceedAfterFirebaseAuth(authResult.getUser(), db, name, studentId, email, password, role, department, btnRegister))
+                    .addOnSuccessListener(authResult -> proceedAfterFirebaseAuth(authResult.getUser(), db, name, studentId, email, password, role, department, finalCourseId, finalYearLevel, finalSection, btnRegister))
                     .addOnFailureListener(e -> {
                         String msg = e.getMessage();
                         if (msg != null && msg.contains("email address is already in use")) {
@@ -211,7 +313,7 @@ public class RegisterActivity extends AppCompatActivity {
                                 // Orphan Firebase Auth account (SQLite was wiped / mis-matched state)
                                 // → sign in to get a handle on it, delete it, then re-register cleanly
                                 Log.w(TAG, "Orphan Firebase Auth account detected for " + email + " — attempting self-heal");
-                                healOrphanAndRegister(db, name, studentId, email, password, role, department, btnRegister);
+                                healOrphanAndRegister(db, name, studentId, email, password, role, department, finalCourseId, finalYearLevel, finalSection, btnRegister);
                             }
                         } else {
                             btnRegister.setEnabled(true);
@@ -232,6 +334,7 @@ public class RegisterActivity extends AppCompatActivity {
     private void proceedAfterFirebaseAuth(FirebaseUser firebaseUser, DatabaseHelper db,
                                           String name, String studentId, String email,
                                           String password, String role, String department,
+                                          int courseId, int yearLevel, String section,
                                           Button btnRegister) {
         // Extract Firebase Auth UID — this becomes the Firestore document ID for users/
         String firebaseUid = (firebaseUser != null) ? firebaseUser.getUid() : "";
@@ -245,7 +348,7 @@ public class RegisterActivity extends AppCompatActivity {
         // BCrypt hashing is slow (~1s) — must NOT run on the main thread
         final String uid = firebaseUid;
         new Thread(() -> {
-            long id = db.registerUser(name, studentId, email, password, role, department, uid);
+            long id = db.registerUser(name, studentId, email, password, role, department, uid, courseId, yearLevel, section);
             runOnUiThread(() -> {
                 if (id != -1) {
                     Toast.makeText(this, "Registration successful! Check your email to verify.", Toast.LENGTH_LONG).show();
@@ -266,69 +369,56 @@ public class RegisterActivity extends AppCompatActivity {
     /**
      * Handles the "orphan Firebase Auth account" case: SQLite is empty but Firebase Auth
      * already has this email (e.g. admin deleted the account but Firebase Auth record remains).
-     *
-     * Strategy:
-     * 1. Try signing in with the supplied password → delete orphan → re-create.
-     * 2. If sign-in fails (different password), send a password-reset email so the
-     *    user can reclaim the Auth slot later, and proceed with local registration
-     *    (SQLite + Firestore) so the app is usable immediately via local login.
      */
     private void healOrphanAndRegister(DatabaseHelper db, String name, String studentId,
                                        String email, String password, String role,
-                                       String department, Button btnRegister) {
+                                       String department, int courseId, int yearLevel, String section,
+                                       Button btnRegister) {
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnSuccessListener(authResult -> {
                     FirebaseUser orphan = authResult.getUser();
                     if (orphan == null) {
-                        // Shouldn't happen, but fall through to local-only registration
-                        proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
+                        proceedLocalOnly(db, name, studentId, email, password, role, department, courseId, yearLevel, section, btnRegister);
                         return;
                     }
                     Log.d(TAG, "Signed in to orphan account, deleting it...");
                     orphan.delete()
                             .addOnSuccessListener(unused -> {
                                 Log.d(TAG, "Orphan Firebase Auth account deleted. Re-registering...");
-                                // Now re-create the account cleanly
                                 mAuth.createUserWithEmailAndPassword(email, password)
                                         .addOnSuccessListener(newAuth -> proceedAfterFirebaseAuth(
                                                 newAuth.getUser(), db, name, studentId,
-                                                email, password, role, department, btnRegister))
+                                                email, password, role, department, courseId, yearLevel, section, btnRegister))
                                         .addOnFailureListener(e -> {
-                                            // Auth re-create failed but we can still register locally
                                             Log.w(TAG, "Re-create after orphan delete failed", e);
-                                            proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
+                                            proceedLocalOnly(db, name, studentId, email, password, role, department, courseId, yearLevel, section, btnRegister);
                                         });
                             })
                             .addOnFailureListener(e -> {
                                 Log.w(TAG, "Could not delete orphan account", e);
-                                proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
+                                proceedLocalOnly(db, name, studentId, email, password, role, department, courseId, yearLevel, section, btnRegister);
                             });
                 })
                 .addOnFailureListener(e -> {
-                    // Sign-in failed → orphan was created with a different password.
-                    // Send a password-reset email so the user can reclaim the Auth slot later,
-                    // then proceed with local (SQLite + Firestore) registration.
                     Log.w(TAG, "Could not sign in to orphan account — registering locally", e);
                     mAuth.sendPasswordResetEmail(email)
                             .addOnSuccessListener(unused ->
                                     Log.d(TAG, "Password-reset email sent to " + email))
                             .addOnFailureListener(err ->
                                     Log.w(TAG, "Failed to send password-reset email", err));
-                    proceedLocalOnly(db, name, studentId, email, password, role, department, btnRegister);
+                    proceedLocalOnly(db, name, studentId, email, password, role, department, courseId, yearLevel, section, btnRegister);
                 });
     }
 
     /**
      * Registers the user in SQLite + Firestore only (no Firebase Auth account created).
-     * Used when we can't delete the orphan Firebase Auth account because the old password
-     * is unknown. The user can still log in via local credentials.
      */
     private void proceedLocalOnly(DatabaseHelper db, String name, String studentId,
                                   String email, String password, String role,
-                                  String department, Button btnRegister) {
+                                  String department, int courseId, int yearLevel, String section,
+                                  Button btnRegister) {
         new Thread(() -> {
-            // No Firebase Auth user available — UID will be filled on next login
-            long id = db.registerUser(name, studentId, email, password, role, department, "");
+            long id = db.registerUser(name, studentId, email, password, role, department, "", courseId, yearLevel, section);
             runOnUiThread(() -> {
                 if (id != -1) {
                     Toast.makeText(this,
@@ -347,6 +437,69 @@ public class RegisterActivity extends AppCompatActivity {
                 }
             });
         }).start();
+    }
+
+    /**
+     * Populates the year level spinner with ordinal year options (required for students).
+     * Uses the same "Select Year Level" placeholder + disabled-item pattern as Department/Course.
+     */
+    private void populateYearSpinner(Spinner spinner) {
+        List<String> years = new ArrayList<>();
+        years.add("Select Year Level");
+        years.add("1st Year");
+        years.add("2nd Year");
+        years.add("3rd Year");
+        years.add("4th Year");
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                R.layout.spinner_item, years) {
+            @Override
+            public boolean isEnabled(int position) {
+                return position != 0;
+            }
+            @Override
+            public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                TextView tv = (TextView) view;
+                tv.setTextColor(position == 0
+                        ? ContextCompat.getColor(RegisterActivity.this, R.color.text_hint)
+                        : ContextCompat.getColor(RegisterActivity.this, R.color.text_primary));
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(R.layout.spinner_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(0);
+    }
+
+    /**
+     * Populates the section spinner with A, B, C options (required field).
+     * Uses the same "Select Section" placeholder + disabled-item pattern as Department/Course.
+     */
+    private void populateSectionSpinner(Spinner spinner) {
+        List<String> sections = new ArrayList<>();
+        sections.add("Select Section");
+        sections.add("A");
+        sections.add("B");
+        sections.add("C");
+        ArrayAdapter<String> sectionAdapter = new ArrayAdapter<String>(this,
+                R.layout.spinner_item, sections) {
+            @Override
+            public boolean isEnabled(int position) {
+                return position != 0;
+            }
+            @Override
+            public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                TextView tv = (TextView) view;
+                tv.setTextColor(position == 0
+                        ? ContextCompat.getColor(RegisterActivity.this, R.color.text_hint)
+                        : ContextCompat.getColor(RegisterActivity.this, R.color.text_primary));
+                return view;
+            }
+        };
+        sectionAdapter.setDropDownViewResource(R.layout.spinner_item);
+        spinner.setAdapter(sectionAdapter);
+        spinner.setSelection(0);
     }
 
     private void setupStudentIdField(EditText etStudentId) {

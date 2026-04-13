@@ -72,6 +72,17 @@
                     android:maxLines="1"
                     android:ellipsize="end" />
 
+                <TextView
+                    android:id="@+id/tv_academic_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/primary_green"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="3dp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
             </LinearLayout>
 
             <!-- Status chip -->

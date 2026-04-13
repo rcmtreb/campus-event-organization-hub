@@ -17,6 +17,7 @@ import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.model.Event;
 import com.google.android.material.button.MaterialButton;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -52,6 +53,9 @@ public class OfficerAnalyticsFragment extends Fragment {
 
         tvNoEvents.setVisibility(View.GONE);
 
+        // Reverse so oldest is added first (goes to bottom), latest added last (goes to top)
+        Collections.reverse(officerEvents);
+
         for (Event e : officerEvents) {
             addEventSectionProgrammatically(breakdownContainer, e, db);
         }
@@ -73,6 +77,7 @@ public class OfficerAnalyticsFragment extends Fragment {
         TextView tvTimeIn = cardView.findViewById(R.id.tv_breakdown_time_in);
         TextView tvTimeOut = cardView.findViewById(R.id.tv_breakdown_time_out);
         LinearLayout containerDepts = cardView.findViewById(R.id.container_breakdown_depts);
+        LinearLayout containerCourses = cardView.findViewById(R.id.container_breakdown_courses);
         MaterialButton btnViewAttendees = cardView.findViewById(R.id.btn_view_attendees);
 
         tvTitle.setText(e.getTitle());
@@ -80,9 +85,13 @@ public class OfficerAnalyticsFragment extends Fragment {
         String dateTime = e.getTime().isEmpty() ? e.getDate() : e.getDate() + "  " + e.getTime();
         tvDateStatus.setText(dateTime + "  |  " + e.getStatus());
 
-        Map<String, Integer> stats = db.getEventRegistrationStats(e.getId());
+        // Department stats
+        Map<String, Integer> deptStats = db.getEventRegistrationStats(e.getId());
         int eventTotal = 0;
-        for (int cnt : stats.values()) eventTotal += cnt;
+        for (int cnt : deptStats.values()) eventTotal += cnt;
+
+        // Course stats
+        Map<String, Integer> courseStats = db.getEventRegistrationStatsByCourse(e.getId());
 
         int timeInCount  = db.getAttendanceCount(e.getId());
         int timeOutCount = db.getTimeOutCount(e.getId());
@@ -91,13 +100,23 @@ public class OfficerAnalyticsFragment extends Fragment {
         tvTimeIn.setText("Timed In: " + timeInCount);
         tvTimeOut.setText("Timed Out: " + timeOutCount);
 
-        if (!stats.isEmpty()) {
-            for (Map.Entry<String, Integer> entry : stats.entrySet()) {
+        if (!deptStats.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : deptStats.entrySet()) {
                 TextView tvDept = new TextView(requireContext());
                 tvDept.setText("  " + entry.getKey() + ": " + entry.getValue());
                 tvDept.setTextColor(getResources().getColor(R.color.text_secondary, null));
                 tvDept.setTextSize(12);
                 containerDepts.addView(tvDept);
+            }
+        }
+
+        if (!courseStats.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : courseStats.entrySet()) {
+                TextView tvCourse = new TextView(requireContext());
+                tvCourse.setText("  " + entry.getKey() + ": " + entry.getValue());
+                tvCourse.setTextColor(getResources().getColor(R.color.text_secondary, null));
+                tvCourse.setTextSize(12);
+                containerCourses.addView(tvCourse);
             }
         }
 
