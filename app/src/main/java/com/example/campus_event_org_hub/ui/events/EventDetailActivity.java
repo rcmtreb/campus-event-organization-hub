@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -102,7 +103,13 @@ public class EventDetailActivity extends AppCompatActivity {
         if (studentId == null) studentId = "";
         if (userRole  == null) userRole  = "";
 
+        final String finalStudentId = studentId;
+        final String finalUserRole = userRole;
+        final int eventId = event.getId();
+
         if (event != null) {
+            DatabaseHelper db = DatabaseHelper.getInstance(this);
+
             ImageView  eventImage      = findViewById(R.id.detail_event_image);
             TextView   title          = findViewById(R.id.detail_event_title);
             TextView   date           = findViewById(R.id.detail_event_date);
@@ -158,11 +165,6 @@ public class EventDetailActivity extends AppCompatActivity {
             shareButton.setOnClickListener(v ->
                     Toast.makeText(this, "Sharing event: " + event.getTitle(), Toast.LENGTH_SHORT).show());
 
-            DatabaseHelper db = DatabaseHelper.getInstance(this);
-            final String finalStudentId = studentId;
-            final String finalUserRole  = userRole;
-            final int eventId = event.getId();
-
             boolean isOfficerOrAdmin = "Officer".equals(finalUserRole) || "Admin".equals(finalUserRole);
 
             if ("POSTPONED".equals(event.getStatus())) {
@@ -179,7 +181,6 @@ public class EventDetailActivity extends AppCompatActivity {
                 scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
                 bindAttendanceCard(attendanceCard, db, event, finalStudentId);
             } else if (!isRegistrationOpen(event)) {
-                // Registration closed — 1-hour window after start time has passed
                 registerButton.setEnabled(false);
                 registerButton.setText("Registration Closed");
                 registerButton.setBackgroundTintList(
@@ -188,7 +189,6 @@ public class EventDetailActivity extends AppCompatActivity {
                 registerButton.setEnabled(true);
                 registerButton.setText("Register for Event");
                 registerButton.setOnClickListener(v -> {
-                    // Re-check window at click time in case the minute just ticked over
                     if (!isRegistrationOpen(event)) {
                         registerButton.setEnabled(false);
                         registerButton.setText("Registration Closed");
@@ -199,19 +199,31 @@ public class EventDetailActivity extends AppCompatActivity {
                                 Toast.LENGTH_LONG).show();
                         return;
                     }
-                    boolean success = db.registerForEvent(finalStudentId, eventId);
-                    if (success) {
-                        registrationChanged = true;
-                        setRegisteredState(registerButton);
-                        Toast.makeText(this, "Successfully registered!", Toast.LENGTH_LONG).show();
-                        scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
-                        bindAttendanceCard(attendanceCard, db, event, finalStudentId);
-                    } else {
-                        setRegisteredState(registerButton);
-                        Toast.makeText(this, "You are already registered for this event.", Toast.LENGTH_SHORT).show();
-                        scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
-                        bindAttendanceCard(attendanceCard, db, event, finalStudentId);
-                    }
+                    registerButton.setEnabled(false);
+                    registerButton.setText("Registering...");
+                    new AsyncTask<Void, Void, Boolean>() {
+                        @Override
+                        protected Boolean doInBackground(Void... params) {
+                            return db.registerForEvent(finalStudentId, eventId);
+                        }
+                        @Override
+                        protected void onPostExecute(Boolean success) {
+                            if (success) {
+                                registrationChanged = true;
+                                setRegisteredState(registerButton);
+                                scheduleActiveCheck(attendanceCard, db, event, finalStudentId);
+                                bindAttendanceCard(attendanceCard, db, event, finalStudentId);
+                                Toast.makeText(EventDetailActivity.this,
+                                        "Registered successfully!", Toast.LENGTH_SHORT).show();
+                            } else {
+                                registerButton.setEnabled(true);
+                                registerButton.setText("Register for Event");
+                                Toast.makeText(EventDetailActivity.this,
+                                        "Registration failed. You may already be registered.",
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    }.execute();
                 });
             }
         }
@@ -219,24 +231,7 @@ public class EventDetailActivity extends AppCompatActivity {
 
     private void scheduleActiveCheck(MaterialCardView card, DatabaseHelper db,
                                      Event event, String studentId) {
-        attendanceCardRef = card;
-        dbRef             = db;
-        eventRef          = event;
-        studentIdRef      = studentId;
-
-        if (activeCheckRunnable != null) {
-            activeCheckHandler.removeCallbacks(activeCheckRunnable);
-        }
-        activeCheckRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (attendanceCardRef != null && eventRef != null &&
-                        dbRef != null && studentIdRef != null) {
-                    bindAttendanceCard(attendanceCardRef, dbRef, eventRef, studentIdRef);
-                }
-                activeCheckHandler.postDelayed(this, ACTIVE_CHECK_INTERVAL_MS);
-            }
-        };
+        activeCheckRunnable = () -> bindAttendanceCard(card, db, event, studentId);
         activeCheckHandler.postDelayed(activeCheckRunnable, ACTIVE_CHECK_INTERVAL_MS);
     }
 
@@ -253,122 +248,6 @@ public class EventDetailActivity extends AppCompatActivity {
         super.onResume();
         if (activeCheckRunnable != null) {
             activeCheckHandler.postDelayed(activeCheckRunnable, ACTIVE_CHECK_INTERVAL_MS);
-        }
-    }
-
-    private boolean isEventActive(Event event) {
-        String startTime = event.getStartTime();
-        String endTime   = event.getEndTime();
-
-        if (startTime == null || startTime.isEmpty() ||
-            endTime   == null || endTime.isEmpty()) {
-            return false;
-        }
-
-        if ("HAPPENING".equals(event.getStatus())) {
-            if (startTime.isEmpty() || endTime.isEmpty()) return true;
-        }
-
-        try {
-            String eventDate = event.getDate();
-            String today     = ServerTimeUtil.todayString();
-
-            if (!eventDate.equals(today)) {
-                return false;
-            }
-
-            int nowMinutes   = minutesSinceMidnight(ServerTimeUtil.now());
-            int startMinutes = parseTimeToMinutes(startTime);
-            int endMinutes   = parseTimeToMinutes(endTime);
-
-            if (startMinutes < 0 || endMinutes < 0) return false;
-
-            return nowMinutes >= startMinutes && nowMinutes < endMinutes;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private boolean isAttendanceWindowOpen(Event event) {
-        String startTime = event.getStartTime();
-        String endTime   = event.getEndTime();
-
-        if (startTime == null || startTime.isEmpty() ||
-            endTime   == null || endTime.isEmpty()) {
-            return false;
-        }
-
-        String status = event.getStatus();
-        if (!"APPROVED".equals(status) && !"HAPPENING".equals(status)) {
-            return false;
-        }
-
-        try {
-            String eventDate = event.getDate();
-            String today     = ServerTimeUtil.todayString();
-
-            if (eventDate.compareTo(today) > 0) {
-                return false;
-            }
-
-            Calendar nowCal = Calendar.getInstance();
-            nowCal.setTime(ServerTimeUtil.now());
-            int nowMinutes = nowCal.get(Calendar.HOUR_OF_DAY) * 60 + nowCal.get(Calendar.MINUTE);
-            int startMinutes = parseTimeToMinutes(startTime);
-            int endMinutes   = parseTimeToMinutes(endTime);
-
-            if (startMinutes < 0 || endMinutes < 0) return false;
-
-            boolean afterStart = eventDate.equals(today)
-                    ? nowMinutes >= startMinutes - 10
-                    : eventDate.compareTo(today) < 0;
-            boolean beforeTimeout = eventDate.equals(today)
-                    ? nowMinutes <= endMinutes + 30
-                    : true;
-
-            return afterStart && beforeTimeout;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /** Returns true only during the Time-In window: (start - 10min) to (start + 60min). */
-    private boolean isTimeInWindowOpen(Event event) {
-        String startTime = event.getStartTime();
-        if (startTime == null || startTime.isEmpty()) return false;
-
-        String status = event.getStatus();
-        if (!"APPROVED".equals(status) && !"HAPPENING".equals(status)) return false;
-
-        try {
-            String eventDate = event.getDate();
-            String today     = ServerTimeUtil.todayString();
-            if (!eventDate.equals(today)) return false;
-
-            Calendar nowCal = Calendar.getInstance();
-            nowCal.setTime(ServerTimeUtil.now());
-            int nowMinutes   = nowCal.get(Calendar.HOUR_OF_DAY) * 60 + nowCal.get(Calendar.MINUTE);
-            int startMinutes = parseTimeToMinutes(startTime);
-            if (startMinutes < 0) return false;
-
-            return nowMinutes >= startMinutes - 10 && nowMinutes <= startMinutes + 60;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private int minutesSinceMidnight(Date now) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(now);
-        return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE);
-    }
-
-    private int parseTimeToMinutes(String time) {
-        try {
-            String[] parts = time.split(":");
-            return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
-        } catch (Exception e) {
-            return -1;
         }
     }
 
@@ -401,6 +280,61 @@ public class EventDetailActivity extends AppCompatActivity {
             return nowMinutes < startMinutes + 60;
         } catch (Exception e) {
             return true; // fail open
+        }
+    }
+
+    private int minutesSinceMidnight(Date now) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(now);
+        return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE);
+    }
+
+    private int parseTimeToMinutes(String time) {
+        try {
+            String[] parts = time.split(":");
+            return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private boolean isAttendanceWindowOpen(Event event) {
+        try {
+            String startTime = event.getStartTime();
+            if (startTime == null || startTime.isEmpty()) return true;
+            int startMinutes = parseTimeToMinutes(startTime);
+            if (startMinutes < 0) return true;
+            int nowMinutes = minutesSinceMidnight(ServerTimeUtil.now());
+            return nowMinutes < startMinutes + 60;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    private boolean isTimeInWindowOpen(Event event) {
+        try {
+            String startTime = event.getStartTime();
+            if (startTime == null || startTime.isEmpty()) return true;
+            int startMinutes = parseTimeToMinutes(startTime);
+            if (startMinutes < 0) return true;
+            int nowMinutes = minutesSinceMidnight(ServerTimeUtil.now());
+            return nowMinutes < startMinutes + 60;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /** Returns true if the event's date has already passed. */
+    private boolean isEventPast(Event event) {
+        try {
+            String dateStr = event.getDate();
+            if (dateStr == null || dateStr.isEmpty()) return false;
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            Date eventDate = sdf.parse(dateStr);
+            Date today = sdf.parse(sdf.format(ServerTimeUtil.now()));
+            return eventDate != null && eventDate.before(today);
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -445,9 +379,16 @@ public class EventDetailActivity extends AppCompatActivity {
 
         if (hasTimeIn) {
             // Already timed in — show time-out form if window is still open, else show status only.
-            tvStatus.setText("Timed in at " + rec[0] + (windowOpen
-                    ? ". Submit Time-Out code when you leave."
-                    : ". Attendance window is currently closed."));
+            boolean isPast = isEventPast(ev);
+            String suffix;
+            if (windowOpen) {
+                suffix = ". Submit Time-Out code when you leave.";
+            } else if (isPast) {
+                suffix = ". Event has ended.";
+            } else {
+                suffix = ". Attendance window is currently closed.";
+            }
+            tvStatus.setText("Timed in at " + rec[0] + suffix);
             layoutTimeIn.setVisibility(View.GONE);
             layoutPhoto.setVisibility(windowOpen ? View.VISIBLE : View.GONE);
             layoutTimeOut.setVisibility(windowOpen ? View.VISIBLE : View.GONE);
@@ -525,8 +466,13 @@ public class EventDetailActivity extends AppCompatActivity {
 
         // Not yet timed in.
         if (!windowOpen) {
-            // The entire attendance window (time-in + time-out) is closed.
-            tvStatus.setText("You did not time in for this event.");
+            // Distinguish past events from future ones.
+            boolean isPast = isEventPast(ev);
+            if (isPast) {
+                tvStatus.setText("Event has ended.\nYou did not time in for this event.");
+            } else {
+                tvStatus.setText("Attendance window not yet open.");
+            }
             layoutTimeIn.setVisibility(View.GONE);
             layoutTimeOut.setVisibility(View.GONE);
             layoutPhoto.setVisibility(View.GONE);

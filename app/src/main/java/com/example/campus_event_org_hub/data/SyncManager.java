@@ -13,26 +13,30 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Pulls all 4 Firestore collections into the local SQLite database.
+ * Pulls Firestore collections into the local SQLite database.
  *
  * Strategy: Firestore is source of truth for shared data (events, notifications,
- * registrations, user profiles). On every sync, we fetch all documents and
- * UPSERT them locally via DatabaseHelper.syncUpsert*() methods.
+ * user profiles). On every sync, we fetch all documents and UPSERT them locally
+ * via DatabaseHelper.syncUpsert*() methods.
+ *
+ * Attendance is synced separately via syncAttendancesOnly() — called explicitly
+ * by officers when needed (not during general sync to avoid DB lock contention).
  *
  * Passwords are NEVER synced from Firestore — they remain local-only.
  *
  * Usage:
  *   SyncManager.sync(context, () -> { // runs on main thread when done });
+ *   SyncManager.syncAttendancesOnly(context, null); // officer-only, explicit call
  */
 public class SyncManager {
 
     private static final String TAG = "SyncManager";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
-    /** Max time to wait for each Firestore collection fetch. */
     private static final long TIMEOUT_SECONDS = 10;
 
     /**
-     * Pull Firestore → SQLite on a background thread.
+     * Pull Firestore → SQLite on a background thread (events, users, notifications).
+     * Attendance is NOT included here — use syncAttendancesOnly() separately.
      * @param onComplete Runnable executed on the calling thread's Looper when sync finishes
      *                   (may be null). Always called even if sync partially fails.
      */
@@ -43,10 +47,26 @@ public class SyncManager {
 
             syncUsers(db, fsh);
             syncEvents(db, fsh);
-            syncRegistrations(db, fsh);
             syncNotifications(db, fsh);
 
             Log.d(TAG, "Sync complete");
+            if (onComplete != null) {
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(onComplete);
+            }
+        });
+    }
+
+    /**
+     * Pull attendance records from Firestore → local SQLite.
+     * Call this explicitly from officer/admin screens when attendance data is needed
+     * (e.g., when opening the attendee list). Runs on background thread.
+     */
+    public static void syncAttendancesOnly(Context context, Runnable onComplete) {
+        EXECUTOR.execute(() -> {
+            DatabaseHelper db   = DatabaseHelper.getInstance(context);
+            FirestoreHelper fsh = new FirestoreHelper();
+            syncAttendances(db, fsh);
+            Log.d(TAG, "Attendance sync complete");
             if (onComplete != null) {
                 new android.os.Handler(android.os.Looper.getMainLooper()).post(onComplete);
             }
@@ -117,25 +137,6 @@ public class SyncManager {
         }
     }
 
-    private static void syncRegistrations(DatabaseHelper db, FirestoreHelper fsh) {
-        try {
-            QuerySnapshot snap = Tasks.await(
-                    fsh.getDb().collection(FirestoreHelper.COL_REGISTRATIONS).get(),
-                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            List<DocumentSnapshot> docs = snap.getDocuments();
-            for (DocumentSnapshot d : docs) {
-                String sid       = str(d, "student_id");
-                int    eventId   = intVal(d, "event_id");
-                String timestamp = str(d, "timestamp");
-                if (sid == null || sid.isEmpty() || eventId <= 0) continue;
-                db.syncUpsertRegistration(sid, eventId, timestamp);
-            }
-            Log.d(TAG, "Synced " + docs.size() + " registrations");
-        } catch (Exception e) {
-            Log.e(TAG, "syncRegistrations failed", e);
-        }
-    }
-
     private static void syncNotifications(DatabaseHelper db, FirestoreHelper fsh) {
         try {
             QuerySnapshot snap = Tasks.await(
@@ -165,6 +166,35 @@ public class SyncManager {
         }
     }
 
+    private static void syncAttendances(DatabaseHelper db, FirestoreHelper fsh) {
+        try {
+            QuerySnapshot snap = Tasks.await(
+                    fsh.getDb().collection(FirestoreHelper.COL_ATTENDANCE).get(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            List<DocumentSnapshot> docs = snap.getDocuments();
+            for (DocumentSnapshot d : docs) {
+                int    eventId          = intVal(d, "event_id");
+                String studentId        = str(d, "student_id");
+                String timeInAt         = str(d, "time_in_at");
+                String timeOutAt        = str(d, "time_out_at");
+                String timeInPhoto      = str(d, "time_in_photo");
+                String timeOutPhoto     = str(d, "time_out_photo");
+                String timeInWindowOpen  = str(d, "time_in_window_open");
+                String timeInWindowClose = str(d, "time_in_window_close");
+                String timeOutWindowOpen  = str(d, "time_out_window_open");
+                String timeOutWindowClose = str(d, "time_out_window_close");
+                long   updatedAt        = longVal(d, "updated_at");
+                if (eventId <= 0 || studentId == null || studentId.isEmpty()) continue;
+                db.syncUpsertAttendance(eventId, studentId, timeInAt, timeOutAt,
+                        timeInPhoto, timeOutPhoto, timeInWindowOpen, timeInWindowClose,
+                        timeOutWindowOpen, timeOutWindowClose, updatedAt);
+            }
+            Log.d(TAG, "Synced " + docs.size() + " attendance records");
+        } catch (Exception e) {
+            Log.e(TAG, "syncAttendances failed", e);
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static String str(DocumentSnapshot d, String field) {
@@ -181,6 +211,19 @@ public class SyncManager {
             return Integer.parseInt(v.toString());
         } catch (Exception e) {
             return 0;
+        }
+    }
+
+    private static long longVal(DocumentSnapshot d, String field) {
+        try {
+            Object v = d.get(field);
+            if (v == null) return 0L;
+            if (v instanceof Long)   return ((Long) v);
+            if (v instanceof Integer) return ((Integer) v).longValue();
+            if (v instanceof Double) return ((Double) v).longValue();
+            return Long.parseLong(v.toString());
+        } catch (Exception e) {
+            return 0L;
         }
     }
 }
