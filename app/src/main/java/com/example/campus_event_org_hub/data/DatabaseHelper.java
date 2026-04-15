@@ -3215,6 +3215,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return total;
     }
 
+    public int getTotalRegistrationsForCreatorSid(String creatorSid) {
+        int total = 0;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT COUNT(*) FROM " + TABLE_REGISTRATIONS + " r" +
+                    " INNER JOIN " + TABLE_EVENTS + " e ON r." + COLUMN_REG_EVENT_ID +
+                    " = e." + COLUMN_ID +
+                    " WHERE e." + COLUMN_CREATOR_SID + " = ?",
+                    new String[]{creatorSid});
+            if (c != null && c.moveToFirst()) { total = c.getInt(0); c.close(); }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getTotalRegistrationsForCreatorSid failed", e);
+        }
+        return total;
+    }
+
     /**
      * Safe overload — uses the already-open db. Call this from onOpen().
      */

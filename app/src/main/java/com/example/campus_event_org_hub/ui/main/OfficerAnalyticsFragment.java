@@ -31,7 +31,7 @@ public class OfficerAnalyticsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_officer_analytics, container, false);
 
         Bundle args = getArguments();
-        String officerName = args != null ? args.getString("USER_NAME", "") : "";
+        String officerSid = args != null ? args.getString("USER_STUDENT_ID", "") : "";
 
         TextView tvTotalEvents        = view.findViewById(R.id.tv_total_events);
         TextView tvTotalRegistrations = view.findViewById(R.id.tv_total_registrations);
@@ -40,8 +40,8 @@ public class OfficerAnalyticsFragment extends Fragment {
 
         DatabaseHelper db = DatabaseHelper.getInstance(requireContext());
 
-        List<Event> officerEvents = db.getEventsByOfficer(officerName);
-        int totalRegs = db.getTotalRegistrationsForOfficer(officerName);
+        List<Event> officerEvents = db.getEventsByCreatorSid(officerSid);
+        int totalRegs = db.getTotalRegistrationsForCreatorSid(officerSid);
 
         tvTotalEvents.setText(String.valueOf(officerEvents.size()));
         tvTotalRegistrations.setText(String.valueOf(totalRegs));
