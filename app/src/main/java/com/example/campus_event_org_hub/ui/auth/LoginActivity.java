@@ -58,9 +58,16 @@ public class LoginActivity extends AppCompatActivity {
         SessionManager session = new SessionManager(this);
         if (session.isLoggedIn()) {
             Log.d(TAG, "Valid session found, auto-logging in as: " + session.getRole());
-            uploadPendingFcmToken(session.getFirebaseUid());
-            launchHome(session.getName(), session.getRole(), session.getDept(),
-                    session.getEmail(), session.getStudentId());
+            try {
+                uploadPendingFcmToken(session.getFirebaseUid());
+                launchHome(session.getName(), session.getRole(), session.getDept(),
+                        session.getEmail(), session.getStudentId());
+            } catch (Throwable t) {
+                Log.e(TAG, "Auto-login crashed", t);
+                session.clearSession();
+                setContentView(R.layout.activity_login);
+                Toast.makeText(this, "Session error. Please log in again.", Toast.LENGTH_SHORT).show();
+            }
             return;
         }
 
@@ -90,75 +97,93 @@ public class LoginActivity extends AppCompatActivity {
                         Uri.parse("https://www.tiktok.com/"))));
 
         btnLogin.setOnClickListener(v -> {
-            String loginInput = etEmail.getText().toString().trim();
-            String password   = etPassword.getText().toString().trim();
+            try {
+                String loginInput = etEmail.getText().toString().trim();
+                String password   = etPassword.getText().toString().trim();
 
-            Log.d(TAG, "Login attempt with: " + loginInput);
+                Log.d(TAG, "Login attempt with: " + loginInput);
 
-            if (loginInput.isEmpty() || password.isEmpty()) {
-                showLoginToast("Please fill in your Student ID/Email and password.", true);
-                return;
-            }
-
-            if (loginInput.contains("@") && !Patterns.EMAIL_ADDRESS.matcher(loginInput).matches()) {
-                showLoginToast("Please enter a valid email address.", true);
-                return;
-            }
-
-            if (db.isLoginLocked(loginInput) && !isOnline()) {
-                long remainingMs = db.getLoginLockoutRemainingMs(loginInput);
-                int minutes = (int) (remainingMs / 60000) + 1;
-                showLoginToast("Account locked due to too many attempts. Try again in " + minutes + " minute(s).", true);
-                return;
-            }
-
-            btnLogin.setEnabled(false);
-
-            if (isOnline()) {
-                String authEmail = loginInput.contains("@")
-                        ? loginInput
-                        : db.getEmailForLoginInput(loginInput);
-                if (authEmail == null || !authEmail.contains("@")) {
-                    Log.w(TAG, "No email mapping for input=" + loginInput + "; using local login path");
-                    proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                if (loginInput.isEmpty() || password.isEmpty()) {
+                    showLoginToast("Please fill in your Student ID/Email and password.", true);
                     return;
                 }
-                showLoginToast("Signing in...", false);
-                FirebaseAuth.getInstance().signInWithEmailAndPassword(authEmail, password)
-                        .addOnSuccessListener(authResult -> {
-                            FirebaseUser firebaseUser = authResult.getUser();
-                            if (firebaseUser != null) {
-                                firebaseUser.getIdToken(false)
-                                        .addOnSuccessListener(tokenResult -> {
-                                            Object adminClaim = tokenResult.getClaims().get("admin");
-                                            if (Boolean.TRUE.equals(adminClaim)) {
-                                                Log.d(TAG, "Admin custom claim detected — launching AdminActivity");
-                                                String adminUid = firebaseUser.getUid();
-                                                session.saveSession("Admin", "Admin", "Administration", authEmail, "admin", adminUid);
-                                                uploadPendingFcmToken(adminUid);
-                                                Intent intent = new Intent(LoginActivity.this, AdminActivity.class);
-                                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                                startActivity(intent);
-                                                finish();
-                                            } else {
-                                                Log.d(TAG, "Firebase Auth succeeded — fetching user from Firestore directly");
-                                                proceedWithFirestoreLogin(db, session, loginInput, password, firebaseUser.getUid(), btnLogin);
-                                            }
-                                        })
-                                        .addOnFailureListener(e -> {
-                                            Log.w(TAG, "getIdToken failed — proceeding with Firestore login", e);
-                                            proceedWithFirestoreLogin(db, session, loginInput, password, firebaseUser.getUid(), btnLogin);
-                                        });
-                            } else {
-                                proceedWithFirestoreLogin(db, session, loginInput, password, null, btnLogin);
-                            }
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.w(TAG, "Firebase Auth FAILED: " + e.getMessage() + " — falling back to local DB", e);
-                            proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
-                        });
-            } else {
-                proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+
+                if (loginInput.contains("@") && !Patterns.EMAIL_ADDRESS.matcher(loginInput).matches()) {
+                    showLoginToast("Please enter a valid email address.", true);
+                    return;
+                }
+
+                if (db.isLoginLocked(loginInput) && !isOnline()) {
+                    long remainingMs = db.getLoginLockoutRemainingMs(loginInput);
+                    int minutes = (int) (remainingMs / 60000) + 1;
+                    showLoginToast("Account locked due to too many attempts. Try again in " + minutes + " minute(s).", true);
+                    return;
+                }
+
+                btnLogin.setEnabled(false);
+
+                if (isOnline()) {
+                    String authEmail = loginInput.contains("@")
+                            ? loginInput
+                            : db.getEmailForLoginInput(loginInput);
+                    if (authEmail == null || !authEmail.contains("@")) {
+                        Log.w(TAG, "No email mapping for input=" + loginInput + "; using local login path");
+                        proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                        return;
+                    }
+                    showLoginToast("Signing in...", false);
+                    FirebaseAuth.getInstance().signInWithEmailAndPassword(authEmail, password)
+                            .addOnSuccessListener(authResult -> {
+                                try {
+                                    FirebaseUser firebaseUser = authResult.getUser();
+                                    if (firebaseUser != null) {
+                                        firebaseUser.getIdToken(false)
+                                                .addOnSuccessListener(tokenResult -> {
+                                                    try {
+                                                        Object adminClaim = tokenResult.getClaims().get("admin");
+                                                        if (Boolean.TRUE.equals(adminClaim)) {
+                                                            Log.d(TAG, "Admin custom claim detected — launching AdminActivity");
+                                                            String adminUid = firebaseUser.getUid();
+                                                            session.saveSession("Admin", "Admin", "Administration", authEmail, "admin", adminUid);
+                                                            uploadPendingFcmToken(adminUid);
+                                                            Intent intent = new Intent(LoginActivity.this, AdminActivity.class);
+                                                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                                            startActivity(intent);
+                                                            finish();
+                                                        } else {
+                                                            Log.d(TAG, "Firebase Auth succeeded — fetching user from Firestore directly");
+                                                            proceedWithFirestoreLogin(db, session, loginInput, password, firebaseUser.getUid(), btnLogin);
+                                                        }
+                                                    } catch (Throwable t) {
+                                                        Log.e(TAG, "getIdToken callback crashed", t);
+                                                        btnLogin.setEnabled(true);
+                                                        attemptLocalLogin(db, session, loginInput, password);
+                                                    }
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    Log.w(TAG, "getIdToken failed — proceeding with Firestore login", e);
+                                                    proceedWithFirestoreLogin(db, session, loginInput, password, firebaseUser.getUid(), btnLogin);
+                                                });
+                                    } else {
+                                        proceedWithFirestoreLogin(db, session, loginInput, password, null, btnLogin);
+                                    }
+                                } catch (Throwable t) {
+                                    Log.e(TAG, "Firebase Auth success callback crashed", t);
+                                    btnLogin.setEnabled(true);
+                                    attemptLocalLogin(db, session, loginInput, password);
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.w(TAG, "Firebase Auth FAILED: " + e.getMessage() + " — falling back to local DB", e);
+                                proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                            });
+                } else {
+                    proceedWithNormalLogin(db, session, loginInput, password, btnLogin);
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "Login button crashed", t);
+                btnLogin.setEnabled(true);
+                Toast.makeText(this, "Login error. Please try again.", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -172,62 +197,53 @@ public class LoginActivity extends AppCompatActivity {
         final String inputUid = firebaseUid;
         Log.d(TAG, "proceedWithFirestoreLogin: uid=" + inputUid + ", input=" + loginInput);
         new Thread(() -> {
-            FirestoreHelper fsh = new FirestoreHelper();
-            DocumentSnapshot doc = (inputUid != null && !inputUid.isEmpty())
-                    ? fsh.getUserByUid(inputUid) : null;
+            try {
+                FirestoreHelper fsh = new FirestoreHelper();
+                DocumentSnapshot doc = (inputUid != null && !inputUid.isEmpty())
+                        ? fsh.getUserByUid(inputUid) : null;
 
-            if (doc != null && doc.exists()) {
-                String sid          = str(doc, "student_id");
-                String name         = str(doc, "name");
-                String email        = str(doc, "email");
-                String role         = str(doc, "role");
-                String dept         = str(doc, "department");
-                String gender       = str(doc, "gender");
-                String mobile       = str(doc, "mobile");
-                String profileImg   = str(doc, "profile_image");
-                String notifPref    = str(doc, "notif_pref");
-                String hashedPwd    = str(doc, "password");
-                boolean emailVerified = intVal(doc, "email_verified") == 1;
-                FirebaseUser currentAuthUser = FirebaseAuth.getInstance().getCurrentUser();
-                boolean firebaseEmailVerified = currentAuthUser != null && currentAuthUser.isEmailVerified();
-                boolean effectiveEmailVerified = emailVerified || firebaseEmailVerified;
+                if (doc != null && doc.exists()) {
+                    String sid          = str(doc, "student_id");
+                    String name         = str(doc, "name");
+                    String email        = str(doc, "email");
+                    String role         = str(doc, "role");
+                    String dept         = str(doc, "department");
+                    String gender       = str(doc, "gender");
+                    String mobile       = str(doc, "mobile");
+                    String profileImg   = str(doc, "profile_image");
+                    String notifPref    = str(doc, "notif_pref");
+                    String hashedPwd    = str(doc, "password");
+                    boolean emailVerified = intVal(doc, "email_verified") == 1;
+                    String resolvedUid = inputUid;
 
-                Log.d(TAG, "Firestore user found: " + name + " (" + role + "), sid=" + sid
-                        + ", docVerified=" + emailVerified + ", authVerified=" + firebaseEmailVerified
-                        + ", effectiveVerified=" + effectiveEmailVerified);
+                    Log.d(TAG, "Firestore user found: " + name + " (" + role + "), sid=" + sid
+                            + ", docVerified=" + emailVerified);
 
-                if (sid == null || sid.isEmpty()) {
-                    sid = loginInput.contains("@") ? db.getStudentIdForEmail(loginInput) : loginInput;
-                }
-                if (name == null || name.isEmpty()) name = "User";
-                if (role == null || role.isEmpty())  role = "Student";
-                if (dept == null || dept.isEmpty())  dept = "General";
+                    if (sid == null || sid.isEmpty()) {
+                        sid = loginInput.contains("@") ? db.getStudentIdForEmail(loginInput) : loginInput;
+                    }
+                    if (name == null || name.isEmpty()) name = "User";
+                    if (role == null || role.isEmpty())  role = "Student";
+                    if (dept == null || dept.isEmpty())  dept = "General";
 
-                String resolvedUid = inputUid;
-                if (resolvedUid == null || resolvedUid.isEmpty()) {
-                    FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-                    if (u != null) resolvedUid = u.getUid();
-                }
+                    final String finalSid = sid;
+                    final String finalUid = resolvedUid;
+                    final String finalName = name;
+                    final String finalRole = role;
+                    final String finalDept = dept;
+                    final String finalEmail = email;
+                    final boolean finalEv = emailVerified;
 
-                final String finalSid = sid;
-                final String finalUid = resolvedUid;
-                final String finalName = name;
-                final String finalRole = role;
-                final String finalDept = dept;
-                final String finalEmail = email;
-                final boolean finalEv = effectiveEmailVerified;
+                    if (!emailVerified) {
+                        runOnUiThread(() -> {
+                            Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
+                            intent.putExtra("STUDENT_ID", finalSid);
+                            intent.putExtra("EMAIL", finalEmail);
+                            startActivity(intent);
+                        });
+                        return;
+                    }
 
-                if (!effectiveEmailVerified) {
-                    runOnUiThread(() -> {
-                        Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
-                        intent.putExtra("STUDENT_ID", finalSid);
-                        intent.putExtra("EMAIL", finalEmail);
-                        startActivity(intent);
-                    });
-                    return;
-                }
-
-                new Thread(() -> {
                     clearLoginLockouts(db, loginInput, finalSid, finalEmail);
                     db.syncUpsertUser(finalSid, finalName, finalEmail, finalRole, finalDept,
                             gender, mobile, profileImg, notifPref, hashedPwd, finalEv, finalUid);
@@ -238,15 +254,21 @@ public class LoginActivity extends AppCompatActivity {
                     if ("Student".equals(finalRole)) {
                         db.updateLastLogin(finalSid);
                     }
-                }).start();
 
-                runOnUiThread(() -> {
-                    session.saveSession(finalName, finalRole, finalDept, finalEmail, finalSid, finalUid);
-                    uploadPendingFcmToken(finalUid);
-                    launchHome(finalName, finalRole, finalDept, finalEmail, finalSid);
-                });
-            } else {
-                Log.w(TAG, "Firestore user NOT found for uid=" + inputUid + " — falling back to local DB");
+                    runOnUiThread(() -> {
+                        session.saveSession(finalName, finalRole, finalDept, finalEmail, finalSid, finalUid);
+                        uploadPendingFcmToken(finalUid);
+                        launchHome(finalName, finalRole, finalDept, finalEmail, finalSid);
+                    });
+                } else {
+                    Log.w(TAG, "Firestore user NOT found for uid=" + inputUid + " — falling back to local DB");
+                    runOnUiThread(() -> {
+                        btnLogin.setEnabled(true);
+                        attemptLocalLogin(db, session, loginInput, password);
+                    });
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "proceedWithFirestoreLogin crashed — falling back to local login", t);
                 runOnUiThread(() -> {
                     btnLogin.setEnabled(true);
                     attemptLocalLogin(db, session, loginInput, password);
@@ -260,8 +282,14 @@ public class LoginActivity extends AppCompatActivity {
         if (isOnline()) {
             showLoginToast("Syncing your account...", false);
             SyncManager.sync(this, () -> {
-                btnLogin.setEnabled(true);
-                attemptLocalLogin(db, session, loginInput, password);
+                try {
+                    btnLogin.setEnabled(true);
+                    attemptLocalLogin(db, session, loginInput, password);
+                } catch (Throwable t) {
+                    Log.e(TAG, "SyncManager callback crashed", t);
+                    btnLogin.setEnabled(true);
+                    Toast.makeText(LoginActivity.this, "Login error. Please try again.", Toast.LENGTH_SHORT).show();
+                }
             });
         } else {
             btnLogin.setEnabled(true);
@@ -284,21 +312,27 @@ public class LoginActivity extends AppCompatActivity {
         final String firebaseEmail = email;
         FirebaseAuth.getInstance().signInWithEmailAndPassword(firebaseEmail, password)
                 .addOnSuccessListener(authResult -> {
-                    Log.d(TAG, "Firebase Auth confirmed correct password — restoring hash");
-                    // Keep Firebase Auth signed in; the user will proceed to MainActivity
-                    // and their Firestore writes need an authenticated session.
-                    // Store the Firebase UID in SQLite for this user.
-                    FirebaseUser healedUser = authResult.getUser();
-                    if (healedUser != null) {
-                        db.setFirebaseUid(loginInput, healedUser.getUid());
+                    try {
+                        Log.d(TAG, "Firebase Auth confirmed correct password — restoring hash");
+                        // Keep Firebase Auth signed in; the user will proceed to MainActivity
+                        // and their Firestore writes need an authenticated session.
+                        // Store the Firebase UID in SQLite for this user.
+                        FirebaseUser healedUser = authResult.getUser();
+                        if (healedUser != null) {
+                            db.setFirebaseUid(loginInput, healedUser.getUid());
+                        }
+                        new Thread(() -> {
+                            db.restorePassword(loginInput, password);
+                            runOnUiThread(() -> {
+                                // Now retry local login — password is restored
+                                attemptLocalLogin(db, session, loginInput, password);
+                            });
+                        }).start();
+                    } catch (Throwable t) {
+                        Log.e(TAG, "healEmptyPassword success callback crashed", t);
+                        db.incrementLoginAttempts(loginInput);
+                        Toast.makeText(this, "Login error. Please try again.", Toast.LENGTH_SHORT).show();
                     }
-                    new Thread(() -> {
-                        db.restorePassword(loginInput, password);
-                        runOnUiThread(() -> {
-                            // Now retry local login — password is restored
-                            attemptLocalLogin(db, session, loginInput, password);
-                        });
-                    }).start();
                 })
                 .addOnFailureListener(e -> {
                     Log.w(TAG, "Heal failed — Firebase Auth rejected credentials", e);
@@ -347,30 +381,46 @@ public class LoginActivity extends AppCompatActivity {
                     final String fName = name, fRole = role, fDept = dept, fEmail = email, fSid = sid;
                     FirebaseAuth.getInstance().signInWithEmailAndPassword(fEmail, password)
                             .addOnSuccessListener(authResult -> {
-                                FirebaseUser firebaseUser = authResult.getUser();
-                                if (firebaseUser != null) {
-                                    // Store/update Firebase UID
-                                    String uid = firebaseUser.getUid();
-                                    db.setFirebaseUid(fSid, uid);
-                                    firebaseUser.reload().addOnCompleteListener(reloadTask -> {
-                                        FirebaseUser refreshed = FirebaseAuth.getInstance().getCurrentUser();
-                                        if (refreshed != null && refreshed.isEmailVerified()) {
-                                            // Verified! Update local DB and proceed.
-                                            // Keep Firebase Auth signed in so Firestore writes succeed.
-                                            db.setEmailVerified(fSid, true);
-                                            session.saveSession(fName, fRole, fDept, fEmail, fSid, uid);
-                                            uploadPendingFcmToken(uid);
-                                            launchHome(fName, fRole, fDept, fEmail, fSid);
-                                        } else {
-                                            // Still not verified — keep Firebase Auth signed in
-                                            // so EmailVerificationPendingActivity can resend/poll
-                                            Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
-                                            intent.putExtra("STUDENT_ID", fSid);
-                                            intent.putExtra("EMAIL", fEmail);
-                                            startActivity(intent);
-                                        }
-                                    });
-                                } else {
+                                try {
+                                    FirebaseUser firebaseUser = authResult.getUser();
+                                    if (firebaseUser != null) {
+                                        // Store/update Firebase UID
+                                        String uid = firebaseUser.getUid();
+                                        db.setFirebaseUid(fSid, uid);
+                                        firebaseUser.reload().addOnCompleteListener(reloadTask -> {
+                                            try {
+                                                FirebaseUser refreshed = FirebaseAuth.getInstance().getCurrentUser();
+                                                if (refreshed != null && refreshed.isEmailVerified()) {
+                                                    // Verified! Update local DB and proceed.
+                                                    // Keep Firebase Auth signed in so Firestore writes succeed.
+                                                    db.setEmailVerified(fSid, true);
+                                                    session.saveSession(fName, fRole, fDept, fEmail, fSid, uid);
+                                                    uploadPendingFcmToken(uid);
+                                                    launchHome(fName, fRole, fDept, fEmail, fSid);
+                                                } else {
+                                                    // Still not verified — keep Firebase Auth signed in
+                                                    // so EmailVerificationPendingActivity can resend/poll
+                                                    Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
+                                                    intent.putExtra("STUDENT_ID", fSid);
+                                                    intent.putExtra("EMAIL", fEmail);
+                                                    startActivity(intent);
+                                                }
+                                            } catch (Throwable t) {
+                                                Log.e(TAG, "reload callback crashed", t);
+                                                Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
+                                                intent.putExtra("STUDENT_ID", fSid);
+                                                intent.putExtra("EMAIL", fEmail);
+                                                startActivity(intent);
+                                            }
+                                        });
+                                    } else {
+                                        Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
+                                        intent.putExtra("STUDENT_ID", fSid);
+                                        intent.putExtra("EMAIL", fEmail);
+                                        startActivity(intent);
+                                    }
+                                } catch (Throwable t) {
+                                    Log.e(TAG, "Firebase Auth verify callback crashed", t);
                                     Intent intent = new Intent(LoginActivity.this, EmailVerificationPendingActivity.class);
                                     intent.putExtra("STUDENT_ID", fSid);
                                     intent.putExtra("EMAIL", fEmail);
@@ -414,15 +464,20 @@ public class LoginActivity extends AppCompatActivity {
                         && fEmail2 != null && !fEmail2.isEmpty() && isOnline()) {
                     FirebaseAuth.getInstance().signInWithEmailAndPassword(fEmail2, password)
                             .addOnCompleteListener(task -> {
-                                // After silent sign-in, store/update the Firebase UID
-                                FirebaseUser silentUser = FirebaseAuth.getInstance().getCurrentUser();
-                                if (silentUser != null) {
-                                    String uid = silentUser.getUid();
-                                    db.setFirebaseUid(fSid2, uid);
-                                    session.saveSession(fName2, fRole2, fDept2, fEmail2, fSid2, uid);
-                                    uploadPendingFcmToken(uid);
+                                try {
+                                    // After silent sign-in, store/update the Firebase UID
+                                    FirebaseUser silentUser = FirebaseAuth.getInstance().getCurrentUser();
+                                    if (silentUser != null) {
+                                        String uid = silentUser.getUid();
+                                        db.setFirebaseUid(fSid2, uid);
+                                        session.saveSession(fName2, fRole2, fDept2, fEmail2, fSid2, uid);
+                                        uploadPendingFcmToken(uid);
+                                    }
+                                    launchHome(fName2, fRole2, fDept2, fEmail2, fSid2);
+                                } catch (Throwable t) {
+                                    Log.e(TAG, "Silent Firebase sign-in callback crashed", t);
+                                    launchHome(fName2, fRole2, fDept2, fEmail2, fSid2);
                                 }
-                                launchHome(fName2, fRole2, fDept2, fEmail2, fSid2);
                             });
                 } else {
                     launchHome(name, role, dept, email, sid);
@@ -483,20 +538,24 @@ public class LoginActivity extends AppCompatActivity {
 
     private void uploadPendingFcmToken(String firebaseUid) {
         if (firebaseUid == null || firebaseUid.isEmpty()) return;
-        FirestoreHelper fsh = new FirestoreHelper();
-        SharedPreferences prefs = getSharedPreferences("ceoh_fcm", MODE_PRIVATE);
-        String cached = prefs.getString("pending_token", null);
-        if (cached != null && !cached.isEmpty()) {
-            fsh.saveFcmToken(firebaseUid, cached);
-        } else {
-            FirebaseMessaging.getInstance().getToken()
-                    .addOnSuccessListener(token -> {
-                        if (token != null && !token.isEmpty()) {
-                            fsh.saveFcmToken(firebaseUid, token);
-                            prefs.edit().putString("pending_token", token).apply();
-                        }
-                    })
-                    .addOnFailureListener(e -> Log.w(TAG, "getToken failed", e));
+        try {
+            FirestoreHelper fsh = new FirestoreHelper();
+            SharedPreferences prefs = getSharedPreferences("ceoh_fcm", MODE_PRIVATE);
+            String cached = prefs.getString("pending_token", null);
+            if (cached != null && !cached.isEmpty()) {
+                fsh.saveFcmToken(firebaseUid, cached);
+            } else {
+                FirebaseMessaging.getInstance().getToken()
+                        .addOnSuccessListener(token -> {
+                            if (token != null && !token.isEmpty()) {
+                                fsh.saveFcmToken(firebaseUid, token);
+                                prefs.edit().putString("pending_token", token).apply();
+                            }
+                        })
+                        .addOnFailureListener(e -> Log.w(TAG, "getToken failed", e));
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "uploadPendingFcmToken failed (non-critical)", t);
         }
     }
 

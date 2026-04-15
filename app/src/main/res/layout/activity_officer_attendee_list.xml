@@ -173,7 +173,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="@dimen/space_2"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
+                style="@style/Widget.MaterialComponents.Chip.Action"
                 app:chipBackgroundColor="@color/primary_blue"
                 android:textColor="@color/white"
                 android:text="Registered: 0" />
@@ -183,7 +183,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="@dimen/space_2"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
+                style="@style/Widget.MaterialComponents.Chip.Action"
                 app:chipBackgroundColor="@color/primary_green"
                 android:textColor="@color/white"
                 android:text="In: 0" />
@@ -192,7 +192,7 @@
                 android:id="@+id/chip_timed_out"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
+                style="@style/Widget.MaterialComponents.Chip.Action"
                 app:chipBackgroundColor="@color/text_secondary"
                 android:textColor="@color/white"
                 android:text="Out: 0" />

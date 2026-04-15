@@ -30,7 +30,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "ceoh.db";
-    private static final int DATABASE_VERSION = 16; // v16: added courses, academic_settings, promotion_log tables; added orion columns to users
+    private static final int DATABASE_VERSION = 17; // v17: added updated_at to attendance table
 
     // ── Singleton ─────────────────────────────────────────────────────────────
     private static volatile DatabaseHelper instance;
@@ -383,6 +383,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         ensureCoursesTable(db);
         ensureAcademicSettingsTable(db);
         ensurePromotionLogTable(db);
+    }
+
+    @Override
+    public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        Log.w("DatabaseHelper", "Database downgrade from " + oldVersion + " to " + newVersion + " — recreating attendance table");
+        try {
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_ATTENDANCE);
+            db.execSQL(CREATE_TABLE_ATTENDANCE);
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "onDowngrade failed", e);
+        }
     }
 
     @Override
@@ -2948,8 +2959,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Officer confirms the admin's suggested date and time.
+     * Officer proposes a new date and time for a postponed event.
      * Sets the event's date+time and sets status to PENDING for admin re-approval.
+     * Also parses the combined event_time string ("HH:mm - HH:mm") and saves
+     * the individual start_time and end_time columns so the attendance tracker
+     * respects the new schedule.
      */
     public boolean proposeNewDateTimePending(int eventId, String newDate, String newTime) {
         try {
@@ -2958,6 +2972,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_DATE,       newDate);
             v.put(COLUMN_EVENT_TIME, newTime != null ? newTime : "");
             v.put(COLUMN_STATUS,     "PENDING");
+
+            if (newTime != null && newTime.contains("-")) {
+                String[] parts = newTime.split("-");
+                if (parts.length == 2) {
+                    String start = parts[0].trim();
+                    String end   = parts[1].trim();
+                    v.put(COLUMN_START_TIME, start);
+                    v.put(COLUMN_END_TIME,   end);
+                }
+            } else {
+                v.put(COLUMN_START_TIME, "");
+                v.put(COLUMN_END_TIME,   "");
+            }
+
             int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                     new String[]{String.valueOf(eventId)});
             db.close();

@@ -187,7 +187,15 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
             h.btnPostpone.setOnClickListener(v -> {
                 int pos = h.getAdapterPosition();
                 if (pos == RecyclerView.NO_ID) return;
-                showPostponeDialog(events.get(pos), pos);
+                Event ev = events.get(pos);
+                String today = ServerTimeUtil.todayString();
+                String eventDateStr = ev.getDate();
+                if (eventDateStr != null && !eventDateStr.isEmpty() && eventDateStr.compareTo(today) < 0) {
+                    Toast.makeText(AdminEventControlActivity.this,
+                            "Cannot postpone an event that has already ended.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showPostponeDialog(ev, pos);
             });
         }
 

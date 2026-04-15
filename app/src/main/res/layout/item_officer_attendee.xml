@@ -93,7 +93,7 @@
                 android:layout_marginStart="@dimen/space_2"
                 android:textSize="11sp"
                 app:chipMinHeight="28dp"
-                style="@style/Widget.MaterialComponents.Chip.Filter" />
+                style="@style/Widget.MaterialComponents.Chip.Action" />
 
         </LinearLayout>
 
