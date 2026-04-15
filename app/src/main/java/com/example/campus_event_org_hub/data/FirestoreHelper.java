@@ -574,12 +574,12 @@ public class FirestoreHelper {
      *     time_out_window_close(String, "HH:mm")
      *     updated_at           (Int64, Unix ms)
      */
-    public void upsertAttendance(int eventId, String studentId,
-                                 String timeInAt, String timeOutAt,
-                                 String timeInPhoto, String timeOutPhoto,
-                                 String timeInWindowOpen, String timeInWindowClose,
-                                 String timeOutWindowOpen, String timeOutWindowClose,
-                                 long updatedAt) {
+    public boolean upsertAttendance(int eventId, String studentId,
+                                    String timeInAt, String timeOutAt,
+                                    String timeInPhoto, String timeOutPhoto,
+                                    String timeInWindowOpen, String timeInWindowClose,
+                                    String timeOutWindowOpen, String timeOutWindowClose,
+                                    long updatedAt) {
         String docId = eventId + "_" + studentId;
         Map<String, Object> data = new HashMap<>();
         data.put("event_id",              (long) eventId);
@@ -599,14 +599,46 @@ public class FirestoreHelper {
             data.put("time_out_at", new Timestamp(parseDate(timeOutAt)));
         }
 
-        db.collection(COL_ATTENDANCE).document(docId)
-                .set(data, SetOptions.merge())
-                .addOnFailureListener(e -> Log.e(TAG, "upsertAttendance failed for " + docId, e));
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                Tasks.await(
+                        db.collection(COL_ATTENDANCE).document(docId).set(data, SetOptions.merge()),
+                        10, java.util.concurrent.TimeUnit.SECONDS);
+                return true;
+            } catch (Throwable t) {
+                Log.e(TAG, "upsertAttendance attempt " + attempt + " failed for " + docId, t);
+                if (attempt == 1) {
+                    try { Thread.sleep(1000); } catch (InterruptedException ie) { break; }
+                }
+            }
+        }
+        return false;
+    }
+
+    public String[] fetchAttendanceFromFirestore(int eventId, String studentId) {
+        try {
+            String docId = eventId + "_" + studentId;
+            DocumentSnapshot snap = Tasks.await(
+                    db.collection(COL_ATTENDANCE).document(docId).get(),
+                    10, java.util.concurrent.TimeUnit.SECONDS);
+            if (!snap.exists()) return null;
+            String timeInAt = timestampToString(snap.getTimestamp("time_in_at"));
+            String timeOutAt = timestampToString(snap.getTimestamp("time_out_at"));
+            return new String[]{timeInAt, timeOutAt};
+        } catch (Exception e) {
+            Log.e(TAG, "fetchAttendanceFromFirestore failed: eventId=" + eventId + ", studentId=" + studentId, e);
+            return null;
+        }
+    }
+
+    private String timestampToString(Timestamp ts) {
+        if (ts == null) return "";
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(ts.toDate());
     }
 
     private Date parseDate(String dateStr) {
         try {
-            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(dateStr);
+            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).parse(dateStr);
         } catch (Exception e) {
             return new Date();
         }

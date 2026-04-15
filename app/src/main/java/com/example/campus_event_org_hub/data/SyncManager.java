@@ -39,10 +39,10 @@ public class SyncManager {
     private static final long TIMEOUT_SECONDS = 30;
 
     /**
-     * Pull Firestore → SQLite on a background thread (events, users, notifications).
-     * Attendance is NOT included here — use syncAttendancesOnly() separately.
+     * Pull Firestore → SQLite on a background thread (events, users, notifications, attendance).
      * @param onComplete Runnable executed on the calling thread's Looper when sync finishes
      *                   (may be null). Always called even if sync partially fails.
+     *                   Attendance is synced as a one-time backup to the realtime listener.
      */
     public static void sync(Context context, Runnable onComplete) {
         EXECUTOR.execute(() -> {
@@ -54,6 +54,7 @@ public class SyncManager {
             syncUsers(db, fsh);
             syncEvents(db, fsh);
             syncNotifications(db, fsh);
+            syncAttendances(db, fsh);
             long elapsed = System.currentTimeMillis() - startTime;
             Log.d(TAG, "=== SYNC COMPLETE in " + elapsed + "ms ===");
             if (onComplete != null) {
@@ -66,6 +67,7 @@ public class SyncManager {
      * Pull attendance records from Firestore → local SQLite.
      * Call this explicitly from officer/admin screens when attendance data is needed
      * (e.g., when opening the attendee list). Runs on background thread.
+     * Also called automatically during the general sync() as a one-time backup.
      */
     public static void syncAttendancesOnly(Context context, Runnable onComplete) {
         EXECUTOR.execute(() -> {

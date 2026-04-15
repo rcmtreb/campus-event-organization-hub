@@ -2202,125 +2202,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     public int submitTimeOut(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress) {
-        if (eventId <= 0 || studentId == null || studentId.isEmpty() || submittedCode == null || submittedCode.isEmpty()) {
-            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -1, deviceInfo, ipAddress);
-            return -1;
-        }
-
-        if (isRateLimited(eventId, studentId, "OUT")) {
-            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -4, deviceInfo, ipAddress);
-            Log.w("DatabaseHelper", "Time-out blocked due to rate limit: student=" + studentId + ", event=" + eventId);
-            return -4;
-        }
-
-        try {
-            int timeCheck = checkEventTimeWindow(eventId, "OUT");
-            if (timeCheck != 0) {
-                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 4, deviceInfo, ipAddress);
-                return 4; // time window violation (distinct from 3 = already timed out)
-            }
-
-            SQLiteDatabase db = this.getWritableDatabase();
-
-            Cursor ac = db.rawQuery(
-                    "SELECT " + COLUMN_ATT_TIME_IN_AT + ", " + COLUMN_ATT_TIME_OUT_AT +
-                    " FROM " + TABLE_ATTENDANCE +
-                    " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
-                    new String[]{String.valueOf(eventId), studentId});
-            boolean hasTimeIn = false;
-            boolean alreadyOut = false;
-            if (ac != null && ac.moveToFirst()) {
-                String ti = ac.getString(0);
-                String to = ac.getString(1);
-                hasTimeIn  = ti != null && !ti.isEmpty();
-                alreadyOut = to != null && !to.isEmpty();
-                ac.close();
-            }
-            if (!hasTimeIn)  {
-                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 2, deviceInfo, ipAddress);
-                db.close(); return 2;
-            }
-            if (alreadyOut) {
-                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 3, deviceInfo, ipAddress);
-                db.close(); return 3;
-            }
-
-            String activeCode = getActiveAttendanceCode(eventId, studentId, "OUT");
-            boolean codeValid = activeCode != null && activeCode.equals(submittedCode);
-
-            if (!codeValid) {
-                Cursor ec = db.rawQuery(
-                        "SELECT " + COLUMN_TIME_OUT_CODE + " FROM " + TABLE_EVENTS +
-                                " WHERE " + COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
-                String eventCode = "";
-                if (ec != null && ec.moveToFirst()) {
-                    eventCode = ec.getString(0);
-                    ec.close();
-                }
-                if (eventCode != null && !eventCode.isEmpty() && eventCode.equals(submittedCode)) {
-                    codeValid = true;
-                }
-            }
-
-            if (!codeValid) {
-                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 1, deviceInfo, ipAddress);
-                incrementFailedAttempt(eventId, studentId, "OUT");
-                db.close();
-                return 1;
-            }
-
-            // Use server-corrected time to prevent phone clock manipulation.
-            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-                    .format(new java.util.Date(ServerTimeUtil.nowMillis()));
-
-            // Compute and record the time-out window that was active at submission time.
-            // Window: start_time to (end_time + 30min).
-            String winOpen  = "";
-            String winClose = "";
-            try {
-                Cursor wc = db.rawQuery(
-                        "SELECT " + COLUMN_START_TIME + ", " + COLUMN_END_TIME +
-                        " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?",
-                        new String[]{String.valueOf(eventId)});
-                if (wc != null && wc.moveToFirst()) {
-                    String st = wc.getString(0);
-                    String et = wc.getString(1);
-                    wc.close();
-                    int sm = parseTimeToMinutes(st, -1);
-                    int em = parseTimeToMinutes(et, -1);
-                    if (sm >= 0) winOpen  = minutesToHHmm(sm);
-                    if (em >= 0) winClose = minutesToHHmm(em + 30);
-                } else { if (wc != null) wc.close(); }
-            } catch (Exception ignored) {}
-
-            ContentValues av = new ContentValues();
-            av.put(COLUMN_ATT_TIME_OUT_AT, timestamp);
-            av.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN,  winOpen);
-            av.put(COLUMN_ATT_TIME_OUT_WINDOW_CLOSE, winClose);
-            av.put(COLUMN_ATT_UPDATED_AT, System.currentTimeMillis());
-            db.update(TABLE_ATTENDANCE, av,
-                    COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
-                    new String[]{String.valueOf(eventId), studentId});
-
-            if (activeCode != null && activeCode.equals(submittedCode)) {
-                consumeAttendanceCode(eventId, studentId, "OUT", submittedCode);
-            } else {
-                String newCode = generateAttendanceCode();
-                ContentValues cv = new ContentValues();
-                cv.put(COLUMN_TIME_OUT_CODE, newCode);
-                db.update(TABLE_EVENTS, cv, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
-            }
-
-            resetFailedAttempts(eventId, studentId, "OUT");
-            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 0, deviceInfo, ipAddress);
-            db.close();
-            syncAttendanceToFirestore(eventId, studentId);
-            return 0;
-        } catch (Exception e) {
-            Log.e("DatabaseHelper", "submitTimeOut failed", e);
-            logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -1, deviceInfo, ipAddress);
-            return -1;
-        }
+        return submitTimeOut(eventId, studentId, submittedCode, deviceInfo, ipAddress, "");
     }
 
     public int submitTimeOut(int eventId, String studentId, String submittedCode, String deviceInfo, String ipAddress, String photoBase64) {
@@ -2356,7 +2238,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 alreadyOut = to != null && !to.isEmpty();
                 ac.close();
             }
-            if (!hasTimeIn)  { logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 2, deviceInfo, ipAddress); db.close(); return 2; }
+            if (!hasTimeIn) {
+                logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 6, deviceInfo, ipAddress);
+                db.close();
+                return 6;
+            }
             if (alreadyOut)  { logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 3, deviceInfo, ipAddress); db.close(); return 3; }
 
             String activeCode = getActiveAttendanceCode(eventId, studentId, "OUT");
@@ -2395,7 +2281,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 } else { if (wc != null) wc.close(); }
             } catch (Exception ignored) {}
 
-            // Include photo in the UPDATE — no separate UPDATE needed
             ContentValues av = new ContentValues();
             av.put(COLUMN_ATT_TIME_OUT_AT, timestamp);
             av.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN, winOpen);
@@ -2425,6 +2310,38 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", -1, deviceInfo, ipAddress);
             return -1;
         }
+    }
+
+    /**
+     * Time-out submission with Firestore fallback.
+     * If the local SQLite has no time-in record (code 6), tries to fetch from Firestore,
+     * syncs it locally, and retries the time-out.
+     *
+     * Returns the same codes as submitTimeOut, plus:
+     *   6  = no time-in record found locally (will try Firestore fallback)
+     *   61 = no time-in record found in Firestore either
+     */
+    public int submitTimeOutWithFallback(int eventId, String studentId, String submittedCode,
+                                         String deviceInfo, String ipAddress, String photoBase64) {
+        int firstResult = submitTimeOut(eventId, studentId, submittedCode, deviceInfo, ipAddress, photoBase64);
+        if (firstResult != 6) return firstResult;
+
+        // Code 6: no time-in record in local SQLite. Try Firestore.
+        try {
+            String[] fsData = new FirestoreHelper().fetchAttendanceFromFirestore(eventId, studentId);
+            if (fsData != null && fsData[0] != null && !fsData[0].isEmpty()) {
+                // Found time-in in Firestore. Sync it to local SQLite and retry.
+                syncUpsertAttendance(eventId, studentId,
+                        fsData[0], fsData[1],
+                        "", "",
+                        "", "", "", "",
+                        System.currentTimeMillis());
+                return submitTimeOut(eventId, studentId, submittedCode, deviceInfo, ipAddress, photoBase64);
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "submitTimeOutWithFallback Firestore lookup failed", e);
+        }
+        return 61;
     }
 
     /**
@@ -2852,7 +2769,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                      String timeOutWindowOpen, String timeOutWindowClose,
                                      long updatedAt) {
         try {
-            SQLiteDatabase db = this.getWritableDatabase();
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor local = db.rawQuery(
+                    "SELECT " + COLUMN_ATT_UPDATED_AT + " FROM " + TABLE_ATTENDANCE +
+                    " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
+                    new String[]{String.valueOf(eventId), studentId});
+            long localUpdatedAt = 0;
+            if (local != null && local.moveToFirst()) {
+                localUpdatedAt = local.getLong(0);
+            }
+            if (local != null) local.close();
+            db.close();
+
+            if (updatedAt <= localUpdatedAt) {
+                Log.d("DatabaseHelper", "syncUpsertAttendance skipped — local record is same or newer (eventId=" + eventId + ", studentId=" + studentId + ")");
+                return;
+            }
+
+            SQLiteDatabase wdb = this.getWritableDatabase();
             ContentValues v = new ContentValues();
             v.put(COLUMN_ATT_EVENT_ID,            eventId);
             v.put(COLUMN_ATT_STUDENT_ID,          studentId);
@@ -2864,8 +2798,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             v.put(COLUMN_ATT_TIME_IN_WINDOW_CLOSE,  timeInWindowClose  != null ? timeInWindowClose  : "");
             v.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN,  timeOutWindowOpen  != null ? timeOutWindowOpen  : "");
             v.put(COLUMN_ATT_TIME_OUT_WINDOW_CLOSE, timeOutWindowClose != null ? timeOutWindowClose : "");
-            db.insertWithOnConflict(TABLE_ATTENDANCE, null, v, SQLiteDatabase.CONFLICT_REPLACE);
-            db.close();
+            v.put(COLUMN_ATT_UPDATED_AT, updatedAt);
+            wdb.insertWithOnConflict(TABLE_ATTENDANCE, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            wdb.close();
         } catch (Exception e) {
             Log.e("DatabaseHelper", "syncUpsertAttendance failed", e);
         }

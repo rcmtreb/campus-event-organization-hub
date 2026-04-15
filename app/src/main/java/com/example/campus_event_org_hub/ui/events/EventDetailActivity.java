@@ -39,6 +39,7 @@ import java.util.Locale;
 
 import com.example.campus_event_org_hub.R;
 import com.example.campus_event_org_hub.data.DatabaseHelper;
+import com.example.campus_event_org_hub.data.SyncManager;
 import com.example.campus_event_org_hub.model.Event;
 import com.example.campus_event_org_hub.util.ImageUtils;
 import com.example.campus_event_org_hub.util.ServerTimeUtil;
@@ -108,6 +109,8 @@ public class EventDetailActivity extends AppCompatActivity {
         final int eventId = event.getId();
 
         if (event != null) {
+            this.eventRef = event;
+            this.studentIdRef = studentId;
             DatabaseHelper db = DatabaseHelper.getInstance(this);
 
             ImageView  eventImage      = findViewById(R.id.detail_event_image);
@@ -124,6 +127,7 @@ public class EventDetailActivity extends AppCompatActivity {
             Button      registerButton = findViewById(R.id.btn_register);
             MaterialCardView postponedBanner = findViewById(R.id.card_postponed_banner);
             MaterialCardView attendanceCard = findViewById(R.id.card_attendance);
+            this.attendanceCardRef = attendanceCard;
 
             int fallbackBanner = ImageUtils.getDefaultBannerForCategory(event.getCategory());
             ImageUtils.load(this, eventImage, event.getImagePath(), fallbackBanner);
@@ -249,6 +253,13 @@ public class EventDetailActivity extends AppCompatActivity {
         if (activeCheckRunnable != null) {
             activeCheckHandler.postDelayed(activeCheckRunnable, ACTIVE_CHECK_INTERVAL_MS);
         }
+        SyncManager.sync(this, () -> {
+            DatabaseHelper db = DatabaseHelper.getInstance(this);
+            Event fresh = db.getEventById(eventRef != null ? eventRef.getId() : 0);
+            if (fresh != null && attendanceCardRef != null && studentIdRef != null) {
+                bindAttendanceCard(attendanceCardRef, db, fresh, studentIdRef);
+            }
+        });
     }
 
     /**
@@ -428,7 +439,7 @@ public class EventDetailActivity extends AppCompatActivity {
                     }
                     // Disable immediately to prevent double-submission
                     btnTimeOut.setEnabled(false);
-                    int result = db.submitTimeOut(ev.getId(), studentId, code, "", "", pendingTimeOutPhoto);
+                    int result = db.submitTimeOutWithFallback(ev.getId(), studentId, code, "", "", pendingTimeOutPhoto);
                     switch (result) {
                         case 0:
                             Toast.makeText(this, "Time-Out recorded!", Toast.LENGTH_SHORT).show();
@@ -440,7 +451,7 @@ public class EventDetailActivity extends AppCompatActivity {
                             btnTimeOut.setEnabled(true);
                             break;
                         case 2:
-                            Toast.makeText(this, "You must Time-In first.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "It's too early to Time-Out — the event hasn't started yet.", Toast.LENGTH_LONG).show();
                             btnTimeOut.setEnabled(true);
                             break;
                         case 3:
@@ -448,6 +459,14 @@ public class EventDetailActivity extends AppCompatActivity {
                             break;
                         case 4:
                             Toast.makeText(this, "Time-Out window has closed.", Toast.LENGTH_LONG).show();
+                            break;
+                        case 6:
+                            Toast.makeText(this, "No Time-In record found. Try again in a moment.", Toast.LENGTH_LONG).show();
+                            btnTimeOut.setEnabled(true);
+                            break;
+                        case 61:
+                            Toast.makeText(this, "No Time-In record found. Please Time-In first.", Toast.LENGTH_LONG).show();
+                            btnTimeOut.setEnabled(true);
                             break;
                         case -4:
                             Toast.makeText(this, "Too many incorrect attempts. Please wait 15 minutes.", Toast.LENGTH_LONG).show();
