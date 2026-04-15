@@ -870,6 +870,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return null;
     }
 
+    /** Returns the student_id for a given email address. */
+    public String getStudentIdForEmail(String email) {
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            Cursor c = db.rawQuery(
+                    "SELECT " + COLUMN_USER_STUDENT_ID + " FROM " + TABLE_USERS +
+                    " WHERE " + COLUMN_USER_EMAIL + "=? LIMIT 1",
+                    new String[]{email});
+            if (c != null && c.moveToFirst()) {
+                String sid = c.getString(0);
+                c.close();
+                return sid;
+            }
+            if (c != null) c.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "getStudentIdForEmail failed for " + email, e);
+        }
+        return null;
+    }
+
     /** Returns true if a user row exists for this loginInput but their stored password is empty or null. */
     public boolean userExistsWithEmptyPassword(String loginInput) {
         try {
@@ -2752,6 +2772,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.close();
         } catch (Exception e) {
             Log.e("DatabaseHelper", "syncUpsertNotification failed", e);
+        }
+    }
+
+    public void syncUpsertAttendance(int eventId, String studentId, String timeInAt, String timeOutAt,
+                                     String timeInPhoto, String timeOutPhoto,
+                                     String timeInWindowOpen, String timeInWindowClose,
+                                     String timeOutWindowOpen, String timeOutWindowClose,
+                                     long updatedAt) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_ATT_EVENT_ID,            eventId);
+            v.put(COLUMN_ATT_STUDENT_ID,          studentId);
+            v.put(COLUMN_ATT_TIME_IN_AT,          timeInAt       != null ? timeInAt       : "");
+            v.put(COLUMN_ATT_TIME_OUT_AT,         timeOutAt      != null ? timeOutAt      : "");
+            v.put(COLUMN_ATT_TIME_IN_PHOTO,       timeInPhoto    != null ? timeInPhoto    : "");
+            v.put(COLUMN_ATT_TIME_OUT_PHOTO,      timeOutPhoto   != null ? timeOutPhoto   : "");
+            v.put(COLUMN_ATT_TIME_IN_WINDOW_OPEN,   timeInWindowOpen   != null ? timeInWindowOpen   : "");
+            v.put(COLUMN_ATT_TIME_IN_WINDOW_CLOSE,  timeInWindowClose  != null ? timeInWindowClose  : "");
+            v.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN,  timeOutWindowOpen  != null ? timeOutWindowOpen  : "");
+            v.put(COLUMN_ATT_TIME_OUT_WINDOW_CLOSE, timeOutWindowClose != null ? timeOutWindowClose : "");
+            db.insertWithOnConflict(TABLE_ATTENDANCE, null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.close();
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "syncUpsertAttendance failed", e);
         }
     }
 

@@ -32,7 +32,7 @@ public class SyncManager {
 
     private static final String TAG = "SyncManager";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
-    private static final long TIMEOUT_SECONDS = 10;
+    private static final long TIMEOUT_SECONDS = 30;
 
     /**
      * Pull Firestore → SQLite on a background thread (events, users, notifications).
@@ -45,11 +45,13 @@ public class SyncManager {
             DatabaseHelper db   = DatabaseHelper.getInstance(context);
             FirestoreHelper fsh = new FirestoreHelper();
 
+            Log.d(TAG, "=== SYNC START (timeout=" + TIMEOUT_SECONDS + "s) ===");
+            long startTime = System.currentTimeMillis();
             syncUsers(db, fsh);
             syncEvents(db, fsh);
             syncNotifications(db, fsh);
-
-            Log.d(TAG, "Sync complete");
+            long elapsed = System.currentTimeMillis() - startTime;
+            Log.d(TAG, "=== SYNC COMPLETE in " + elapsed + "ms ===");
             if (onComplete != null) {
                 new android.os.Handler(android.os.Looper.getMainLooper()).post(onComplete);
             }
@@ -100,7 +102,8 @@ public class SyncManager {
             }
             Log.d(TAG, "Synced " + docs.size() + " users");
         } catch (Exception e) {
-            Log.e(TAG, "syncUsers failed", e);
+            String msg = e.getMessage();
+            Log.e(TAG, "syncUsers FAILED: " + (msg != null ? msg : "unknown error") + " — login will rely on local DB only", e);
         }
     }
 
@@ -133,7 +136,8 @@ public class SyncManager {
             }
             Log.d(TAG, "Synced " + docs.size() + " events");
         } catch (Exception e) {
-            Log.e(TAG, "syncEvents failed", e);
+            String msg = e.getMessage();
+            Log.e(TAG, "syncEvents FAILED: " + (msg != null ? msg : "unknown error") + " — events may not be up-to-date", e);
         }
     }
 
@@ -162,7 +166,8 @@ public class SyncManager {
             }
             Log.d(TAG, "Synced " + docs.size() + " notifications");
         } catch (Exception e) {
-            Log.e(TAG, "syncNotifications failed", e);
+            String msg = e.getMessage();
+            Log.e(TAG, "syncNotifications FAILED: " + (msg != null ? msg : "unknown error") + " — notifications may not be up-to-date", e);
         }
     }
 
@@ -191,7 +196,8 @@ public class SyncManager {
             }
             Log.d(TAG, "Synced " + docs.size() + " attendance records");
         } catch (Exception e) {
-            Log.e(TAG, "syncAttendances failed", e);
+            String msg = e.getMessage();
+            Log.e(TAG, "syncAttendances FAILED: " + (msg != null ? msg : "unknown error") + " — attendance data may not be up-to-date", e);
         }
     }
 

@@ -34,6 +34,7 @@ public class FirestoreHelper {
     public static final String COL_EVENTS        = "events";
     public static final String COL_REGISTRATIONS = "registrations";
     public static final String COL_NOTIFICATIONS = "notifications";
+    public static final String COL_ATTENDANCE    = "attendance";
 
     private final FirebaseFirestore db;
 
@@ -66,6 +67,19 @@ public class FirestoreHelper {
         db.collection(COL_USERS).document(firebaseUid)
                 .set(data, SetOptions.merge())
                 .addOnFailureListener(e -> Log.e(TAG, "upsertUser failed: uid=" + firebaseUid + " sid=" + studentId, e));
+    }
+
+    public DocumentSnapshot getUserByUid(String firebaseUid) {
+        if (firebaseUid == null || firebaseUid.isEmpty()) {
+            Log.w(TAG, "getUserByUid skipped: no firebaseUid");
+            return null;
+        }
+        try {
+            return Tasks.await(db.collection(COL_USERS).document(firebaseUid).get(), 15, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            Log.e(TAG, "getUserByUid FAILED for uid=" + firebaseUid + ": " + e.getMessage(), e);
+            return null;
+        }
     }
 
     public void upsertUserWithVerification(String firebaseUid, String studentId, String name, String email,
