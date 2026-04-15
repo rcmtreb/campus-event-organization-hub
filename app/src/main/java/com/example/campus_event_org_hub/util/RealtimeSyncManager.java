@@ -7,6 +7,7 @@ import android.util.Log;
 
 import com.example.campus_event_org_hub.data.DatabaseHelper;
 import com.example.campus_event_org_hub.data.FirestoreHelper;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -49,6 +50,7 @@ public class RealtimeSyncManager {
         listenToNotifications();
         listenToRegistrations();
         listenToUsers();
+        listenToAttendance();
         Log.d(TAG, "Realtime listeners started");
     }
 
@@ -87,9 +89,11 @@ public class RealtimeSyncManager {
                         String category   = str(d, "category");
                         String imagePath  = str(d, "image_path");
                         String status     = str(d, "status");
-                        String creatorSid = str(d, "creator_sid");
-                        String timeInCode  = str(d, "time_in_code");
-                        String timeOutCode = str(d, "time_out_code");
+                        String creatorSid   = str(d, "creator_sid");
+                        String timeInCode   = str(d, "time_in_code");
+                        String timeOutCode  = str(d, "time_out_code");
+                        String proposedDate = str(d, "proposed_date");
+                        String proposedTime = str(d, "proposed_time");
                         if (localId <= 0 || title == null || title.isEmpty()) continue;
 
                         if (dc.getType() == DocumentChange.Type.REMOVED) {
@@ -99,7 +103,7 @@ public class RealtimeSyncManager {
                         }
                         dbHelper.syncUpsertEvent(localId, title, desc, date, time, tags,
                                 organizer, category, imagePath, status, creatorSid,
-                                startTime, endTime, timeInCode, timeOutCode);
+                                startTime, endTime, timeInCode, timeOutCode, proposedDate, proposedTime);
                     }
                     notifyChange();
                 });
@@ -202,6 +206,65 @@ public class RealtimeSyncManager {
                     notifyChange();
                 });
         listeners.add(reg);
+    }
+
+    // ── Attendance ─────────────────────────────────────────────────────────
+
+    private void listenToAttendance() {
+        ListenerRegistration reg = db.collection(FirestoreHelper.COL_ATTENDANCE)
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        Log.e(TAG, "Attendance listener error", error);
+                        return;
+                    }
+                    if (snapshots == null || snapshots.isEmpty()) return;
+
+                    DatabaseHelper dbHelper = DatabaseHelper.getInstance(appContext);
+                    for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                        if (dc.getType() == DocumentChange.Type.REMOVED) continue;
+                        com.google.firebase.firestore.DocumentSnapshot d = dc.getDocument();
+                        int    eventId          = intVal(d, "event_id");
+                        String studentId        = str(d, "student_id");
+                        if (eventId <= 0 || studentId == null || studentId.isEmpty()) continue;
+
+                        // Convert Firestore Timestamp fields to String for SQLite
+                        String timeInAt  = timestampToString(d.getTimestamp("time_in_at"));
+                        String timeOutAt = timestampToString(d.getTimestamp("time_out_at"));
+
+                        String timeInPhoto  = str(d, "time_in_photo");
+                        String timeOutPhoto = str(d, "time_out_photo");
+                        String timeInWindowOpen   = str(d, "time_in_window_open");
+                        String timeInWindowClose  = str(d, "time_in_window_close");
+                        String timeOutWindowOpen  = str(d, "time_out_window_open");
+                        String timeOutWindowClose = str(d, "time_out_window_close");
+                        long   updatedAt  = longVal(d, "updated_at");
+
+                        dbHelper.syncUpsertAttendance(eventId, studentId, timeInAt, timeOutAt,
+                                timeInPhoto, timeOutPhoto,
+                                timeInWindowOpen, timeInWindowClose,
+                                timeOutWindowOpen, timeOutWindowClose,
+                                updatedAt);
+                    }
+                    notifyChange();
+                });
+        listeners.add(reg);
+    }
+
+    private String timestampToString(Timestamp ts) {
+        if (ts == null) return "";
+        return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                .format(ts.toDate());
+    }
+
+    private long longVal(com.google.firebase.firestore.DocumentSnapshot d, String field) {
+        try {
+            Object v = d.get(field);
+            if (v == null) return 0L;
+            if (v instanceof Long) return ((Long) v);
+            return Long.parseLong(v.toString());
+        } catch (Exception e) {
+            return 0L;
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -242,11 +242,21 @@ public class NotificationsFragment extends Fragment {
                 (dpView, year, month, day) -> {
                     String chosenDate = String.format(Locale.getDefault(),
                             "%04d-%02d-%02d", year, month + 1, day);
+                    Calendar timeCal = Calendar.getInstance();
                     new TimePickerDialog(requireContext(),
-                            (tpView, hour, minute) -> {
-                                String chosenTime = String.format(Locale.getDefault(),
-                                        "%02d:%02d", hour, minute);
-                                confirmReschedule(item, adapterPos, chosenDate, chosenTime);
+                            (tpView1, hour1, minute1) -> {
+                                String startTime = String.format(Locale.getDefault(),
+                                        "%02d:%02d", hour1, minute1);
+                                new TimePickerDialog(requireContext(),
+                                        (tpView2, hour2, minute2) -> {
+                                            String endTime = String.format(Locale.getDefault(),
+                                                    "%02d:%02d", hour2, minute2);
+                                            String chosenTime = startTime + " - " + endTime;
+                                            confirmReschedule(item, adapterPos, chosenDate, chosenTime);
+                                        },
+                                        timeCal.get(Calendar.HOUR_OF_DAY),
+                                        timeCal.get(Calendar.MINUTE),
+                                        false).show();
                             },
                             cal.get(Calendar.HOUR_OF_DAY),
                             cal.get(Calendar.MINUTE),
@@ -267,15 +277,7 @@ public class NotificationsFragment extends Fragment {
             }
             adapter.notifyItemChanged(adapterPos);
             updateUnreadBadge();
-            String timeDisplay = chosenTime;
-            try {
-                String[] tp = chosenTime.split(":");
-                int h = Integer.parseInt(tp[0]);
-                int m = Integer.parseInt(tp[1]);
-                String ampm = h >= 12 ? "PM" : "AM";
-                int h12 = h % 12; if (h12 == 0) h12 = 12;
-                timeDisplay = String.format(Locale.getDefault(), "%d:%02d %s", h12, m, ampm);
-            } catch (Exception ignored) { }
+            String timeDisplay = formatTimeRange(chosenTime);
 
             // Notify admin that the officer proposed a new date for review
             Bundle args = getArguments();
@@ -294,6 +296,28 @@ public class NotificationsFragment extends Fragment {
         } else {
             Toast.makeText(requireContext(), "Failed to update event.", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private String formatTimeRange(String timeRange) {
+        if (timeRange == null || timeRange.isEmpty()) return "";
+        try {
+            if (timeRange.contains("-")) {
+                String[] parts = timeRange.split("-");
+                return formatTime12h(parts[0].trim()) + " - " + formatTime12h(parts[1].trim());
+            }
+            return formatTime12h(timeRange);
+        } catch (Exception e) { return timeRange; }
+    }
+
+    private String formatTime12h(String t) {
+        try {
+            String[] tp = t.split(":");
+            int h = Integer.parseInt(tp[0]);
+            int m = Integer.parseInt(tp[1]);
+            String ampm = h >= 12 ? "PM" : "AM";
+            int h12 = h % 12; if (h12 == 0) h12 = 12;
+            return String.format(Locale.getDefault(), "%d:%02d %s", h12, m, ampm);
+        } catch (Exception e) { return t; }
     }
 
     // ── Adapter ──────────────────────────────────────────────────────────────

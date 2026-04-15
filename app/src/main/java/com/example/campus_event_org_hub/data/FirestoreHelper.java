@@ -3,6 +3,7 @@ package com.example.campus_event_org_hub.data;
 import android.util.Log;
 
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -10,7 +11,10 @@ import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -324,11 +328,14 @@ public class FirestoreHelper {
                 .addOnFailureListener(e -> Log.e(TAG, "updateEventDateAndStatus failed", e));
     }
 
-    public void updateEventDateTimeAndStatus(int localId, String date, String time, String status) {
+    public void updateEventDateTimeAndStatus(int localId, String date, String time,
+                                            String startTime, String endTime, String status) {
         Map<String, Object> data = new HashMap<>();
-        data.put("date",       date);
-        data.put("event_time", time  != null ? time  : "");
-        data.put("status",     status);
+        data.put("date",        date);
+        data.put("event_time",  time      != null ? time      : "");
+        data.put("start_time",  startTime != null ? startTime : "");
+        data.put("end_time",    endTime   != null ? endTime   : "");
+        data.put("status",      status);
         db.collection(COL_EVENTS).document(String.valueOf(localId))
                 .update(data)
                 .addOnFailureListener(e -> Log.e(TAG, "updateEventDateTimeAndStatus failed", e));
@@ -375,14 +382,16 @@ public class FirestoreHelper {
             String organizer  = snap.getString("organizer");
             String category   = snap.getString("category");
             String imagePath  = snap.getString("image_path");
-            String status     = snap.getString("status");
-            String creatorSid = snap.getString("creator_sid");
-            String timeInCode  = snap.getString("time_in_code");
-            String timeOutCode = snap.getString("time_out_code");
+            String status       = snap.getString("status");
+            String creatorSid   = snap.getString("creator_sid");
+            String timeInCode   = snap.getString("time_in_code");
+            String timeOutCode  = snap.getString("time_out_code");
+            String proposedDate = snap.getString("proposed_date");
+            String proposedTime = snap.getString("proposed_time");
 
             dbHelper.syncUpsertEvent(localId, title, desc, date, time, tags,
                     organizer, category, imagePath, status, creatorSid,
-                    startTime, endTime, timeInCode, timeOutCode);
+                    startTime, endTime, timeInCode, timeOutCode, proposedDate, proposedTime);
             return localId;
         } catch (Exception e) {
             Log.e(TAG, "fetchEventById failed", e);
@@ -543,5 +552,63 @@ public class FirestoreHelper {
         db.collection(COL_NOTIFICATIONS).document(String.valueOf(localNotifId))
                 .update("is_read", 1)
                 .addOnFailureListener(e -> Log.e(TAG, "markNotificationRead failed", e));
+    }
+
+    /**
+     * Upsert an attendance record to Firestore.
+     * Uses event_id + student_id as the composite document ID.
+     *
+     * Firestore document structure:
+     *   Collection: "attendance"
+     *   Doc ID: "{event_id}_{student_id}"
+     *   Fields:
+     *     event_id              (Int64)
+     *     student_id            (String)
+     *     time_in_at           (Timestamp) — null if not yet timed in
+     *     time_out_at          (Timestamp) — null if not yet timed out
+     *     time_in_photo        (String, Base64 JPEG)
+     *     time_out_photo       (String, Base64 JPEG)
+     *     time_in_window_open  (String, "HH:mm")
+     *     time_in_window_close (String, "HH:mm")
+     *     time_out_window_open (String, "HH:mm")
+     *     time_out_window_close(String, "HH:mm")
+     *     updated_at           (Int64, Unix ms)
+     */
+    public void upsertAttendance(int eventId, String studentId,
+                                 String timeInAt, String timeOutAt,
+                                 String timeInPhoto, String timeOutPhoto,
+                                 String timeInWindowOpen, String timeInWindowClose,
+                                 String timeOutWindowOpen, String timeOutWindowClose,
+                                 long updatedAt) {
+        String docId = eventId + "_" + studentId;
+        Map<String, Object> data = new HashMap<>();
+        data.put("event_id",              (long) eventId);
+        data.put("student_id",             studentId != null ? studentId : "");
+        data.put("time_in_photo",         timeInPhoto    != null ? timeInPhoto    : "");
+        data.put("time_out_photo",        timeOutPhoto   != null ? timeOutPhoto   : "");
+        data.put("time_in_window_open",   timeInWindowOpen   != null ? timeInWindowOpen   : "");
+        data.put("time_in_window_close",  timeInWindowClose  != null ? timeInWindowClose  : "");
+        data.put("time_out_window_open",  timeOutWindowOpen  != null ? timeOutWindowOpen  : "");
+        data.put("time_out_window_close", timeOutWindowClose!= null ? timeOutWindowClose : "");
+        data.put("updated_at",            updatedAt);
+
+        if (timeInAt != null && !timeInAt.isEmpty()) {
+            data.put("time_in_at", new Timestamp(parseDate(timeInAt)));
+        }
+        if (timeOutAt != null && !timeOutAt.isEmpty()) {
+            data.put("time_out_at", new Timestamp(parseDate(timeOutAt)));
+        }
+
+        db.collection(COL_ATTENDANCE).document(docId)
+                .set(data, SetOptions.merge())
+                .addOnFailureListener(e -> Log.e(TAG, "upsertAttendance failed for " + docId, e));
+    }
+
+    private Date parseDate(String dateStr) {
+        try {
+            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(dateStr);
+        } catch (Exception e) {
+            return new Date();
+        }
     }
 }

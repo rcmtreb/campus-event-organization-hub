@@ -69,6 +69,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_VENUE         = "venue";
     public static final String COLUMN_TIME_IN_CODE  = "time_in_code";
     public static final String COLUMN_TIME_OUT_CODE = "time_out_code";
+    public static final String COLUMN_PROPOSED_DATE = "proposed_date";
+    public static final String COLUMN_PROPOSED_TIME = "proposed_time";
 
     // Table: Attendance
     public static final String TABLE_ATTENDANCE          = "attendance";
@@ -84,6 +86,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_ATT_TIME_IN_WINDOW_CLOSE = "time_in_window_close";
     public static final String COLUMN_ATT_TIME_OUT_WINDOW_OPEN  = "time_out_window_open";
     public static final String COLUMN_ATT_TIME_OUT_WINDOW_CLOSE = "time_out_window_close";
+    public static final String COLUMN_ATT_UPDATED_AT             = "updated_at";
 
     // Table: Attendance Codes (per student)
     public static final String TABLE_ATTENDANCE_CODES        = "attendance_codes";
@@ -218,7 +221,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_IS_HIDDEN   + " INTEGER DEFAULT 0, " +
             COLUMN_VENUE       + " TEXT DEFAULT '', " +
             COLUMN_TIME_IN_CODE  + " TEXT DEFAULT '', " +
-            COLUMN_TIME_OUT_CODE + " TEXT DEFAULT '')";
+            COLUMN_TIME_OUT_CODE + " TEXT DEFAULT '', " +
+            COLUMN_PROPOSED_DATE + " TEXT DEFAULT '', " +
+            COLUMN_PROPOSED_TIME + " TEXT DEFAULT '')";
 
     private static final String CREATE_TABLE_ATTENDANCE =
             "CREATE TABLE " + TABLE_ATTENDANCE + " (" +
@@ -233,6 +238,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             COLUMN_ATT_TIME_IN_WINDOW_CLOSE  + " TEXT DEFAULT '', " +
             COLUMN_ATT_TIME_OUT_WINDOW_OPEN  + " TEXT DEFAULT '', " +
             COLUMN_ATT_TIME_OUT_WINDOW_CLOSE + " TEXT DEFAULT '', " +
+            COLUMN_ATT_UPDATED_AT + " INTEGER DEFAULT 0, " +
             "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))";
 
     private static final String CREATE_TABLE_ATTENDANCE_CODES =
@@ -647,6 +653,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_TIME_IN_CODE + " TEXT DEFAULT ''");
             if (!cols.contains(COLUMN_TIME_OUT_CODE))
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_TIME_OUT_CODE + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_PROPOSED_DATE))
+                db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_PROPOSED_DATE + " TEXT DEFAULT ''");
+            if (!cols.contains(COLUMN_PROPOSED_TIME))
+                db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN " + COLUMN_PROPOSED_TIME + " TEXT DEFAULT ''");
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureEventTableColumns failed", e);
         } finally {
@@ -668,9 +678,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     COLUMN_ATT_TIME_IN_WINDOW_CLOSE  + " TEXT DEFAULT '', " +
                     COLUMN_ATT_TIME_OUT_WINDOW_OPEN  + " TEXT DEFAULT '', " +
                     COLUMN_ATT_TIME_OUT_WINDOW_CLOSE + " TEXT DEFAULT '', " +
+                    COLUMN_ATT_UPDATED_AT + " INTEGER DEFAULT 0, " +
                     "UNIQUE(" + COLUMN_ATT_EVENT_ID + ", " + COLUMN_ATT_STUDENT_ID + "))");
-            // Add window columns to existing tables (safe no-op if already present)
             migrateAttendanceWindowColumns(db);
+            migrateAttendanceUpdatedAt(db);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "ensureAttendanceTable failed", e);
         }
@@ -703,6 +714,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 // Already exists — safe to ignore
                 Log.d("DatabaseHelper", "migrateAttendanceWindowColumns " + col + ": " + e.getMessage());
             }
+        }
+    }
+
+    /** v17: add updated_at column for Firestore sync tracking. */
+    private void migrateAttendanceUpdatedAt(SQLiteDatabase db) {
+        try {
+            db.execSQL("ALTER TABLE " + TABLE_ATTENDANCE + " ADD COLUMN " + COLUMN_ATT_UPDATED_AT + " INTEGER DEFAULT 0");
+        } catch (Exception e) {
+            Log.d("DatabaseHelper", "migrateAttendanceUpdatedAt: " + e.getMessage());
         }
     }
 
@@ -1397,12 +1417,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    /**
-     * Set (or replace) the Time-Out code for an event.
-     * Persists to local SQLite AND pushes both codes to Firestore so other devices
-     * can receive the code via the next SyncManager run.
-     * Returns true if the local update succeeded.
-     */
     public boolean setTimeOutCode(int eventId, String code) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
@@ -1412,13 +1426,48 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     new String[]{String.valueOf(eventId)});
             db.close();
             if (rows > 0) {
-                // Also push to Firestore so students on other devices receive it.
                 String currentTimeIn = getTimeInCodeForEvent(eventId);
                 new FirestoreHelper().updateEventAttendanceCodes(eventId, currentTimeIn, code);
             }
             return rows > 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "setTimeOutCode failed", e);
+            return false;
+        }
+    }
+
+    /**
+     * Officer counter-proposes a new date/time. Stores proposed date/time and sets status to PENDING.
+     * Parses the combined event_time string ("HH:mm - HH:mm") and saves the individual start/end times.
+     */
+    public boolean proposeNewDateTimePending(int eventId, String newDate, String newTime) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_PROPOSED_DATE, newDate != null ? newDate : "");
+            v.put(COLUMN_PROPOSED_TIME, newTime != null ? newTime : "");
+            v.put(COLUMN_STATUS,        "PENDING");
+
+            String startTime = "";
+            String endTime   = "";
+            if (newTime != null && newTime.contains("-")) {
+                String[] parts = newTime.split("-");
+                if (parts.length == 2) {
+                    startTime = parts[0].trim();
+                    endTime   = parts[1].trim();
+                }
+            }
+
+            int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
+                    new String[]{String.valueOf(eventId)});
+            db.close();
+            if (rows > 0) {
+                new FirestoreHelper().updateEventDateTimeAndStatus(eventId, newDate, newTime,
+                        startTime, endTime, "PENDING");
+            }
+            return rows > 0;
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "proposeNewDateTimePending failed", e);
             return false;
         }
     }
@@ -2110,6 +2159,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             av.put(COLUMN_ATT_TIME_IN_WINDOW_CLOSE, winClose);
             av.put(COLUMN_ATT_TIME_IN_PHOTO, photoBase64 != null ? photoBase64 : "");
             av.put(COLUMN_ATT_TIME_OUT_PHOTO, "");
+            av.put(COLUMN_ATT_UPDATED_AT, System.currentTimeMillis());
             db.insertWithOnConflict(TABLE_ATTENDANCE, null, av, SQLiteDatabase.CONFLICT_IGNORE);
 
             if (activeCode != null && activeCode.equals(submittedCode)) {
@@ -2124,6 +2174,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             resetFailedAttempts(eventId, studentId, "IN");
             logAttendanceAttempt(eventId, studentId, "IN", "SUBMIT", 0, deviceInfo, ipAddress);
             db.close();
+            syncAttendanceToFirestore(eventId, studentId);
             return 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "submitTimeIn with photo failed", e);
@@ -2246,6 +2297,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             av.put(COLUMN_ATT_TIME_OUT_AT, timestamp);
             av.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN,  winOpen);
             av.put(COLUMN_ATT_TIME_OUT_WINDOW_CLOSE, winClose);
+            av.put(COLUMN_ATT_UPDATED_AT, System.currentTimeMillis());
             db.update(TABLE_ATTENDANCE, av,
                     COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
                     new String[]{String.valueOf(eventId), studentId});
@@ -2262,6 +2314,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             resetFailedAttempts(eventId, studentId, "OUT");
             logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 0, deviceInfo, ipAddress);
             db.close();
+            syncAttendanceToFirestore(eventId, studentId);
             return 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "submitTimeOut failed", e);
@@ -2348,6 +2401,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             av.put(COLUMN_ATT_TIME_OUT_WINDOW_OPEN, winOpen);
             av.put(COLUMN_ATT_TIME_OUT_WINDOW_CLOSE, winClose);
             av.put(COLUMN_ATT_TIME_OUT_PHOTO, photoBase64 != null ? photoBase64 : "");
+            av.put(COLUMN_ATT_UPDATED_AT, System.currentTimeMillis());
             db.update(TABLE_ATTENDANCE, av,
                     COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
                     new String[]{String.valueOf(eventId), studentId});
@@ -2364,6 +2418,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             resetFailedAttempts(eventId, studentId, "OUT");
             logAttendanceAttempt(eventId, studentId, "OUT", "SUBMIT", 0, deviceInfo, ipAddress);
             db.close();
+            syncAttendanceToFirestore(eventId, studentId);
             return 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "submitTimeOut with photo failed", e);
@@ -2634,7 +2689,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                  String organizer, String category,
                                  String imagePath, String status, String creatorSid,
                                  String startTime, String endTime,
-                                 String timeInCode, String timeOutCode) {
+                                 String timeInCode, String timeOutCode,
+                                 String proposedDate, String proposedTime) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
 
@@ -2655,17 +2711,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 v.put(COLUMN_TITLE,        title);
                 v.put(COLUMN_DESC,         description);
                 v.put(COLUMN_DATE,         date);
-                v.put(COLUMN_EVENT_TIME,   time       != null ? time       : "");
-                v.put(COLUMN_START_TIME,   startTime  != null ? startTime  : "");
-                v.put(COLUMN_END_TIME,     endTime    != null ? endTime    : "");
-                v.put(COLUMN_TAGS,         tags       != null ? tags       : "");
+                v.put(COLUMN_EVENT_TIME,   time           != null ? time           : "");
+                v.put(COLUMN_START_TIME,   startTime      != null ? startTime      : "");
+                v.put(COLUMN_END_TIME,     endTime        != null ? endTime        : "");
+                v.put(COLUMN_TAGS,         tags           != null ? tags           : "");
                 v.put(COLUMN_ORGANIZER,    organizer);
                 v.put(COLUMN_CATEGORY,     category);
-                v.put(COLUMN_IMAGE_PATH,   imagePath  != null ? imagePath  : "");
+                v.put(COLUMN_IMAGE_PATH,   imagePath      != null ? imagePath      : "");
                 v.put(COLUMN_STATUS,       status);
-                v.put(COLUMN_CREATOR_SID,  creatorSid != null ? creatorSid : "");
-                v.put(COLUMN_TIME_IN_CODE,  timeInCode  != null ? timeInCode  : "");
-                v.put(COLUMN_TIME_OUT_CODE, timeOutCode != null ? timeOutCode : "");
+                v.put(COLUMN_CREATOR_SID,  creatorSid     != null ? creatorSid     : "");
+                v.put(COLUMN_TIME_IN_CODE,  timeInCode     != null ? timeInCode     : "");
+                v.put(COLUMN_TIME_OUT_CODE, timeOutCode    != null ? timeOutCode    : "");
+                v.put(COLUMN_PROPOSED_DATE, proposedDate   != null ? proposedDate   : "");
+                v.put(COLUMN_PROPOSED_TIME, proposedTime   != null ? proposedTime   : "");
                 // venue, is_hidden use column DEFAULT values
                 db.insertWithOnConflict(TABLE_EVENTS, null, v, SQLiteDatabase.CONFLICT_IGNORE);
             } else {
@@ -2675,17 +2733,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 v.put(COLUMN_TITLE,        title);
                 v.put(COLUMN_DESC,         description);
                 v.put(COLUMN_DATE,         date);
-                v.put(COLUMN_EVENT_TIME,   time       != null ? time       : "");
-                v.put(COLUMN_START_TIME,   startTime  != null ? startTime  : "");
-                v.put(COLUMN_END_TIME,     endTime    != null ? endTime    : "");
-                v.put(COLUMN_TAGS,         tags       != null ? tags       : "");
+                v.put(COLUMN_EVENT_TIME,   time           != null ? time           : "");
+                v.put(COLUMN_START_TIME,   startTime      != null ? startTime      : "");
+                v.put(COLUMN_END_TIME,     endTime        != null ? endTime        : "");
+                v.put(COLUMN_TAGS,         tags           != null ? tags           : "");
                 v.put(COLUMN_ORGANIZER,    organizer);
                 v.put(COLUMN_CATEGORY,     category);
-                v.put(COLUMN_IMAGE_PATH,   imagePath  != null ? imagePath  : "");
+                v.put(COLUMN_IMAGE_PATH,   imagePath      != null ? imagePath      : "");
                 v.put(COLUMN_STATUS,       status);
-                v.put(COLUMN_CREATOR_SID,  creatorSid != null ? creatorSid : "");
-                v.put(COLUMN_TIME_IN_CODE,  timeInCode  != null ? timeInCode  : "");
-                v.put(COLUMN_TIME_OUT_CODE, timeOutCode != null ? timeOutCode : "");
+                v.put(COLUMN_CREATOR_SID,  creatorSid     != null ? creatorSid     : "");
+                v.put(COLUMN_TIME_IN_CODE,  timeInCode     != null ? timeInCode     : "");
+                v.put(COLUMN_TIME_OUT_CODE, timeOutCode    != null ? timeOutCode    : "");
+                v.put(COLUMN_PROPOSED_DATE, proposedDate   != null ? proposedDate   : "");
+                v.put(COLUMN_PROPOSED_TIME, proposedTime   != null ? proposedTime   : "");
                 db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
                         new String[]{String.valueOf(localId)});
             }
@@ -2703,7 +2763,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                                  String imagePath, String status, String creatorSid,
                                  String startTime, String endTime) {
         syncUpsertEvent(localId, title, description, date, time, tags, organizer, category,
-                imagePath, status, creatorSid, startTime, endTime, null, null);
+                imagePath, status, creatorSid, startTime, endTime, null, null, "", "");
     }
 
     /**
@@ -2811,6 +2871,52 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Write a single attendance record to Firestore.
+     * Reads the latest data from the local SQLite record and pushes it to Firestore.
+     * Called asynchronously after time-in/time-out (fire-and-forget).
+     */
+    public void syncAttendanceToFirestore(int eventId, String studentId) {
+        new Thread(() -> {
+            try {
+                SQLiteDatabase db = this.getReadableDatabase();
+                Cursor c = db.rawQuery(
+                        "SELECT " + COLUMN_ATT_TIME_IN_AT + ", " + COLUMN_ATT_TIME_OUT_AT + ", " +
+                        COLUMN_ATT_TIME_IN_PHOTO + ", " + COLUMN_ATT_TIME_OUT_PHOTO + ", " +
+                        COLUMN_ATT_TIME_IN_WINDOW_OPEN + ", " + COLUMN_ATT_TIME_IN_WINDOW_CLOSE + ", " +
+                        COLUMN_ATT_TIME_OUT_WINDOW_OPEN + ", " + COLUMN_ATT_TIME_OUT_WINDOW_CLOSE + ", " +
+                        COLUMN_ATT_UPDATED_AT +
+                        " FROM " + TABLE_ATTENDANCE +
+                        " WHERE " + COLUMN_ATT_EVENT_ID + "=? AND " + COLUMN_ATT_STUDENT_ID + "=?",
+                        new String[]{String.valueOf(eventId), studentId});
+                if (c != null && c.moveToFirst()) {
+                    String timeInAt         = c.getString(0);
+                    String timeOutAt        = c.getString(1);
+                    String timeInPhoto      = c.getString(2);
+                    String timeOutPhoto     = c.getString(3);
+                    String timeInWindowOpen  = c.getString(4);
+                    String timeInWindowClose = c.getString(5);
+                    String timeOutWindowOpen = c.getString(6);
+                    String timeOutWindowClose= c.getString(7);
+                    long updatedAt           = c.getLong(8);
+                    c.close();
+                    db.close();
+                    new FirestoreHelper().upsertAttendance(eventId, studentId,
+                            timeInAt, timeOutAt,
+                            timeInPhoto, timeOutPhoto,
+                            timeInWindowOpen, timeInWindowClose,
+                            timeOutWindowOpen, timeOutWindowClose,
+                            updatedAt);
+                } else {
+                    if (c != null) c.close();
+                    db.close();
+                }
+            } catch (Exception e) {
+                Log.e("DatabaseHelper", "syncAttendanceToFirestore failed for event=" + eventId + ", student=" + studentId, e);
+            }
+        }).start();
+    }
+
     // ── Event Operations ──────────────────────────────────────────────────────
 
     public long addEvent(Event event) {
@@ -2854,12 +2960,52 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     public void approveEvent(int eventId) {
-        SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues v = new ContentValues();
-        v.put(COLUMN_STATUS, "APPROVED");
-        db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
-        db.close();
-        new FirestoreHelper().updateEventStatus(eventId, "APPROVED");
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            Cursor c = db.rawQuery("SELECT " + COLUMN_PROPOSED_DATE + ", " + COLUMN_PROPOSED_TIME + ", " + COLUMN_DATE +
+                    " FROM " + TABLE_EVENTS + " WHERE " + COLUMN_ID + "=?",
+                    new String[]{String.valueOf(eventId)});
+            String proposedDate = "";
+            String proposedTime = "";
+            String originalDate = "";
+            if (c != null && c.moveToFirst()) {
+                proposedDate = c.getString(0) != null ? c.getString(0) : "";
+                proposedTime = c.getString(1) != null ? c.getString(1) : "";
+                originalDate = c.getString(2) != null ? c.getString(2) : "";
+                c.close();
+            }
+
+            boolean hasProposedDate = proposedDate != null && !proposedDate.isEmpty();
+
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_STATUS,     "APPROVED");
+            v.put(COLUMN_DATE,      hasProposedDate ? proposedDate : originalDate);
+            v.put(COLUMN_EVENT_TIME, proposedTime);
+            String startTime = "";
+            String endTime   = "";
+            if (proposedTime != null && proposedTime.contains("-")) {
+                String[] parts = proposedTime.split("-");
+                if (parts.length == 2) {
+                    startTime = parts[0].trim();
+                    endTime   = parts[1].trim();
+                }
+            }
+            v.put(COLUMN_START_TIME, startTime);
+            v.put(COLUMN_END_TIME,   endTime);
+            v.put(COLUMN_PROPOSED_DATE, "");
+            v.put(COLUMN_PROPOSED_TIME, "");
+            db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.close();
+
+            if (hasProposedDate) {
+                new FirestoreHelper().updateEventDateTimeAndStatus(eventId, proposedDate, proposedTime,
+                        startTime, endTime, "APPROVED");
+            } else {
+                new FirestoreHelper().updateEventStatus(eventId, "APPROVED");
+            }
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "approveEvent failed", e);
+        }
     }
 
     public void deleteEvent(int eventId) {
@@ -2909,6 +3055,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    public void postponeEventWithDate(int eventId, String proposedDate, String proposedTime,
+                                       String startTime, String endTime) {
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues v = new ContentValues();
+            v.put(COLUMN_STATUS,        "POSTPONED");
+            v.put(COLUMN_PROPOSED_DATE, proposedDate != null ? proposedDate : "");
+            v.put(COLUMN_PROPOSED_TIME, proposedTime != null ? proposedTime : "");
+            db.update(TABLE_EVENTS, v, COLUMN_ID + "=?", new String[]{String.valueOf(eventId)});
+            db.close();
+            new FirestoreHelper().updateEventDateTimeAndStatus(eventId, proposedDate, proposedTime,
+                    startTime, endTime, "POSTPONED");
+        } catch (Exception e) {
+            Log.e("DatabaseHelper", "postponeEventWithDate failed", e);
+        }
+    }
+
     public void startEvent(int eventId) {
         try {
             SQLiteDatabase db = this.getWritableDatabase();
@@ -2954,47 +3117,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             return rows > 0;
         } catch (Exception e) {
             Log.e("DatabaseHelper", "proposeNewDate failed", e);
-            return false;
-        }
-    }
-
-    /**
-     * Officer proposes a new date and time for a postponed event.
-     * Sets the event's date+time and sets status to PENDING for admin re-approval.
-     * Also parses the combined event_time string ("HH:mm - HH:mm") and saves
-     * the individual start_time and end_time columns so the attendance tracker
-     * respects the new schedule.
-     */
-    public boolean proposeNewDateTimePending(int eventId, String newDate, String newTime) {
-        try {
-            SQLiteDatabase db = this.getWritableDatabase();
-            ContentValues v = new ContentValues();
-            v.put(COLUMN_DATE,       newDate);
-            v.put(COLUMN_EVENT_TIME, newTime != null ? newTime : "");
-            v.put(COLUMN_STATUS,     "PENDING");
-
-            if (newTime != null && newTime.contains("-")) {
-                String[] parts = newTime.split("-");
-                if (parts.length == 2) {
-                    String start = parts[0].trim();
-                    String end   = parts[1].trim();
-                    v.put(COLUMN_START_TIME, start);
-                    v.put(COLUMN_END_TIME,   end);
-                }
-            } else {
-                v.put(COLUMN_START_TIME, "");
-                v.put(COLUMN_END_TIME,   "");
-            }
-
-            int rows = db.update(TABLE_EVENTS, v, COLUMN_ID + "=?",
-                    new String[]{String.valueOf(eventId)});
-            db.close();
-            if (rows > 0) {
-                new FirestoreHelper().updateEventDateTimeAndStatus(eventId, newDate, newTime, "PENDING");
-            }
-            return rows > 0;
-        } catch (Exception e) {
-            Log.e("DatabaseHelper", "proposeNewDateTimePending failed", e);
             return false;
         }
     }
@@ -3869,6 +3991,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         int toCodeIdx = c.getColumnIndex(COLUMN_TIME_OUT_CODE);
         String toCode = toCodeIdx >= 0 ? c.getString(toCodeIdx) : "";
         if (toCode == null) toCode = "";
+        int proposedDateIdx = c.getColumnIndex(COLUMN_PROPOSED_DATE);
+        String proposedDate = proposedDateIdx >= 0 ? c.getString(proposedDateIdx) : "";
+        if (proposedDate == null) proposedDate = "";
+        int proposedTimeIdx = c.getColumnIndex(COLUMN_PROPOSED_TIME);
+        String proposedTime = proposedTimeIdx >= 0 ? c.getString(proposedTimeIdx) : "";
+        if (proposedTime == null) proposedTime = "";
         Event e = new Event(
                 c.getInt(c.getColumnIndexOrThrow(COLUMN_ID)),
                 c.getString(c.getColumnIndexOrThrow(COLUMN_TITLE)),
@@ -3887,6 +4015,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         e.setVenue(venue);
         e.setTimeInCode(tiCode);
         e.setTimeOutCode(toCode);
+        e.setProposedDate(proposedDate);
+        e.setProposedTime(proposedTime);
         return e;
     }
 

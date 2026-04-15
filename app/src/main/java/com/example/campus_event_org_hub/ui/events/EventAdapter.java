@@ -101,7 +101,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = eventList.get(position);
         holder.title.setText(event.getTitle());
-        holder.date.setText(event.getDate());
+        String displayDate = event.getDate();
+        String proposedDate = event.getProposedDate();
+        if (proposedDate != null && !proposedDate.isEmpty()) {
+            displayDate = proposedDate;
+        }
+        holder.date.setText(displayDate);
         holder.description.setText(event.getDescription());
         if (holder.startTime != null) {
             holder.startTime.setText(event.getStartTime() != null ? event.getStartTime() : "");
@@ -118,9 +123,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         ImageUtils.load(holder.itemView.getContext(), holder.image,
                 event.getImagePath(), fallbackBanner);
 
-        // Status badge for CANCELLED / POSTPONED (below description)
+        // Status badge for CANCELLED / POSTPONED / RESCHEDULED (below description)
         if (holder.statusBadge != null) {
             String status = event.getStatus();
+            String evtProposedDate = event.getProposedDate();
+            boolean hasProposedDate = evtProposedDate != null && !evtProposedDate.isEmpty();
             if ("CANCELLED".equals(status)) {
                 holder.statusBadge.setVisibility(View.VISIBLE);
                 holder.statusBadge.setText("CANCELLED");
@@ -129,14 +136,20 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 holder.statusBadge.setVisibility(View.VISIBLE);
                 holder.statusBadge.setText("POSTPONED");
                 holder.statusBadge.setBackgroundColor(0xFF7B1FA2);
+            } else if ("PENDING".equals(status) && hasProposedDate) {
+                holder.statusBadge.setVisibility(View.VISIBLE);
+                holder.statusBadge.setText("RESCHEDULED");
+                holder.statusBadge.setBackgroundColor(0xFFE65100);
             } else {
                 holder.statusBadge.setVisibility(View.GONE);
             }
         }
 
-        // Timeline badge: UPCOMING / HAPPENING / ENDED / POSTPONED / CANCELLED
+        // Timeline badge: UPCOMING / HAPPENING / ENDED / POSTPONED / CANCELLED / RESCHEDULED
         if (holder.timelineBadge != null) {
             String status = event.getStatus();
+            String tlProposedDate = event.getProposedDate();
+            boolean hasProposedDate = tlProposedDate != null && !tlProposedDate.isEmpty();
             if ("CANCELLED".equals(status)) {
                 holder.timelineBadge.setText("CANCELLED");
                 holder.timelineBadge.setBackgroundColor(0xFFD32F2F);
@@ -144,6 +157,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             } else if ("POSTPONED".equals(status)) {
                 holder.timelineBadge.setText("POSTPONED");
                 holder.timelineBadge.setBackgroundColor(0xFF7B1FA2);
+                holder.timelineBadge.setVisibility(View.VISIBLE);
+            } else if ("PENDING".equals(status) && hasProposedDate) {
+                holder.timelineBadge.setText("RESCHEDULED");
+                holder.timelineBadge.setBackgroundColor(0xFFE65100);
                 holder.timelineBadge.setVisibility(View.VISIBLE);
             } else if ("APPROVED".equals(status)) {
                 String today = ServerTimeUtil.todayString();

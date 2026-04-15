@@ -4,10 +4,14 @@ import android.content.Context;
 import android.util.Log;
 
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -126,13 +130,15 @@ public class SyncManager {
                 String category   = str(d, "category");
                 String imagePath  = str(d, "image_path");
                 String status     = str(d, "status");
-                String creatorSid = str(d, "creator_sid");
-                String timeInCode  = str(d, "time_in_code");
-                String timeOutCode = str(d, "time_out_code");
+                String creatorSid   = str(d, "creator_sid");
+                String timeInCode   = str(d, "time_in_code");
+                String timeOutCode  = str(d, "time_out_code");
+                String proposedDate = str(d, "proposed_date");
+                String proposedTime = str(d, "proposed_time");
                 if (localId <= 0 || title == null) continue;
                 db.syncUpsertEvent(localId, title, desc, date, time, tags,
                         organizer, category, imagePath, status, creatorSid, startTime, endTime,
-                        timeInCode, timeOutCode);
+                        timeInCode, timeOutCode, proposedDate, proposedTime);
             }
             Log.d(TAG, "Synced " + docs.size() + " events");
         } catch (Exception e) {
@@ -180,8 +186,8 @@ public class SyncManager {
             for (DocumentSnapshot d : docs) {
                 int    eventId          = intVal(d, "event_id");
                 String studentId        = str(d, "student_id");
-                String timeInAt         = str(d, "time_in_at");
-                String timeOutAt        = str(d, "time_out_at");
+                String timeInAt         = timestampToString(d.getTimestamp("time_in_at"));
+                String timeOutAt        = timestampToString(d.getTimestamp("time_out_at"));
                 String timeInPhoto      = str(d, "time_in_photo");
                 String timeOutPhoto     = str(d, "time_out_photo");
                 String timeInWindowOpen  = str(d, "time_in_window_open");
@@ -231,5 +237,10 @@ public class SyncManager {
         } catch (Exception e) {
             return 0L;
         }
+    }
+
+    private static String timestampToString(Timestamp ts) {
+        if (ts == null) return "";
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(ts.toDate());
     }
 }

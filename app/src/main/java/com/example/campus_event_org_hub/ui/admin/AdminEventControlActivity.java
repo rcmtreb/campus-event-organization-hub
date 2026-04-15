@@ -275,40 +275,44 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
                 (view, year, month, day) -> {
                     String suggestedDate = String.format(Locale.getDefault(),
                             "%04d-%02d-%02d", year, month + 1, day);
-                    // After picking date, prompt for a suggested time
+                    // After picking date, prompt for start time
                     Calendar timeCal = Calendar.getInstance();
-                    TimePickerDialog tpd = new TimePickerDialog(this,
-                            (tv, hourOfDay, minute) -> {
-                                String suggestedTime = String.format(Locale.getDefault(),
-                                        "%02d:%02d", hourOfDay, minute);
-                                showPostponeReasonDialog(e, pos, suggestedDate, suggestedTime);
+                    TimePickerDialog startTpd = new TimePickerDialog(this,
+                            (tv1, hour1, minute1) -> {
+                                String startTime = String.format(Locale.getDefault(),
+                                        "%02d:%02d", hour1, minute1);
+                                // Then prompt for end time
+                                TimePickerDialog endTpd = new TimePickerDialog(this,
+                                        (tv2, hour2, minute2) -> {
+                                            String endTime = String.format(Locale.getDefault(),
+                                                    "%02d:%02d", hour2, minute2);
+                                            String suggestedTime = startTime + " - " + endTime;
+                                            showPostponeReasonDialog(e, pos, suggestedDate, suggestedTime, startTime, endTime);
+                                        },
+                                        timeCal.get(Calendar.HOUR_OF_DAY),
+                                        timeCal.get(Calendar.MINUTE),
+                                        false);
+                                endTpd.setTitle("Select End Time");
+                                endTpd.show();
                             },
                             timeCal.get(Calendar.HOUR_OF_DAY),
                             timeCal.get(Calendar.MINUTE),
-                            false /* 12-hour clock */);
-                    tpd.setTitle("Select Suggested New Time");
-                    tpd.show();
+                            false);
+                    startTpd.setTitle("Select Start Time");
+                    startTpd.show();
                 },
                 cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
         dpd.setTitle("Select Suggested New Date");
         dpd.show();
     }
 
-    private void showPostponeReasonDialog(Event e, int pos, String suggestedDate, String suggestedTime) {
+    private void showPostponeReasonDialog(Event e, int pos, String suggestedDate, String suggestedTime,
+                                          String startTime, String endTime) {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_reason, null);
         EditText etReason = dialogView.findViewById(R.id.et_reason);
         EditText etInstructions = dialogView.findViewById(R.id.et_instructions);
 
-        // Format time to 12-hour display for the message
-        String timeDisplay = suggestedTime;
-        try {
-            String[] tp = suggestedTime.split(":");
-            int h = Integer.parseInt(tp[0]);
-            int m = Integer.parseInt(tp[1]);
-            String ampm = h >= 12 ? "PM" : "AM";
-            int h12 = h % 12; if (h12 == 0) h12 = 12;
-            timeDisplay = String.format(Locale.getDefault(), "%d:%02d %s", h12, m, ampm);
-        } catch (Exception ignored) { }
+        String timeDisplay = formatTimeRange(suggestedTime);
 
         new AlertDialog.Builder(this)
                 .setTitle("Postpone Event")
@@ -317,7 +321,7 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
                 .setPositiveButton("Confirm Postpone", (d, w) -> {
                     String reason = etReason.getText().toString().trim();
                     String instructions = etInstructions.getText().toString().trim();
-                    db.postponeEvent(e.getId());
+                    db.postponeEventWithDate(e.getId(), suggestedDate, suggestedTime, startTime, endTime);
                     e.setStatus("POSTPONED");
                     notifyOfficer(e, "POSTPONED", reason, suggestedDate, suggestedTime, instructions);
                     adapter.notifyItemChanged(pos);
@@ -325,6 +329,28 @@ public class AdminEventControlActivity extends com.example.campus_event_org_hub.
                 })
                 .setNegativeButton("Back", null)
                 .show();
+    }
+
+    private String formatTimeRange(String timeRange) {
+        if (timeRange == null || timeRange.isEmpty()) return "";
+        try {
+            if (timeRange.contains("-")) {
+                String[] parts = timeRange.split("-");
+                return formatTime12h(parts[0].trim()) + " - " + formatTime12h(parts[1].trim());
+            }
+            return formatTime12h(timeRange);
+        } catch (Exception e) { return timeRange; }
+    }
+
+    private String formatTime12h(String t) {
+        try {
+            String[] tp = t.split(":");
+            int h = Integer.parseInt(tp[0]);
+            int m = Integer.parseInt(tp[1]);
+            String ampm = h >= 12 ? "PM" : "AM";
+            int h12 = h % 12; if (h12 == 0) h12 = 12;
+            return String.format(Locale.getDefault(), "%d:%02d %s", h12, m, ampm);
+        } catch (Exception e) { return t; }
     }
 
     /**

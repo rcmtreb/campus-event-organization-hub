@@ -2,6 +2,7 @@ package com.example.campus_event_org_hub.ui.main;
 
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -319,30 +320,47 @@ public class OfficerMyEventsFragment extends Fragment {
                 (view, year, month, day) -> {
                     String newDate = String.format(Locale.getDefault(),
                             "%04d-%02d-%02d", year, month + 1, day);
-                    boolean ok = db.proposeNewDateTimePending(e.getId(), newDate, "");
-                    if (ok) {
-                        e.setStatus("PENDING");
-                        notifyAdminsOfProposedDate(e, newDate, db);
-                        Toast.makeText(requireContext(),
-                                "The admin will receive your proposal date.",
-                                Toast.LENGTH_LONG).show();
-                        loadEvents();
-                        showTab(TAB_POSTPONED);
-                    } else {
-                        Toast.makeText(requireContext(), "Failed to update.", Toast.LENGTH_SHORT).show();
-                    }
+                    Calendar timeCal = Calendar.getInstance();
+                    new TimePickerDialog(requireContext(),
+                            (tv1, hour1, minute1) -> {
+                                String startTime = String.format(Locale.getDefault(), "%02d:%02d", hour1, minute1);
+                                new TimePickerDialog(requireContext(),
+                                        (tv2, hour2, minute2) -> {
+                                            String endTime = String.format(Locale.getDefault(), "%02d:%02d", hour2, minute2);
+                                            String newTime = startTime + " - " + endTime;
+                                            boolean ok = db.proposeNewDateTimePending(e.getId(), newDate, newTime);
+                                            if (ok) {
+                                                e.setStatus("PENDING");
+                                                notifyAdminsOfProposedDate(e, newDate, newTime, db);
+                                                Toast.makeText(requireContext(),
+                                                        "The admin will receive your proposal.",
+                                                        Toast.LENGTH_LONG).show();
+                                                loadEvents();
+                                                showTab(TAB_POSTPONED);
+                                            } else {
+                                                Toast.makeText(requireContext(), "Failed to update.", Toast.LENGTH_SHORT).show();
+                                            }
+                                        },
+                                        timeCal.get(Calendar.HOUR_OF_DAY), timeCal.get(Calendar.MINUTE), false)
+                                        .show();
+                            },
+                            timeCal.get(Calendar.HOUR_OF_DAY), timeCal.get(Calendar.MINUTE), false)
+                            .show();
                 },
                 cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
                 .show();
     }
 
-    private void notifyAdminsOfProposedDate(Event e, String proposedDate, DatabaseHelper db) {
-        String message = "Officer proposed a new date (" + proposedDate + ") for the postponed event \""
-                + e.getTitle() + "\". Please review and approve or reject.";
+    private void notifyAdminsOfProposedDate(Event e, String proposedDate, String proposedTime, DatabaseHelper db) {
+        String timeDisplay = proposedTime != null && proposedTime.contains("-")
+                ? proposedTime.split("-")[0].trim() + " to " + proposedTime.split("-")[1].trim()
+                : (proposedTime != null ? proposedTime : "");
+        String message = "Officer proposed a new date/time (" + proposedDate + " " + timeDisplay
+                + ") for the postponed event \"" + e.getTitle() + "\". Please review and approve or reject.";
         List<String> adminIds = db.getAdminStudentIds();
         for (String adminSid : adminIds) {
             db.insertNotification(adminSid, e.getId(), "PENDING",
-                    message, "Officer-proposed reschedule date", proposedDate, "", "");
+                    message, "Officer-proposed reschedule", proposedDate, proposedTime, "");
         }
     }
 

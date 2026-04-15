@@ -19,6 +19,8 @@ public class Event implements Serializable {
     private String venue;
     private String timeInCode;
     private String timeOutCode;
+    private String proposedDate;
+    private String proposedTime;
 
     // Full constructor (with id and time)
     public Event(int id, String title, String description, String date, String time,
@@ -109,6 +111,10 @@ public class Event implements Serializable {
     public void   setTimeInCode(String code) { this.timeInCode = code; }
     public String getTimeOutCode() { return timeOutCode != null ? timeOutCode : ""; }
     public void   setTimeOutCode(String code) { this.timeOutCode = code; }
+    public String getProposedDate() { return proposedDate != null ? proposedDate : ""; }
+    public void   setProposedDate(String proposedDate) { this.proposedDate = proposedDate; }
+    public String getProposedTime() { return proposedTime != null ? proposedTime : ""; }
+    public void   setProposedTime(String proposedTime) { this.proposedTime = proposedTime; }
 
     /** Convenience alias — some views call getEventTime() */
     public String getEventTime()   { return getTime(); }
